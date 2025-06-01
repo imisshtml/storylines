@@ -3,7 +3,7 @@ import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { useAtom } from 'jotai';
-import { fetchCampaignsAtom, initializeRealtimeAtom } from '../src/atoms/campaignAtoms'
+import { fetchCampaignsAtom } from '../src/atoms/campaignAtoms'
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
 // Prevent splash screen from auto-hiding
@@ -17,14 +17,11 @@ export default function RootLayout() {
   });
 
   const [, fetchCampaigns] = useAtom(fetchCampaignsAtom);
-  const [, initializeRealtime] = useAtom(initializeRealtimeAtom);
 
   useEffect(() => {
-    // Initialize Supabase realtime subscription
-    initializeRealtime();
     // Fetch initial campaigns data
     fetchCampaigns();
-  }, [initializeRealtime, fetchCampaigns]);
+  }, [, fetchCampaigns]);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
