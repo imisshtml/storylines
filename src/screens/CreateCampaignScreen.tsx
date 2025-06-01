@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { ChevronRight, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { ChevronRight, CircleAlert as AlertCircle, Save } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { campaignsAtom, currentCampaignAtom, type Campaign } from '../atoms/campaignAtoms';
 import { router } from 'expo-router';
@@ -31,13 +31,26 @@ const contentTags = [
 
 export default function CreateCampaignScreen() {
   const [campaigns, setCampaigns] = useAtom(campaignsAtom);
-  const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
+  const [currentCampaign, setCurrentCampaign] = useAtom(currentCampaignAtom);
   
   const [campaignName, setCampaignName] = useState('');
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
   const [startingLevel, setStartingLevel] = useState('1');
   const [selectedTone, setSelectedTone] = useState<Tone | null>(null);
   const [excludedTags, setExcludedTags] = useState<string[]>([]);
+
+  const isEditing = currentCampaign !== null;
+
+  // Load existing campaign data if editing
+  useEffect(() => {
+    if (currentCampaign) {
+      setCampaignName(currentCampaign.name);
+      setSelectedTheme(currentCampaign.theme);
+      setStartingLevel(currentCampaign.startingLevel.toString());
+      setSelectedTone(currentCampaign.tone);
+      setExcludedTags(currentCampaign.excludedTags);
+    }
+  }, [currentCampaign]);
 
   const toggleTag = (tag: string) => {
     setExcludedTags(prev => 
@@ -47,33 +60,39 @@ export default function CreateCampaignScreen() {
     );
   };
 
-  const handleCreateCampaign = () => {
+  const handleSave = () => {
     if (!campaignName || !selectedTheme || !selectedTone) return;
 
-    const newCampaign: Campaign = {
-      id: Date.now().toString(),
+    const updatedCampaign: Campaign = {
+      ...(currentCampaign || {}),
+      id: currentCampaign?.id || Date.now().toString(),
       name: campaignName,
       theme: selectedTheme,
       startingLevel: parseInt(startingLevel, 10),
       tone: selectedTone,
       excludedTags,
       status: 'creation',
-      players: [{
+      players: currentCampaign?.players || [{
         id: 'host',
         name: 'Game Master',
         ready: false,
       }],
-      inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+      inviteCode: currentCampaign?.inviteCode || Math.random().toString(36).substring(2, 8).toUpperCase(),
     };
 
-    setCampaigns(prev => [...prev, newCampaign]);
-    setCurrentCampaign(newCampaign);
-    router.push('/invite');
+    if (isEditing) {
+      setCampaigns(prev => prev.map(c => c.id === updatedCampaign.id ? updatedCampaign : c));
+    } else {
+      setCampaigns(prev => [...prev, updatedCampaign]);
+    }
+    
+    setCurrentCampaign(updatedCampaign);
+    router.push(isEditing ? '/' : '/invite');
   };
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Create New Campaign</Text>
+      <Text style={styles.title}>{isEditing ? 'Edit Campaign' : 'Create New Campaign'}</Text>
       
       <View style={styles.section}>
         <Text style={styles.label}>Campaign Name</Text>
@@ -168,14 +187,23 @@ export default function CreateCampaignScreen() {
 
       <TouchableOpacity 
         style={[
-          styles.createButton,
-          (!campaignName || !selectedTheme || !selectedTone) && styles.createButtonDisabled
+          styles.actionButton,
+          (!campaignName || !selectedTheme || !selectedTone) && styles.actionButtonDisabled
         ]}
-        onPress={handleCreateCampaign}
+        onPress={handleSave}
         disabled={!campaignName || !selectedTheme || !selectedTone}
       >
-        <Text style={styles.createButtonText}>Create Campaign</Text>
-        <ChevronRight size={20} color="#fff" />
+        {isEditing ? (
+          <>
+            <Save size={20} color="#fff" />
+            <Text style={styles.actionButtonText}>Save Changes</Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.actionButtonText}>Create Campaign</Text>
+            <ChevronRight size={20} color="#fff" />
+          </>
+        )}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -286,7 +314,7 @@ const styles = StyleSheet.create({
   selectedTagText: {
     fontFamily: 'Inter-Bold',
   },
-  createButton: {
+  actionButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 8,
     padding: 16,
@@ -296,13 +324,13 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 40,
   },
-  createButtonDisabled: {
+  actionButtonDisabled: {
     backgroundColor: '#666',
   },
-  createButtonText: {
+  actionButtonText: {
     color: '#fff',
     fontSize: 18,
-    marginRight: 8,
+    marginHorizontal: 8,
     fontFamily: 'Inter-Bold',
   },
 });
