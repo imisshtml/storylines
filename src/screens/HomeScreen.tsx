@@ -1,9 +1,10 @@
+import { router } from 'expo-router';
+import { Play, Users } from 'lucide-react-native';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 
 export default function HomeScreen() {
-  const navigation = useNavigation();
 
   return (
     <View style={styles.container}>
@@ -11,20 +12,28 @@ export default function HomeScreen() {
       
       <View style={styles.campaignsContainer}>
         <Text style={styles.sectionTitle}>Active Campaigns</Text>
-        {/* Campaign list will go here */}
+        <View style={styles.campaignCard}>
+          <Text style={styles.campaignTitle}>The Goblin Caves</Text>
+          <Text style={styles.campaignDetails}>Players: 4 • In Progress</Text>
+          <TouchableOpacity style={styles.continueButton}>
+            <Play size={20} color="#fff" />
+            <Text style={styles.buttonText}>Continue Story</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <TouchableOpacity 
         style={styles.createButton}
-        onPress={() => navigation.navigate('CreateCampaign')}
+        onPress={() => router.push('/create')}
       >
         <Text style={styles.buttonText}>Create Campaign</Text>
       </TouchableOpacity>
 
       <TouchableOpacity 
         style={styles.joinButton}
-        onPress={() => {/* Handle join via code */}}
+        onPress={() => router.push('/join')}
       >
+        <Users size={20} color="#fff" />
         <Text style={styles.buttonText}>Join via Code</Text>
       </TouchableOpacity>
     </View>
@@ -68,5 +77,32 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '600',
+  },
+  campaignTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 18,
+    color: '#fff',
+    marginBottom: 4,
+  },
+  campaignDetails: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 12,
+  },
+  campaignCard: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  continueButton: {
+    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
   },
 });

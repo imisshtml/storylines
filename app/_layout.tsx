@@ -1,16 +1,12 @@
-import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Inter_400Regular, Inter_700Bold, useFonts } from '@expo-google-fonts/inter';
+import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
-import { SplashScreen } from 'expo-router';
+import React, { useEffect } from 'react';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  useFrameworkReady();
-
   const [fontsLoaded, fontError] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Bold': Inter_700Bold,
@@ -28,8 +24,14 @@ export default function RootLayout() {
 
   return (
     <>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack>
+        <Stack.Screen 
+          name="index" 
+          options={{ 
+            headerShown: false,
+            title: 'Home'
+          }} 
+        />
       </Stack>
       <StatusBar style="auto" />
     </>
