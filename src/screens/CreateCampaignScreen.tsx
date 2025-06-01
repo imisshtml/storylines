@@ -66,11 +66,6 @@ export default function CreateCampaignScreen() {
     if (!campaignName || !selectedTheme || !selectedTone) return;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
       const campaignData: Partial<Campaign> = {
         id: currentCampaign?.id,
         name: campaignName,
@@ -80,12 +75,12 @@ export default function CreateCampaignScreen() {
         exclude: excludedTags,
         status: 'creation',
         players: currentCampaign?.players || [{
-          id: user.id,
+          id: 'anon',
           name: 'Game Master',
           ready: false,
         }],
         invite_code: currentCampaign?.invite_code || Math.random().toString(36).substring(2, 8).toUpperCase(),
-        owner: user.id,
+        owner: 'anon',
       };
 
       await upsertCampaign(campaignData);
