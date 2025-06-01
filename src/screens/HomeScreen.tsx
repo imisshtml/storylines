@@ -2,9 +2,25 @@ import { router } from 'expo-router';
 import { Play, Users } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
+import { useAtom } from 'jotai';
+import { campaignsAtom, currentCampaignAtom } from '../atoms/campaignAtoms';
 
 export default function HomeScreen() {
+  const [campaigns] = useAtom(campaignsAtom);
+  const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
+
+  const handleCampaignPress = (campaignId: string) => {
+    const campaign = campaigns.find(c => c.id === campaignId);
+    if (campaign) {
+      setCurrentCampaign(campaign);
+      if (campaign.status === 'creation') {
+        router.push('/invite');
+      } else {
+        // Handle other campaign states
+        router.push('/play');
+      }
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -12,14 +28,37 @@ export default function HomeScreen() {
       
       <View style={styles.campaignsContainer}>
         <Text style={styles.sectionTitle}>Active Campaigns</Text>
-        <View style={styles.campaignCard}>
-          <Text style={styles.campaignTitle}>The Goblin Caves</Text>
-          <Text style={styles.campaignDetails}>Players: 4 • In Progress</Text>
-          <TouchableOpacity style={styles.continueButton}>
-            <Play size={20} color="#fff" />
-            <Text style={styles.buttonText}>Continue Story</Text>
-          </TouchableOpacity>
-        </View>
+        {campaigns.map(campaign => (
+          <View key={campaign.id} style={styles.campaignCard}>
+            <Text style={styles.campaignTitle}>{campaign.name}</Text>
+            <Text style={styles.campaignDetails}>
+              {campaign.status === 'creation' 
+                ? 'In Creation'
+                : `Players: ${campaign.players.length} • ${campaign.status === 'waiting' ? 'Waiting' : 'In Progress'}`
+              }
+            </Text>
+            <TouchableOpacity 
+              style={styles.continueButton}
+              onPress={() => handleCampaignPress(campaign.id)}
+            >
+              {campaign.status === 'creation' ? (
+                <>
+                  <Users size={20} color="#fff" />
+                  <Text style={styles.buttonText}>Invite Friends</Text>
+                </>
+              ) : (
+                <>
+                  <Play size={20} color="#fff" />
+                  <Text style={styles.buttonText}>Continue Story</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        ))}
+        
+        {campaigns.length === 0 && (
+          <Text style={styles.noCampaigns}>No active campaigns</Text>
+        )}
       </View>
 
       <TouchableOpacity 
@@ -44,11 +83,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#1a1a1a',
   },
   logo: {
     fontSize: 32,
-    fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
     textAlign: 'center',
     marginVertical: 20,
   },
@@ -58,25 +98,36 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
     marginBottom: 10,
+  },
+  noCampaigns: {
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 20,
+    fontFamily: 'Inter-Regular',
   },
   createButton: {
     backgroundColor: '#4CAF50',
     padding: 15,
     borderRadius: 8,
     marginBottom: 10,
+    alignItems: 'center',
   },
   joinButton: {
     backgroundColor: '#2196F3',
     padding: 15,
     borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   buttonText: {
     color: 'white',
-    textAlign: 'center',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Inter-Bold',
   },
   campaignTitle: {
     fontFamily: 'Inter-Bold',
@@ -91,7 +142,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   campaignCard: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#2a2a2a',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
