@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, User, PlusCircle } from 'lucide-react-native';
+import { Chrome as Home, User, CirclePlus as PlusCircle } from 'lucide-react-native';
 import { TouchableOpacity, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 
