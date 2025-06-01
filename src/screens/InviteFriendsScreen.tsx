@@ -1,21 +1,30 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator } from 'react-native';
 import { useAtom } from 'jotai';
-import { currentCampaignAtom } from '../atoms/campaignAtoms';
-import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2 } from 'lucide-react-native';
+import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
+import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, AlertCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
 
 export default function InviteFriendsScreen() {
   const [currentCampaign] = useAtom(currentCampaignAtom);
+  const [isLoading] = useAtom(campaignsLoadingAtom);
+  const [error] = useAtom(campaignsErrorAtom);
+  const [, upsertCampaign] = useAtom(upsertCampaignAtom);
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    if (!currentCampaign) {
+      router.replace('/');
+    }
+  }, [currentCampaign]);
+
   if (!currentCampaign) {
-    router.replace('/');
     return null;
   }
 
-  const handleCopyCode = () => {
-    // In a real app, implement clipboard functionality
+  const handleCopyCode = async () => {
+    await Clipboard.setStringAsync(currentCampaign.invite_code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -23,21 +32,48 @@ export default function InviteFriendsScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Join my Storylines campaign! Use code: ${currentCampaign.inviteCode}`,
+        message: `Join my Storylines campaign! Use code: ${currentCampaign.invite_code}`,
       });
     } catch (error) {
       console.error(error);
     }
   };
 
+  const handleStartCampaign = async () => {
+    try {
+      await upsertCampaign({
+        ...currentCampaign,
+        status: 'waiting',
+      });
+      router.replace('/');
+    } catch (err) {
+      console.error('Error starting campaign:', err);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{currentCampaign.name}</Text>
       
+      {error && (
+        <View style={styles.errorContainer}>
+          <AlertCircle color="#f44336" size={20} />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
       <View style={styles.codeContainer}>
         <Text style={styles.codeLabel}>Invite Code</Text>
         <View style={styles.codeBox}>
-          <Text style={styles.code}>{currentCampaign.inviteCode}</Text>
+          <Text style={styles.code}>{currentCampaign.invite_code}</Text>
           <TouchableOpacity style={styles.copyButton} onPress={handleCopyCode}>
             {copied ? (
               <CheckCircle2 size={24} color="#4CAF50" />
@@ -74,6 +110,7 @@ export default function InviteFriendsScreen() {
       <TouchableOpacity 
         style={[styles.readyButton, currentCampaign.players.length < 2 && styles.readyButtonDisabled]}
         disabled={currentCampaign.players.length < 2}
+        onPress={handleStartCampaign}
       >
         <Text style={styles.readyButtonText}>Start Campaign</Text>
       </TouchableOpacity>
@@ -86,6 +123,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1a1a1a',
     padding: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a1515',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  errorText: {
+    color: '#f44336',
+    marginLeft: 8,
+    fontFamily: 'Inter-Regular',
   },
   title: {
     fontSize: 24,

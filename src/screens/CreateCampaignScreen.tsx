@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { ChevronRight, CircleAlert as AlertCircle, Save } from 'lucide-react-native';
 import { useAtom } from 'jotai';
-import { campaignsAtom, currentCampaignAtom, type Campaign } from '../atoms/campaignAtoms';
+import { campaignsLoadingAtom, campaignsErrorAtom, currentCampaignAtom, upsertCampaignAtom, type Campaign } from '../atoms/campaignAtoms';
 import { router } from 'expo-router';
+import { supabase } from '../config/supabase';
 
 type Theme = {
   id: string;
@@ -30,8 +31,10 @@ const contentTags = [
 ];
 
 export default function CreateCampaignScreen() {
-  const [campaigns, setCampaigns] = useAtom(campaignsAtom);
-  const [currentCampaign, setCurrentCampaign] = useAtom(currentCampaignAtom);
+  const [currentCampaign] = useAtom(currentCampaignAtom);
+  const [isLoading] = useAtom(campaignsLoadingAtom);
+  const [error] = useAtom(campaignsErrorAtom);
+  const [, upsertCampaign] = useAtom(upsertCampaignAtom);
   
   const [campaignName, setCampaignName] = useState('');
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
@@ -41,14 +44,13 @@ export default function CreateCampaignScreen() {
 
   const isEditing = currentCampaign !== null;
 
-  // Load existing campaign data if editing
   useEffect(() => {
     if (currentCampaign) {
       setCampaignName(currentCampaign.name);
       setSelectedTheme(currentCampaign.theme);
-      setStartingLevel(currentCampaign.startingLevel.toString());
+      setStartingLevel(currentCampaign.level.toString());
       setSelectedTone(currentCampaign.tone);
-      setExcludedTags(currentCampaign.excludedTags);
+      setExcludedTags(currentCampaign.exclude || []);
     }
   }, [currentCampaign]);
 
@@ -60,40 +62,53 @@ export default function CreateCampaignScreen() {
     );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!campaignName || !selectedTheme || !selectedTone) return;
 
-    const updatedCampaign: Campaign = {
-      ...(currentCampaign || {}),
-      id: currentCampaign?.id || Date.now().toString(),
-      name: campaignName,
-      theme: selectedTheme,
-      startingLevel: parseInt(startingLevel, 10),
-      tone: selectedTone,
-      excludedTags,
-      status: 'creation',
-      players: currentCampaign?.players || [{
-        id: 'host',
-        name: 'Game Master',
-        ready: false,
-      }],
-      inviteCode: currentCampaign?.inviteCode || Math.random().toString(36).substring(2, 8).toUpperCase(),
-    };
+    try {
+      const campaignData: Partial<Campaign> = {
+        id: currentCampaign?.id,
+        name: campaignName,
+        theme: selectedTheme,
+        level: parseInt(startingLevel, 10),
+        tone: selectedTone,
+        exclude: excludedTags,
+        status: 'creation',
+        players: currentCampaign?.players || [{
+          id: 'anon',
+          name: 'Game Master',
+          ready: false,
+        }],
+        invite_code: currentCampaign?.invite_code || Math.random().toString(36).substring(2, 8).toUpperCase(),
+        owner: 'anon',
+      };
 
-    if (isEditing) {
-      setCampaigns(prev => prev.map(c => c.id === updatedCampaign.id ? updatedCampaign : c));
-    } else {
-      setCampaigns(prev => [...prev, updatedCampaign]);
+      await upsertCampaign(campaignData);
+      router.push(isEditing ? '/' : '/invite');
+    } catch (err) {
+      console.error('Error saving campaign:', err);
     }
-    
-    setCurrentCampaign(updatedCampaign);
-    router.push(isEditing ? '/' : '/invite');
   };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>{isEditing ? 'Edit Campaign' : 'Create New Campaign'}</Text>
       
+      {error && (
+        <View style={styles.errorContainer}>
+          <AlertCircle color="#f44336" size={20} />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
       <View style={styles.section}>
         <Text style={styles.label}>Campaign Name</Text>
         <TextInput
@@ -125,7 +140,7 @@ export default function CreateCampaignScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Starting Level (Optional)</Text>
+        <Text style={styles.label}>Starting Level</Text>
         <TextInput
           style={styles.input}
           value={startingLevel}
@@ -214,6 +229,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1a1a1a',
     padding: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a1515',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  errorText: {
+    color: '#f44336',
+    marginLeft: 8,
+    fontFamily: 'Inter-Regular',
   },
   title: {
     fontSize: 24,
