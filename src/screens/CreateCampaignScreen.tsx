@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { ChevronRight, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { useAtom } from 'jotai';
+import { campaignsAtom, currentCampaignAtom, type Campaign } from '../atoms/campaignAtoms';
+import { router } from 'expo-router';
 
 type Theme = {
   id: string;
@@ -27,6 +30,9 @@ const contentTags = [
 ];
 
 export default function CreateCampaignScreen() {
+  const [campaigns, setCampaigns] = useAtom(campaignsAtom);
+  const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
+  
   const [campaignName, setCampaignName] = useState('');
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
   const [startingLevel, setStartingLevel] = useState('1');
@@ -39,6 +45,30 @@ export default function CreateCampaignScreen() {
         ? prev.filter(t => t !== tag)
         : [...prev, tag]
     );
+  };
+
+  const handleCreateCampaign = () => {
+    if (!campaignName || !selectedTheme || !selectedTone) return;
+
+    const newCampaign: Campaign = {
+      id: Date.now().toString(),
+      name: campaignName,
+      theme: selectedTheme,
+      startingLevel: parseInt(startingLevel, 10),
+      tone: selectedTone,
+      excludedTags,
+      status: 'creation',
+      players: [{
+        id: 'host',
+        name: 'Game Master',
+        ready: false,
+      }],
+      inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+    };
+
+    setCampaigns(prev => [...prev, newCampaign]);
+    setCurrentCampaign(newCampaign);
+    router.push('/invite');
   };
 
   return (
@@ -136,7 +166,14 @@ export default function CreateCampaignScreen() {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.createButton}>
+      <TouchableOpacity 
+        style={[
+          styles.createButton,
+          (!campaignName || !selectedTheme || !selectedTone) && styles.createButtonDisabled
+        ]}
+        onPress={handleCreateCampaign}
+        disabled={!campaignName || !selectedTheme || !selectedTone}
+      >
         <Text style={styles.createButtonText}>Create Campaign</Text>
         <ChevronRight size={20} color="#fff" />
       </TouchableOpacity>
@@ -258,6 +295,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 20,
     marginBottom: 40,
+  },
+  createButtonDisabled: {
+    backgroundColor: '#666',
   },
   createButtonText: {
     color: '#fff',
