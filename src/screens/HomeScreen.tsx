@@ -37,15 +37,7 @@ export default function HomeScreen() {
       imageStyle={styles.backgroundImage}
     >
       <View style={styles.overlay}>
-        <TouchableOpacity 
-          onPress={() => {
-            if (__DEV__) {
-              router.push('/dev');
-            }
-          }}
-        >
-          <Text style={styles.logo}>Storylines</Text>
-        </TouchableOpacity>
+        <Text style={styles.logo}>Storylines</Text>
         
         <View style={styles.campaignsContainer}>
           <Text style={styles.sectionTitle}>Campaigns Happening Now</Text>
