@@ -17,7 +17,7 @@ export default function HomeScreen() {
           <Text style={styles.campaignDetails}>Players: 4 • In Progress</Text>
           <TouchableOpacity style={styles.continueButton}>
             <Play size={20} color="#fff" />
-            <Text style={styles.buttonText}>Continue Story!</Text>
+            <Text style={styles.buttonText}>Continue Story</Text>
           </TouchableOpacity>
         </View>
       </View>
