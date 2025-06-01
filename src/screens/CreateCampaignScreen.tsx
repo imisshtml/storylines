@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { ChevronRight, AlertCircle } from 'lucide-react-native';
+import { ChevronRight, CircleAlert as AlertCircle } from 'lucide-react-native';
 
 type Theme = {
   id: string;
