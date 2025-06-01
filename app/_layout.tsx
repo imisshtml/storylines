@@ -2,6 +2,8 @@ import { Inter_400Regular, Inter_700Bold, useFonts } from '@expo-google-fonts/in
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
+import { useAtom } from 'jotai';
+import { fetchCampaignsAtom, initializeRealtimeAtom } from '../src/atoms/campaignAtoms';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -11,6 +13,16 @@ export default function RootLayout() {
     'Inter-Regular': Inter_400Regular,
     'Inter-Bold': Inter_700Bold,
   });
+
+  const [, fetchCampaigns] = useAtom(fetchCampaignsAtom);
+  const [, initializeRealtime] = useAtom(initializeRealtimeAtom);
+
+  useEffect(() => {
+    // Initialize Supabase realtime subscription
+    initializeRealtime();
+    // Fetch initial campaigns data
+    fetchCampaigns();
+  }, [initializeRealtime, fetchCampaigns]);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
