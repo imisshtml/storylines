@@ -36,10 +36,14 @@ export default function RootLayout() {
     <>
       <Stack>
         <Stack.Screen 
-          name="index" 
+          name="(tabs)" 
+          options={{ headerShown: false }} 
+        />
+        <Stack.Screen 
+          name="dev" 
           options={{ 
-            headerShown: false,
-            title: 'Home'
+            presentation: 'modal',
+            headerShown: false 
           }} 
         />
       </Stack>
