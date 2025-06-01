@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Play, Users } from 'lucide-react-native';
+import { Play, Users, Settings } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAtom } from 'jotai';
@@ -22,6 +22,14 @@ export default function HomeScreen() {
     }
   };
 
+  const handleSettingsPress = (campaignId: string) => {
+    const campaign = campaigns.find(c => c.id === campaignId);
+    if (campaign) {
+      setCurrentCampaign(campaign);
+      router.push('/create');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.logo}>Storylines</Text>
@@ -30,7 +38,17 @@ export default function HomeScreen() {
         <Text style={styles.sectionTitle}>Active Campaigns</Text>
         {campaigns.map(campaign => (
           <View key={campaign.id} style={styles.campaignCard}>
-            <Text style={styles.campaignTitle}>{campaign.name}</Text>
+            <View style={styles.campaignHeader}>
+              <Text style={styles.campaignTitle}>{campaign.name}</Text>
+              {campaign.status === 'creation' && (
+                <TouchableOpacity 
+                  style={styles.settingsButton}
+                  onPress={() => handleSettingsPress(campaign.id)}
+                >
+                  <Settings size={20} color="#888" />
+                </TouchableOpacity>
+              )}
+            </View>
             <Text style={styles.campaignDetails}>
               {campaign.status === 'creation' 
                 ? 'In Creation'
@@ -124,16 +142,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
+  campaignHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   campaignTitle: {
     fontFamily: 'Inter-Bold',
     fontSize: 18,
     color: '#fff',
-    marginBottom: 4,
+  },
+  settingsButton: {
+    padding: 4,
   },
   campaignDetails: {
     fontFamily: 'Inter-Regular',
@@ -155,5 +176,10 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     gap: 8,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
   },
 });
