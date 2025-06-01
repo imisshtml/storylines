@@ -10,7 +10,6 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  useFrameworkReady();
   const [fontsLoaded, fontError] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Bold': Inter_700Bold,
@@ -37,14 +36,10 @@ export default function RootLayout() {
     <>
       <Stack>
         <Stack.Screen 
-          name="(tabs)" 
-          options={{ headerShown: false }} 
-        />
-        <Stack.Screen 
-          name="dev" 
+          name="index" 
           options={{ 
-            presentation: 'modal',
-            headerShown: false 
+            headerShown: false,
+            title: 'Home'
           }} 
         />
       </Stack>
