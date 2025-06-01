@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView } from 'react-native';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
-import { Copy, Share as ShareIcon, Users, CheckCircle2 } from 'lucide-react-native';
+import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2 } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 export default function InviteFriendsScreen() {
