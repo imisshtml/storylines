@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator } from 'react-native';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
@@ -13,8 +13,13 @@ export default function InviteFriendsScreen() {
   const [, upsertCampaign] = useAtom(upsertCampaignAtom);
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    if (!currentCampaign) {
+      router.replace('/');
+    }
+  }, [currentCampaign]);
+
   if (!currentCampaign) {
-    router.replace('/');
     return null;
   }
 
