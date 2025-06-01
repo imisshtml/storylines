@@ -42,6 +42,21 @@ export default function RootLayout() {
             title: 'Home'
           }} 
         />
+        <Stack.Screen 
+          name="(tabs)" 
+          options={{ 
+            headerShown: false,
+            title: 'Tabs'
+          }} 
+        />
+        <Stack.Screen 
+          name="story" 
+          options={{ 
+            headerShown: false,
+            title: 'Story',
+            presentation: 'fullScreenModal'
+          }} 
+        />
       </Stack>
       <StatusBar style="auto" />
     </>
