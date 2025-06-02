@@ -17,7 +17,6 @@ export default function HomeScreen() {
         router.push('/invite');
       } else {
         // Handle other campaign states
-        console.log(':::: story')
         router.push('/story');
       }
     }
