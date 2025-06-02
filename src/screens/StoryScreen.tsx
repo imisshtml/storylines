@@ -10,8 +10,10 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  Animated,
 } from 'react-native';
-import { Send, Home, User2 } from 'lucide-react-native';
+import { Send, Home, User2, X } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
@@ -19,6 +21,7 @@ import { currentCampaignAtom } from '../atoms/campaignAtoms';
 export default function StoryScreen() {
   const [userInput, setUserInput] = useState('');
   const [currentCampaign] = useAtom(currentCampaignAtom);
+  const [isCharacterSheetVisible, setIsCharacterSheetVisible] = useState(false);
 
   const handleSend = () => {
     if (userInput.trim()) {
@@ -28,11 +31,11 @@ export default function StoryScreen() {
   };
 
   const handleHomePress = () => {
-    router.push('/index');
+    router.back();
   };
 
   const handleCharacterPress = () => {
-    router.push('/story/character');
+    setIsCharacterSheetVisible(true);
   };
 
   return (
@@ -97,6 +100,30 @@ export default function StoryScreen() {
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
+
+        <Modal
+          visible={isCharacterSheetVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setIsCharacterSheetVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.bottomSheet}>
+              <View style={styles.bottomSheetHeader}>
+                <Text style={styles.bottomSheetTitle}>Character</Text>
+                <TouchableOpacity 
+                  onPress={() => setIsCharacterSheetVisible(false)}
+                  style={styles.closeButton}
+                >
+                  <X size={24} color="#2a2a2a" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.bottomSheetContent}>
+                <Text style={styles.characterText}>Character sheet content coming soon...</Text>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </ImageBackground>
   );
@@ -198,5 +225,41 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: '#2a2a2a',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  bottomSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    minHeight: '50%',
+    maxHeight: '75%',
+  },
+  bottomSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  bottomSheetTitle: {
+    fontSize: 20,
+    color: '#2a2a2a',
+    fontFamily: 'Inter-Bold',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  bottomSheetContent: {
+    padding: 16,
+  },
+  characterText: {
+    fontSize: 16,
+    color: '#2a2a2a',
+    fontFamily: 'Inter-Regular',
   },
 });
