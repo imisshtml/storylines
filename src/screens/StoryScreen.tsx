@@ -11,12 +11,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
-  Animated,
 } from 'react-native';
 import { Send, Home, User2, X } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
+import CharacterView from '../components/CharacterView';
 
 export default function StoryScreen() {
   const [userInput, setUserInput] = useState('');
@@ -110,17 +110,18 @@ export default function StoryScreen() {
           <View style={styles.modalOverlay}>
             <View style={styles.bottomSheet}>
               <View style={styles.bottomSheetHeader}>
-                <Text style={styles.bottomSheetTitle}>Character</Text>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.characterName}>Eldric the Brave</Text>
+                  <Text style={styles.characterClass}>Level 5 Warrior</Text>
+                </View>
                 <TouchableOpacity 
                   onPress={() => setIsCharacterSheetVisible(false)}
                   style={styles.closeButton}
                 >
-                  <X size={24} color="#2a2a2a" />
+                  <X size={24} color="#fff" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={styles.bottomSheetContent}>
-                <Text style={styles.characterText}>Character sheet content coming soon...</Text>
-              </ScrollView>
+              <CharacterView />
             </View>
           </View>
         </Modal>
@@ -235,31 +236,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    minHeight: '50%',
-    maxHeight: '75%',
+    height: '90%',
   },
   bottomSheetHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  bottomSheetTitle: {
-    fontSize: 20,
-    color: '#2a2a2a',
-    fontFamily: 'Inter-Bold',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    backgroundColor: 'rgb(26, 26, 26)',
   },
   closeButton: {
     padding: 4,
   },
-  bottomSheetContent: {
-    padding: 16,
+  characterName: {
+    fontSize: 24,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
   },
-  characterText: {
+  characterClass: {
     fontSize: 16,
-    color: '#2a2a2a',
+    color: '#4CAF50',
     fontFamily: 'Inter-Regular',
+    marginTop: 4,
+  },
+  sheetHeader: {
+    //padding: 16,
+    
   },
 });
