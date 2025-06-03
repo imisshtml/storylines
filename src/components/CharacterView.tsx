@@ -101,11 +101,6 @@ export default function CharacterView() {
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <Text style={styles.characterName}>Eldric the Brave</Text>
-          <Text style={styles.characterClass}>Level 5 Warrior</Text>
-        </View>
-
         <View style={styles.tabs}>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'stats' && styles.activeTab]}
@@ -155,24 +150,13 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 16,
-    backgroundColor: 'rgba(26, 26, 26, 0.9)',
+    backgroundColor: 'rgb(26, 26, 26)',
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
-  characterName: {
-    fontSize: 24,
-    color: '#fff',
-    fontFamily: 'Inter-Bold',
-  },
-  characterClass: {
-    fontSize: 16,
-    color: '#4CAF50',
-    fontFamily: 'Inter-Regular',
-    marginTop: 4,
-  },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(26, 26, 26, 0.9)',
+    backgroundColor: 'rgb(26, 26, 26)',
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
