@@ -17,7 +17,7 @@ export default function HomeScreen() {
         router.push('/invite');
       } else {
         // Handle other campaign states
-        router.push('/play');
+        router.push('/story');
       }
     }
   };
@@ -42,7 +42,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
         
         <View style={styles.campaignsContainer}>
-          <Text style={styles.sectionTitle}>Campaigns Happening Now</Text>
+          <Text style={styles.sectionTitle}>Campaigns Happening Now!</Text>
           {campaigns.map(campaign => (
             <View key={campaign.id} style={styles.campaignCard}>
               <View style={styles.campaignHeader}>

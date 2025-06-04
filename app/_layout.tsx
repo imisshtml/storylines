@@ -4,7 +4,6 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { useAtom } from 'jotai';
 import { fetchCampaignsAtom } from '../src/atoms/campaignAtoms'
-import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -34,13 +33,16 @@ export default function RootLayout() {
 
   return (
     <>
-      <Stack>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="home" />
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen 
-          name="index" 
-          options={{ 
-            headerShown: false,
-            title: 'Home'
-          }} 
+          name="story" 
+          options={{
+            presentation: 'fullScreenModal',
+            animation: 'fade',
+          }}
         />
       </Stack>
       <StatusBar style="auto" />
