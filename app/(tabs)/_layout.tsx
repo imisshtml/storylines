@@ -1,11 +1,7 @@
 import { Tabs } from 'expo-router';
-import { Chrome as Home, User, CirclePlus as PlusCircle } from 'lucide-react-native';
-import { TouchableOpacity, Text } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Home, User, PlusCircle } from 'lucide-react-native';
 
 export default function TabLayout() {
-  const router = useRouter();
-
   return (
     <Tabs
       screenOptions={{
@@ -19,23 +15,6 @@ export default function TabLayout() {
           backgroundColor: '#1a1a1a',
         },
         headerTintColor: '#fff',
-        headerTitle: ({ children }) => (
-          <TouchableOpacity 
-            onPress={() => {
-              if (__DEV__) {
-                router.push('/dev');
-              }
-            }}
-          >
-            <Text style={{ 
-              color: '#fff', 
-              fontSize: 20, 
-              fontFamily: 'Inter-Bold' 
-            }}>
-              {children}
-            </Text>
-          </TouchableOpacity>
-        ),
       }}>
       <Tabs.Screen
         name="index"
