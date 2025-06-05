@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Play, Users, Settings } from 'lucide-react-native';
+import { Play, Users, Settings, LogOut } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground } from 'react-native';
 import { useAtom } from 'jotai';
@@ -30,6 +30,10 @@ export default function HomeScreen() {
     }
   };
 
+  const handleLogout = () => {
+    router.push('/login');
+  };
+
   return (
     <ImageBackground
       source={require('../../assets/images/storylines_splash.png')}
@@ -37,7 +41,12 @@ export default function HomeScreen() {
       imageStyle={styles.backgroundImage}
     >
       <View style={styles.overlay}>
-        <Text style={styles.logo}>Storylines</Text>
+        <View style={styles.header}>
+          <Text style={styles.logo}>Storylines</Text>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <LogOut size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
         
         <View style={styles.campaignsContainer}>
           <Text style={styles.sectionTitle}>Campaigns Happening Now!</Text>
@@ -115,15 +124,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     padding: 20,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 20,
+  },
   logo: {
     fontSize: 32,
     fontFamily: 'Inter-Bold',
     color: '#fff',
-    textAlign: 'center',
-    marginVertical: 20,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
+  },
+  logoutButton: {
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
   },
   campaignsContainer: {
     flex: 1,
