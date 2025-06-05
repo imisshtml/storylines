@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator } from 'react-native';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
-import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, AlertCircle } from 'lucide-react-native';
+import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, AlertCircle, ArrowLeft } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 
@@ -22,6 +22,10 @@ export default function InviteFriendsScreen() {
   if (!currentCampaign) {
     return null;
   }
+
+  const handleBack = () => {
+    router.back();
+  };
 
   const handleCopyCode = async () => {
     await Clipboard.setStringAsync(currentCampaign.invite_code);
@@ -45,7 +49,7 @@ export default function InviteFriendsScreen() {
         ...currentCampaign,
         status: 'waiting',
       });
-      router.replace('/');
+      router.replace('/story');
     } catch (err) {
       console.error('Error starting campaign:', err);
     }
@@ -61,7 +65,12 @@ export default function InviteFriendsScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{currentCampaign.name}</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <ArrowLeft color="#fff" size={24} />
+        </TouchableOpacity>
+        <Text style={styles.title}>{currentCampaign.name}</Text>
+      </View>
       
       {error && (
         <View style={styles.errorContainer}>
@@ -108,8 +117,7 @@ export default function InviteFriendsScreen() {
       </View>
 
       <TouchableOpacity 
-        style={[styles.readyButton, currentCampaign.players.length < 2 && styles.readyButtonDisabled]}
-        disabled={currentCampaign.players.length < 2}
+        style={styles.readyButton}
         onPress={handleStartCampaign}
       >
         <Text style={styles.readyButtonText}>Start Campaign</Text>
@@ -122,7 +130,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1a1a1a',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 20,
+    paddingTop: 40,
+  },
+  backButton: {
+    marginRight: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -136,6 +152,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a1515',
     padding: 12,
     borderRadius: 8,
+    marginHorizontal: 20,
     marginBottom: 20,
   },
   errorText: {
@@ -146,10 +163,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     color: '#fff',
-    marginBottom: 24,
     fontFamily: 'Inter-Bold',
   },
   codeContainer: {
+    marginHorizontal: 20,
     marginBottom: 24,
   },
   codeLabel: {
@@ -183,6 +200,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
+    marginHorizontal: 20,
   },
   shareButtonText: {
     color: '#fff',
@@ -195,6 +213,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     borderRadius: 12,
     padding: 16,
+    marginHorizontal: 20,
   },
   waitingHeader: {
     flexDirection: 'row',
@@ -229,9 +248,8 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     marginTop: 24,
-  },
-  readyButtonDisabled: {
-    backgroundColor: '#666',
+    marginBottom: 24,
+    marginHorizontal: 20,
   },
   readyButtonText: {
     color: '#fff',

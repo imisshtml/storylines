@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { ChevronRight, CircleAlert as AlertCircle, Save } from 'lucide-react-native';
+import { ChevronRight, CircleAlert as AlertCircle, Save, ArrowLeft } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { campaignsLoadingAtom, campaignsErrorAtom, currentCampaignAtom, upsertCampaignAtom, type Campaign } from '../atoms/campaignAtoms';
 import { router } from 'expo-router';
@@ -31,7 +31,7 @@ const contentTags = [
 ];
 
 export default function CreateCampaignScreen() {
-  const [currentCampaign] = useAtom(currentCampaignAtom);
+  const [currentCampaign, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [isLoading] = useAtom(campaignsLoadingAtom);
   const [error] = useAtom(campaignsErrorAtom);
   const [, upsertCampaign] = useAtom(upsertCampaignAtom);
@@ -54,6 +54,11 @@ export default function CreateCampaignScreen() {
     }
   }, [currentCampaign]);
 
+  const handleBack = () => {
+    setCurrentCampaign(null);
+    router.back();
+  };
+
   const toggleTag = (tag: string) => {
     setExcludedTags(prev => 
       prev.includes(tag) 
@@ -67,24 +72,29 @@ export default function CreateCampaignScreen() {
 
     try {
       const campaignData: Partial<Campaign> = {
-        id: currentCampaign?.id,
         name: campaignName,
         theme: selectedTheme,
         level: parseInt(startingLevel, 10),
         tone: selectedTone,
         exclude: excludedTags,
         status: 'creation',
-        players: currentCampaign?.players || [{
+        players: [{
           id: 'anon',
           name: 'Game Master',
           ready: false,
         }],
-        invite_code: currentCampaign?.invite_code || Math.random().toString(36).substring(2, 8).toUpperCase(),
+        invite_code: Math.random().toString(36).substring(2, 8).toUpperCase(),
         owner: 'anon',
       };
 
-      await upsertCampaign(campaignData);
-      router.push(isEditing ? '/' : '/invite');
+      // If editing, include the ID
+      if (isEditing && currentCampaign) {
+        campaignData.id = currentCampaign.id;
+      }
+
+      const savedCampaign = await upsertCampaign(campaignData);
+      setCurrentCampaign(savedCampaign);
+      router.push('/invite');
     } catch (err) {
       console.error('Error saving campaign:', err);
     }
@@ -100,7 +110,12 @@ export default function CreateCampaignScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>{isEditing ? 'Edit Campaign' : 'Create New Campaign'}</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <ArrowLeft color="#fff" size={24} />
+        </TouchableOpacity>
+        <Text style={styles.title}>{isEditing ? 'Edit Campaign' : 'Create New Campaign'}</Text>
+      </View>
       
       {error && (
         <View style={styles.errorContainer}>
@@ -228,7 +243,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1a1a1a',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 20,
+    paddingTop: 40,
+  },
+  backButton: {
+    marginRight: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -242,6 +265,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a1515',
     padding: 12,
     borderRadius: 8,
+    marginHorizontal: 20,
     marginBottom: 20,
   },
   errorText: {
@@ -253,11 +277,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 20,
     fontFamily: 'Inter-Bold',
   },
   section: {
     marginBottom: 24,
+    paddingHorizontal: 20,
   },
   label: {
     fontSize: 16,
@@ -357,6 +381,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 20,
     marginBottom: 40,
+    marginHorizontal: 20,
   },
   actionButtonDisabled: {
     backgroundColor: '#666',
