@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { LogIn, UserPlus, Eye, EyeOff, Phone } from 'lucide-react-native';
+import { LogIn, UserPlus, Eye, EyeOff, Phone, Zap } from 'lucide-react-native';
 import React, { useState, useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, ActivityIndicator } from 'react-native';
 import { useAtom } from 'jotai';
@@ -122,18 +122,16 @@ export default function LoginScreen() {
             )}
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                {isSignUp ? 'Email' : 'Email or Username'}
-              </Text>
+              <Text style={styles.label}>Email</Text>
               <TextInput
                 style={styles.input}
                 value={emailOrUsername}
                 onChangeText={setEmailOrUsername}
-                placeholder={isSignUp ? "Enter your email" : "Enter email or username"}
+                placeholder="Enter your email"
                 placeholderTextColor="#666"
                 autoCapitalize="none"
                 autoCorrect={false}
-                keyboardType={isSignUp ? "email-address" : "default"}
+                keyboardType="email-address"
               />
               {emailOrUsername.length > 0 && (
                 isSignUp ? (
@@ -242,6 +240,14 @@ export default function LoginScreen() {
           </View>
         </View>
       </View>
+
+      {/* Fixed Footer */}
+      <View style={styles.footer}>
+        <View style={styles.builtWithContainer}>
+          <Text style={styles.builtWithText}>Built with Bolt</Text>
+          <Zap size={16} color="#FFD700" />
+        </View>
+      </View>
     </ImageBackground>
   );
 }
@@ -271,8 +277,12 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
+  devIndicator: {
+    fontSize: 16,
+    color: '#4CAF50',
+  },
   form: {
-    backgroundColor: 'rgba(26, 26, 26, 0.9)',
+    backgroundColor: 'rgba(26, 26, 26, 0.45)',
     borderRadius: 12,
     padding: 20,
     gap: 20,
@@ -372,5 +382,29 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontSize: 14,
     fontFamily: 'Inter-Regular',
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  builtWithContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  builtWithText: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    fontStyle: 'italic',
   },
 });
