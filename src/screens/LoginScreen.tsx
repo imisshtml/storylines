@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { LogIn, UserPlus, Eye, EyeOff, Phone } from 'lucide-react-native';
+import { LogIn, UserPlus, Eye, EyeOff, Phone, Zap } from 'lucide-react-native';
 import React, { useState, useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, ActivityIndicator } from 'react-native';
 import { useAtom } from 'jotai';
@@ -213,7 +213,7 @@ export default function LoginScreen() {
               disabled={!isValid() || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   {isSignUp ? (
@@ -240,6 +240,13 @@ export default function LoginScreen() {
                 }
               </Text>
             </TouchableOpacity>
+          </View>
+
+          <View style={styles.footer}>
+            <View style={styles.builtWithContainer}>
+              <Text style={styles.builtWithText}>Built with Bolt</Text>
+              <Zap size={16} color="#FFD700" />
+            </View>
           </View>
         </View>
       </View>
@@ -271,6 +278,10 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
+  },
+  devIndicator: {
+    fontSize: 16,
+    color: '#4CAF50',
   },
   form: {
     backgroundColor: 'rgba(26, 26, 26, 0.9)',
@@ -373,5 +384,20 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontSize: 14,
     fontFamily: 'Inter-Regular',
+  },
+  footer: {
+    marginTop: 30,
+    alignItems: 'center',
+  },
+  builtWithContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  builtWithText: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    fontStyle: 'italic',
   },
 });
