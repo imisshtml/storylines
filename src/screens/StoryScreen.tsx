@@ -24,13 +24,6 @@ import StoryEventItem from '../components/StoryEventItem';
 import StoryChoices from '../components/StoryChoices';
 import { useStoryAI } from '../hooks/useStoryAI';
 
-const DEFAULT_CHOICES = [
-  'Explore deeper into the forest',
-  'Search for signs of civilization',
-  'Set up camp for the night',
-  'Listen carefully for any sounds',
-];
-
 export default function StoryScreen() {
   const [userInput, setUserInput] = useState('');
   const [currentCampaign] = useAtom(currentCampaignAtom);
@@ -115,6 +108,16 @@ export default function StoryScreen() {
     );
   }
 
+  // Use dynamic choices from AI or fallback to default choices
+  const choicesToShow = storyState.currentChoices.length > 0 
+    ? storyState.currentChoices 
+    : [
+        'Explore deeper into the forest',
+        'Search for signs of civilization', 
+        'Set up camp for the night',
+        'Listen carefully for any sounds',
+      ];
+
   return (
     <ImageBackground
       source={require('../../assets/images/paper_background.jpg')}
@@ -181,9 +184,9 @@ export default function StoryScreen() {
               </View>
             )}
 
-            {showChoices && !storyState.isLoading && (
+            {showChoices && !storyState.isLoading && choicesToShow.length > 0 && (
               <StoryChoices
-                choices={DEFAULT_CHOICES}
+                choices={choicesToShow}
                 onChoiceSelect={handleChoiceSelect}
                 disabled={storyState.isLoading}
               />
