@@ -38,6 +38,11 @@ export default function HomeScreen() {
     setIsSidebarVisible(!isSidebarVisible);
   };
 
+  const handleTitlePress = () => {
+    // Only navigate to dev screen in development mode
+    router.push('/dev');
+  };
+
   return (
     <ImageBackground
       source={require('../../assets/images/storylines_splash.png')}
@@ -51,7 +56,15 @@ export default function HomeScreen() {
           </TouchableOpacity>
           
           <View style={styles.titleContainer}>
-            <Text style={styles.logo}>Storylines</Text>
+            <TouchableOpacity 
+              onPress={handleTitlePress}
+              disabled={!__DEV__}
+            >
+              <Text style={[styles.logo, __DEV__ && styles.logoClickable]}>
+                Storylines
+                {__DEV__ && <Text style={styles.devIndicator}> 🔧</Text>}
+              </Text>
+            </TouchableOpacity>
             {user && (
               <Text style={styles.welcomeText}>
                 Welcome back, {user.username || user.email}!
@@ -167,6 +180,14 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
+  },
+  logoClickable: {
+    textDecorationLine: 'underline',
+    textDecorationColor: '#4CAF50',
+  },
+  devIndicator: {
+    fontSize: 16,
+    color: '#4CAF50',
   },
   welcomeText: {
     fontSize: 14,
