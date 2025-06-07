@@ -45,7 +45,7 @@ export default function HomeScreen() {
 
   const handleTitlePress = () => {
     // Only navigate to dev screen in development mode
-      router.push('/dev');
+    router.push('/dev');
   };
 
   return (
