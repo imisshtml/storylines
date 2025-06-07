@@ -1,20 +1,59 @@
 import { router } from 'expo-router';
-import { LogIn } from 'lucide-react-native';
+import { LogIn, UserPlus, Eye, EyeOff } from 'lucide-react-native';
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, ActivityIndicator } from 'react-native';
+import { useAtom } from 'jotai';
+import { signInAtom, signUpAtom, authLoadingAtom, authErrorAtom } from '../atoms/authAtoms';
 
 export default function LoginScreen() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  
+  const [, signIn] = useAtom(signInAtom);
+  const [, signUp] = useAtom(signUpAtom);
+  const [isLoading] = useAtom(authLoadingAtom);
+  const [error] = useAtom(authErrorAtom);
+
+  const isValidEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
 
   const isValid = useCallback(() => {
-    return username.length >= 3 && password.length >= 8;
-  }, [username, password]);
+    const emailOrUsernameValid = isSignUp 
+      ? isValidEmail(email) && username.length >= 3
+      : (email.length >= 3 || isValidEmail(email));
+    
+    return emailOrUsernameValid && password.length >= 8;
+  }, [email, password, username, isSignUp]);
 
-  const handleLogin = () => {
-    if (isValid()) {
-      router.push('/home');
+  const handleAuth = async () => {
+    if (!isValid()) return;
+
+    try {
+      if (isSignUp) {
+        await signUp({ email, password, username });
+        // After successful signup, switch to sign in mode
+        setIsSignUp(false);
+        setPassword('');
+      } else {
+        // For sign in, check if input is email or username
+        const loginEmail = isValidEmail(email) ? email : `${email}@storylines.app`;
+        await signIn({ email: loginEmail, password });
+        router.replace('/home');
+      }
+    } catch (err) {
+      console.error('Authentication error:', err);
     }
+  };
+
+  const toggleMode = () => {
+    setIsSignUp(!isSignUp);
+    setEmail('');
+    setPassword('');
+    setUsername('');
   };
 
   return (
@@ -28,50 +67,126 @@ export default function LoginScreen() {
           <Text style={styles.logo}>Storylines</Text>
           
           <View style={styles.form}>
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            {isSignUp && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Username</Text>
+                <TextInput
+                  style={styles.input}
+                  value={username}
+                  onChangeText={setUsername}
+                  placeholder="Choose a username"
+                  placeholderTextColor="#666"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {username.length > 0 && username.length < 3 && (
+                  <Text style={styles.validationError}>
+                    Username must be at least 3 characters
+                  </Text>
+                )}
+              </View>
+            )}
+
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Username or Email</Text>
+              <Text style={styles.label}>
+                {isSignUp ? 'Email' : 'Username or Email'}
+              </Text>
               <TextInput
                 style={styles.input}
-                value={username}
-                onChangeText={setUsername}
-                placeholder="Enter username or email"
+                value={email}
+                onChangeText={setEmail}
+                placeholder={isSignUp ? "Enter your email" : "Enter username or email"}
                 placeholderTextColor="#666"
                 autoCapitalize="none"
                 autoCorrect={false}
+                keyboardType={isSignUp ? "email-address" : "default"}
               />
-              {username.length > 0 && username.length < 3 && (
-                <Text style={styles.errorText}>
-                  Username must be at least 3 characters
-                </Text>
+              {email.length > 0 && (
+                isSignUp ? (
+                  !isValidEmail(email) && (
+                    <Text style={styles.validationError}>
+                      Please enter a valid email address
+                    </Text>
+                  )
+                ) : (
+                  email.length < 3 && (
+                    <Text style={styles.validationError}>
+                      Username must be at least 3 characters
+                    </Text>
+                  )
+                )
               )}
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Password</Text>
-              <TextInput
-                style={styles.input}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Enter password"
-                placeholderTextColor="#666"
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Enter password"
+                  placeholderTextColor="#666"
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff size={20} color="#666" />
+                  ) : (
+                    <Eye size={20} color="#666" />
+                  )}
+                </TouchableOpacity>
+              </View>
               {password.length > 0 && password.length < 8 && (
-                <Text style={styles.errorText}>
+                <Text style={styles.validationError}>
                   Password must be at least 8 characters
                 </Text>
               )}
             </View>
 
             <TouchableOpacity 
-              style={[styles.loginButton, !isValid() && styles.loginButtonDisabled]}
-              onPress={handleLogin}
-              disabled={!isValid()}
+              style={[styles.authButton, (!isValid() || isLoading) && styles.authButtonDisabled]}
+              onPress={handleAuth}
+              disabled={!isValid() || isLoading}
             >
-              <LogIn size={20} color="#fff" />
-              <Text style={styles.buttonText}>Login</Text>
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  {isSignUp ? (
+                    <UserPlus size={20} color="#fff" />
+                  ) : (
+                    <LogIn size={20} color="#fff" />
+                  )}
+                  <Text style={styles.buttonText}>
+                    {isSignUp ? 'Sign Up' : 'Login'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.toggleButton}
+              onPress={toggleMode}
+              disabled={isLoading}
+            >
+              <Text style={styles.toggleText}>
+                {isSignUp 
+                  ? 'Already have an account? Sign In' 
+                  : "Don't have an account? Sign Up"
+                }
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -111,6 +226,19 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 20,
   },
+  errorContainer: {
+    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(244, 67, 54, 0.3)',
+  },
+  errorText: {
+    color: '#f44336',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+  },
   inputContainer: {
     gap: 8,
   },
@@ -127,13 +255,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
   },
-  errorText: {
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 12,
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+  },
+  eyeButton: {
+    padding: 12,
+  },
+  validationError: {
     color: '#ff4444',
     fontSize: 12,
     fontFamily: 'Inter-Regular',
     marginTop: 4,
   },
-  loginButton: {
+  authButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 8,
     padding: 16,
@@ -143,12 +287,21 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 10,
   },
-  loginButtonDisabled: {
+  authButtonDisabled: {
     backgroundColor: '#666',
   },
   buttonText: {
     color: '#fff',
     fontSize: 18,
     fontFamily: 'Inter-Bold',
+  },
+  toggleButton: {
+    alignItems: 'center',
+    padding: 8,
+  },
+  toggleText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
   },
 });
