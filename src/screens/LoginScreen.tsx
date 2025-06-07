@@ -1,14 +1,15 @@
 import { router } from 'expo-router';
-import { LogIn, UserPlus, Eye, EyeOff } from 'lucide-react-native';
+import { LogIn, UserPlus, Eye, EyeOff, Phone } from 'lucide-react-native';
 import React, { useState, useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, ActivityIndicator } from 'react-native';
 import { useAtom } from 'jotai';
 import { signInAtom, signUpAtom, authLoadingAtom, authErrorAtom } from '../atoms/authAtoms';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
+  const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [phone, setPhone] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
@@ -21,27 +22,41 @@ export default function LoginScreen() {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
+  const isValidPhone = (phone: string) => {
+    // Basic phone validation - at least 10 digits
+    return /^\+?[\d\s\-\(\)]{10,}$/.test(phone);
+  };
+
   const isValid = useCallback(() => {
-    const emailOrUsernameValid = isSignUp 
-      ? isValidEmail(email) && username.length >= 3
-      : (email.length >= 3 || isValidEmail(email));
-    
-    return emailOrUsernameValid && password.length >= 8;
-  }, [email, password, username, isSignUp]);
+    if (isSignUp) {
+      return (
+        isValidEmail(emailOrUsername) && 
+        username.length >= 3 && 
+        password.length >= 8 &&
+        (phone === '' || isValidPhone(phone)) // Phone is optional but must be valid if provided
+      );
+    } else {
+      return emailOrUsername.length >= 3 && password.length >= 8;
+    }
+  }, [emailOrUsername, password, username, phone, isSignUp]);
 
   const handleAuth = async () => {
     if (!isValid()) return;
 
     try {
       if (isSignUp) {
-        await signUp({ email, password, username });
+        await signUp({ 
+          email: emailOrUsername, 
+          password, 
+          username,
+          phone: phone || undefined 
+        });
         // After successful signup, switch to sign in mode
         setIsSignUp(false);
         setPassword('');
+        setPhone('');
       } else {
-        // For sign in, check if input is email or username
-        const loginEmail = isValidEmail(email) ? email : `${email}@storylines.app`;
-        await signIn({ email: loginEmail, password });
+        await signIn({ emailOrUsername, password });
         router.replace('/home');
       }
     } catch (err) {
@@ -51,9 +66,10 @@ export default function LoginScreen() {
 
   const toggleMode = () => {
     setIsSignUp(!isSignUp);
-    setEmail('');
+    setEmailOrUsername('');
     setPassword('');
     setUsername('');
+    setPhone('');
   };
 
   return (
@@ -95,34 +111,57 @@ export default function LoginScreen() {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>
-                {isSignUp ? 'Email' : 'Username or Email'}
+                {isSignUp ? 'Email' : 'Email or Username'}
               </Text>
               <TextInput
                 style={styles.input}
-                value={email}
-                onChangeText={setEmail}
-                placeholder={isSignUp ? "Enter your email" : "Enter username or email"}
+                value={emailOrUsername}
+                onChangeText={setEmailOrUsername}
+                placeholder={isSignUp ? "Enter your email" : "Enter email or username"}
                 placeholderTextColor="#666"
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType={isSignUp ? "email-address" : "default"}
               />
-              {email.length > 0 && (
+              {emailOrUsername.length > 0 && (
                 isSignUp ? (
-                  !isValidEmail(email) && (
+                  !isValidEmail(emailOrUsername) && (
                     <Text style={styles.validationError}>
                       Please enter a valid email address
                     </Text>
                   )
                 ) : (
-                  email.length < 3 && (
+                  emailOrUsername.length < 3 && (
                     <Text style={styles.validationError}>
-                      Username must be at least 3 characters
+                      Must be at least 3 characters
                     </Text>
                   )
                 )
               )}
             </View>
+
+            {isSignUp && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Phone Number (Optional)</Text>
+                <View style={styles.phoneContainer}>
+                  <Phone size={20} color="#666" style={styles.phoneIcon} />
+                  <TextInput
+                    style={styles.phoneInput}
+                    value={phone}
+                    onChangeText={setPhone}
+                    placeholder="Enter phone number"
+                    placeholderTextColor="#666"
+                    keyboardType="phone-pad"
+                    autoCorrect={false}
+                  />
+                </View>
+                {phone.length > 0 && !isValidPhone(phone) && (
+                  <Text style={styles.validationError}>
+                    Please enter a valid phone number
+                  </Text>
+                )}
+              </View>
+            )}
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Password</Text>
@@ -251,6 +290,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
     padding: 12,
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+  },
+  phoneContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    paddingLeft: 12,
+  },
+  phoneIcon: {
+    marginRight: 8,
+  },
+  phoneInput: {
+    flex: 1,
+    padding: 12,
+    paddingLeft: 0,
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Regular',
