@@ -130,7 +130,7 @@ export default function SidebarMenu({ isVisible, onClose }: SidebarMenuProps) {
             <View style={styles.avatar}>
               {!imageError ? (
                 <Image
-                  source={{ uri: 'https://images.pexels.com/photos/1670977/pexels-photo-1670977.jpeg?auto=compress&cs=tinysrgb&w=400' }}
+                  source={{ uri: 'https://images.pexels.com/photos/27567849/pexels-photo-27567849.jpeg?auto=compress&cs=tinysrgb&w=400' }}
                   style={styles.avatarImage}
                   onError={() => setImageError(true)}
                 />
