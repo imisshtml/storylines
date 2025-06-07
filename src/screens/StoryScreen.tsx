@@ -24,20 +24,13 @@ import StoryEventItem from '../components/StoryEventItem';
 import StoryChoices from '../components/StoryChoices';
 import { useStoryAI } from '../hooks/useStoryAI';
 
-const DEFAULT_CHOICES = [
-  'Explore deeper into the forest',
-  'Search for signs of civilization',
-  'Set up camp for the night',
-  'Listen carefully for any sounds',
-];
-
 export default function StoryScreen() {
   const [userInput, setUserInput] = useState('');
   const [currentCampaign] = useAtom(currentCampaignAtom);
   const [user] = useAtom(userAtom);
   const [isCharacterSheetVisible, setIsCharacterSheetVisible] = useState(false);
   const [showChoices, setShowChoices] = useState(true);
-  
+
   const scrollViewRef = useRef<ScrollView>(null);
   const { storyState, sendPlayerAction, sendChoice, clearError } = useStoryAI();
 
@@ -115,6 +108,16 @@ export default function StoryScreen() {
     );
   }
 
+  // Use dynamic choices from AI or fallback to default choices
+  const choicesToShow = storyState.currentChoices.length > 0
+    ? storyState.currentChoices
+    : [
+      'Explore deeper into the forest',
+      'Search for signs of civilization',
+      'Set up camp for the night',
+      'Listen carefully for any sounds',
+    ];
+
   return (
     <ImageBackground
       source={require('../../assets/images/paper_background.jpg')}
@@ -125,7 +128,7 @@ export default function StoryScreen() {
           <TouchableOpacity onPress={handleHomePress} style={styles.headerButton}>
             <Home size={24} color="#2a2a2a" />
           </TouchableOpacity>
-          
+
           <View style={styles.headerTitle}>
             <Text style={styles.title}>{currentCampaign.name}</Text>
             <Text style={styles.subtitle}>
@@ -143,7 +146,7 @@ export default function StoryScreen() {
           style={styles.content}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          <ScrollView 
+          <ScrollView
             ref={scrollViewRef}
             style={styles.storyContainer}
             showsVerticalScrollIndicator={false}
@@ -181,9 +184,9 @@ export default function StoryScreen() {
               </View>
             )}
 
-            {showChoices && !storyState.isLoading && (
+            {showChoices && !storyState.isLoading && choicesToShow.length > 0 && (
               <StoryChoices
-                choices={DEFAULT_CHOICES}
+                choices={choicesToShow}
                 onChoiceSelect={handleChoiceSelect}
                 disabled={storyState.isLoading}
               />
@@ -231,7 +234,7 @@ export default function StoryScreen() {
                   <Text style={styles.characterName}>Eldric the Brave</Text>
                   <Text style={styles.characterClass}>Level 5 Warrior</Text>
                 </View>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setIsCharacterSheetVisible(false)}
                   style={styles.closeButton}
                 >
