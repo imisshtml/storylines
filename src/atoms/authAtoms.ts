@@ -1,0 +1,203 @@
+import { atom } from 'jotai';
+import { supabase } from '../config/supabase';
+import type { User, Session } from '@supabase/supabase-js';
+
+export type AuthUser = {
+  id: string;
+  email: string;
+  username?: string;
+  phone?: string;
+};
+
+export const userAtom = atom<AuthUser | null>(null);
+export const sessionAtom = atom<Session | null>(null);
+export const authLoadingAtom = atom(true);
+export const authErrorAtom = atom<string | null>(null);
+
+// Helper function to find user by username or email
+const findUserByUsernameOrEmail = async (identifier: string) => {
+  // First try to find by username
+  const { data: profileData } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('username', identifier)
+    .single();
+
+  if (profileData) {
+    return profileData.email;
+  }
+
+  // If not found by username, assume it's an email
+  return identifier;
+};
+
+// Atom to handle sign in
+export const signInAtom = atom(
+  null,
+  async (get, set, { emailOrUsername, password }: { emailOrUsername: string; password: string }) => {
+    try {
+      set(authLoadingAtom, true);
+      set(authErrorAtom, null);
+
+      // Find the actual email if username was provided
+      const email = await findUserByUsernameOrEmail(emailOrUsername);
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (data.user && data.session) {
+        set(sessionAtom, data.session);
+        
+        // Fetch user profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username, phone')
+          .eq('id', data.user.id)
+          .single();
+
+        set(userAtom, {
+          id: data.user.id,
+          email: data.user.email!,
+          username: profile?.username,
+          phone: profile?.phone,
+        });
+      }
+
+      return data;
+    } catch (error) {
+      set(authErrorAtom, (error as Error).message);
+      throw error;
+    } finally {
+      set(authLoadingAtom, false);
+    }
+  }
+);
+
+// Atom to handle sign up
+export const signUpAtom = atom(
+  null,
+  async (get, set, { email, password, username, phone }: { email: string; password: string; username?: string; phone?: string }) => {
+    try {
+      set(authLoadingAtom, true);
+      set(authErrorAtom, null);
+
+      // Check if username already exists
+      if (username) {
+        const { data: existingUser } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', username)
+          .single();
+
+        if (existingUser) {
+          throw new Error('Username already taken');
+        }
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username: username || email.split('@')[0],
+            phone: phone || null,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      set(authErrorAtom, (error as Error).message);
+      throw error;
+    } finally {
+      set(authLoadingAtom, false);
+    }
+  }
+);
+
+// Atom to handle sign out
+export const signOutAtom = atom(
+  null,
+  async (get, set) => {
+    try {
+      set(authLoadingAtom, true);
+      set(authErrorAtom, null);
+
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      set(userAtom, null);
+      set(sessionAtom, null);
+    } catch (error) {
+      set(authErrorAtom, (error as Error).message);
+      throw error;
+    } finally {
+      set(authLoadingAtom, false);
+    }
+  }
+);
+
+// Initialize auth state
+export const initializeAuthAtom = atom(
+  null,
+  async (get, set) => {
+    try {
+      set(authLoadingAtom, true);
+
+      // Get initial session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        set(sessionAtom, session);
+        
+        // Fetch user profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username, phone')
+          .eq('id', session.user.id)
+          .single();
+
+        set(userAtom, {
+          id: session.user.id,
+          email: session.user.email!,
+          username: profile?.username,
+          phone: profile?.phone,
+        });
+      }
+
+      // Listen for auth changes
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session?.user) {
+          set(sessionAtom, session);
+          
+          // Fetch user profile
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username, phone')
+            .eq('id', session.user.id)
+            .single();
+
+          set(userAtom, {
+            id: session.user.id,
+            email: session.user.email!,
+            username: profile?.username,
+            phone: profile?.phone,
+          });
+        } else {
+          set(userAtom, null);
+          set(sessionAtom, null);
+        }
+      });
+    } catch (error) {
+      set(authErrorAtom, (error as Error).message);
+    } finally {
+      set(authLoadingAtom, false);
+    }
+  }
+);
