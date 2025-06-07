@@ -30,7 +30,7 @@ export default function StoryScreen() {
   const [user] = useAtom(userAtom);
   const [isCharacterSheetVisible, setIsCharacterSheetVisible] = useState(false);
   const [showChoices, setShowChoices] = useState(true);
-  
+
   const scrollViewRef = useRef<ScrollView>(null);
   const { storyState, sendPlayerAction, sendChoice, clearError } = useStoryAI();
 
@@ -109,14 +109,14 @@ export default function StoryScreen() {
   }
 
   // Use dynamic choices from AI or fallback to default choices
-  const choicesToShow = storyState.currentChoices.length > 0 
-    ? storyState.currentChoices 
+  const choicesToShow = storyState.currentChoices.length > 0
+    ? storyState.currentChoices
     : [
-        'Explore deeper into the forest',
-        'Search for signs of civilization', 
-        'Set up camp for the night',
-        'Listen carefully for any sounds',
-      ];
+      'Explore deeper into the forest',
+      'Search for signs of civilization',
+      'Set up camp for the night',
+      'Listen carefully for any sounds',
+    ];
 
   return (
     <ImageBackground
@@ -128,7 +128,7 @@ export default function StoryScreen() {
           <TouchableOpacity onPress={handleHomePress} style={styles.headerButton}>
             <Home size={24} color="#2a2a2a" />
           </TouchableOpacity>
-          
+
           <View style={styles.headerTitle}>
             <Text style={styles.title}>{currentCampaign.name}</Text>
             <Text style={styles.subtitle}>
@@ -146,7 +146,7 @@ export default function StoryScreen() {
           style={styles.content}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          <ScrollView 
+          <ScrollView
             ref={scrollViewRef}
             style={styles.storyContainer}
             showsVerticalScrollIndicator={false}
@@ -213,7 +213,7 @@ export default function StoryScreen() {
               disabled={!userInput.trim() || storyState.isLoading}
             >
               {storyState.isLoading ? (
-                <ActivityIndicator size="small\" color="#666" />
+                <ActivityIndicator size="small" color="#666" />
               ) : (
                 <Send size={24} color={userInput.trim() ? '#fff' : '#666'} />
               )}
@@ -234,7 +234,7 @@ export default function StoryScreen() {
                   <Text style={styles.characterName}>Eldric the Brave</Text>
                   <Text style={styles.characterClass}>Level 5 Warrior</Text>
                 </View>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setIsCharacterSheetVisible(false)}
                   style={styles.closeButton}
                 >
