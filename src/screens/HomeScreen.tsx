@@ -4,10 +4,13 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground } from 'react-native';
 import { useAtom } from 'jotai';
 import { campaignsAtom, currentCampaignAtom } from '../atoms/campaignAtoms';
+import { signOutAtom, userAtom } from '../atoms/authAtoms';
 
 export default function HomeScreen() {
   const [campaigns] = useAtom(campaignsAtom);
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
+  const [user] = useAtom(userAtom);
+  const [, signOut] = useAtom(signOutAtom);
 
   const handleCampaignPress = (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
@@ -30,8 +33,13 @@ export default function HomeScreen() {
     }
   };
 
-  const handleLogout = () => {
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.replace('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
@@ -44,6 +52,11 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.titleContainer}>
             <Text style={styles.logo}>Storylines</Text>
+            {user && (
+              <Text style={styles.welcomeText}>
+                Welcome back, {user.username || user.email}!
+              </Text>
+            )}
           </View>
           <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
             <LogOut size={24} color="#fff" />
@@ -143,6 +156,15 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
+  },
+  welcomeText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#4CAF50',
+    marginTop: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   logoutButton: {
     padding: 8,
