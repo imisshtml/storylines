@@ -250,7 +250,7 @@ export default function DevScreen() {
             disabled={!userInput.trim() || isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator size="small" color="#666" />
+              <ActivityIndicator size="small\" color="#666" />
             ) : (
               <Send size={24} color={userInput.trim() ? '#fff' : '#666'} />
             )}
