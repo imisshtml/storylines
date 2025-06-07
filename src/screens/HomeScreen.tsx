@@ -11,7 +11,6 @@ export default function HomeScreen() {
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [user] = useAtom(userAtom);
   const [, signOut] = useAtom(signOutAtom);
-  const showDev = true;
 
   const handleCampaignPress = (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
@@ -59,11 +58,11 @@ export default function HomeScreen() {
           <View style={styles.titleContainer}>
             <TouchableOpacity 
               onPress={handleTitlePress}
-              disabled={!showDev}
+              disabled={!__DEV__}
             >
               <Text style={[styles.logo, __DEV__ && styles.logoClickable]}>
                 Storylines
-                {showDev && <Text style={styles.devIndicator}> 🔧</Text>}
+                {__DEV__ && <Text style={styles.devIndicator}> 🔧</Text>}
               </Text>
             </TouchableOpacity>
             {user && (
