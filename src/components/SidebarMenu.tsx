@@ -90,7 +90,7 @@ export default function SidebarMenu({ isVisible, onClose }: SidebarMenuProps) {
       subtitle: 'App information',
       onPress: () => {
         onClose();
-        // Navigate to about when implemented
+        router.push('/about');
       },
     },
   ];
