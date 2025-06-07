@@ -54,15 +54,14 @@ export default function HomeScreen() {
           <TouchableOpacity onPress={toggleSidebar} style={styles.menuButton}>
             <Menu size={24} color="#fff" />
           </TouchableOpacity>
-          
+
           <View style={styles.titleContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={handleTitlePress}
               disabled={!__DEV__}
             >
-              <Text style={[styles.logo, __DEV__ && styles.logoClickable]}>
+              <Text style={styles.logo}>
                 Storylines
-                {__DEV__ && <Text style={styles.devIndicator}> 🔧</Text>}
               </Text>
             </TouchableOpacity>
             {user && (
@@ -72,7 +71,7 @@ export default function HomeScreen() {
             )}
           </View>
         </View>
-        
+
         <View style={styles.campaignsContainer}>
           <Text style={styles.sectionTitle}>My Campaigns</Text>
           {campaigns.map(campaign => (
@@ -80,7 +79,7 @@ export default function HomeScreen() {
               <View style={styles.campaignHeader}>
                 <Text style={styles.campaignTitle}>{campaign.name}</Text>
                 {campaign.status === 'creation' && (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.settingsButton}
                     onPress={() => handleSettingsPress(campaign.id)}
                   >
@@ -89,12 +88,12 @@ export default function HomeScreen() {
                 )}
               </View>
               <Text style={styles.campaignDetails}>
-                {campaign.status === 'creation' 
+                {campaign.status === 'creation'
                   ? 'In Creation'
                   : `Players: ${campaign.players.length} • ${campaign.status === 'waiting' ? 'Waiting' : 'In Progress'}`
                 }
               </Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.continueButton}
                 onPress={() => handleCampaignPress(campaign.id)}
               >
@@ -112,20 +111,20 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           ))}
-          
+
           {campaigns.length === 0 && (
             <Text style={styles.noCampaigns}>No active campaigns</Text>
           )}
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.createButton}
           onPress={() => router.push('/create')}
         >
           <Text style={styles.buttonText}>Create Campaign</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.joinButton}
           onPress={() => router.push('/join')}
         >
@@ -134,7 +133,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      <SidebarMenu 
+      <SidebarMenu
         isVisible={isSidebarVisible}
         onClose={() => setIsSidebarVisible(false)}
       />
@@ -180,10 +179,6 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
-  },
-  logoClickable: {
-    textDecorationLine: 'underline',
-    textDecorationColor: '#4CAF50',
   },
   devIndicator: {
     fontSize: 16,
