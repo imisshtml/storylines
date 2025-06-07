@@ -12,7 +12,7 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const [, signIn] = useAtom(signInAtom);
   const [, signUp] = useAtom(signUpAtom);
   const [isLoading] = useAtom(authLoadingAtom);
@@ -30,8 +30,8 @@ export default function LoginScreen() {
   const isValid = useCallback(() => {
     if (isSignUp) {
       return (
-        isValidEmail(emailOrUsername) && 
-        username.length >= 3 && 
+        isValidEmail(emailOrUsername) &&
+        username.length >= 3 &&
         password.length >= 8 &&
         (phone === '' || isValidPhone(phone)) // Phone is optional but must be valid if provided
       );
@@ -45,11 +45,11 @@ export default function LoginScreen() {
 
     try {
       if (isSignUp) {
-        await signUp({ 
-          email: emailOrUsername, 
-          password, 
+        await signUp({
+          email: emailOrUsername,
+          password,
           username,
-          phone: phone || undefined 
+          phone: phone || undefined
         });
         // After successful signup, switch to sign in mode
         setIsSignUp(false);
@@ -71,7 +71,7 @@ export default function LoginScreen() {
     setUsername('');
     setPhone('');
   };
-  
+
   const handleTitlePress = () => {
     // Only navigate to dev screen in development mode
     router.push('/dev');
@@ -84,17 +84,16 @@ export default function LoginScreen() {
       imageStyle={styles.backgroundImage}
     >
       <View style={styles.overlay}>
-        <View style={styles.content}>            
-          <TouchableOpacity 
-              onPress={handleTitlePress}
-              disabled={!__DEV__}
-            >
+        <View style={styles.content}>
+          <TouchableOpacity
+            onPress={handleTitlePress}
+            disabled={!__DEV__}
+          >
             <Text style={styles.logo}>
               Storylines
-              {__DEV__ && <Text style={styles.devIndicator}> 🔧</Text>}
             </Text>
           </TouchableOpacity>
-          
+
           <View style={styles.form}>
             {error && (
               <View style={styles.errorContainer}>
@@ -207,13 +206,13 @@ export default function LoginScreen() {
               )}
             </View>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.authButton, (!isValid() || isLoading) && styles.authButtonDisabled]}
               onPress={handleAuth}
               disabled={!isValid() || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   {isSignUp ? (
@@ -228,14 +227,14 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.toggleButton}
               onPress={toggleMode}
               disabled={isLoading}
             >
               <Text style={styles.toggleText}>
-                {isSignUp 
-                  ? 'Already have an account? Sign In' 
+                {isSignUp
+                  ? 'Already have an account? Sign In'
                   : "Don't have an account? Sign Up"
                 }
               </Text>
