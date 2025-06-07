@@ -11,6 +11,7 @@ export default function HomeScreen() {
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [user] = useAtom(userAtom);
   const [, signOut] = useAtom(signOutAtom);
+  const showDev = true;
 
   const handleCampaignPress = (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
@@ -44,9 +45,7 @@ export default function HomeScreen() {
 
   const handleTitlePress = () => {
     // Only navigate to dev screen in development mode
-    if (__DEV__) {
       router.push('/dev');
-    }
   };
 
   return (
