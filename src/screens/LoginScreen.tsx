@@ -71,6 +71,11 @@ export default function LoginScreen() {
     setUsername('');
     setPhone('');
   };
+  
+  const handleTitlePress = () => {
+    // Only navigate to dev screen in development mode
+    router.push('/dev');
+  };
 
   return (
     <ImageBackground
