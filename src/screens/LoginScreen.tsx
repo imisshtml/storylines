@@ -79,8 +79,13 @@ export default function LoginScreen() {
       imageStyle={styles.backgroundImage}
     >
       <View style={styles.overlay}>
-        <View style={styles.content}>
+        <View style={styles.content}>            
+          <TouchableOpacity 
+              onPress={handleTitlePress}
+              disabled={!__DEV__}
+            >
           <Text style={styles.logo}>Storylines</Text>
+          </TouchableOpacity>
           
           <View style={styles.form}>
             {error && (
