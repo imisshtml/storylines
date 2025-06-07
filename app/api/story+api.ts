@@ -25,7 +25,7 @@ export async function POST(request: Request) {
         { role: 'system', content: systemPrompt },
         { role: 'user', content: message }
       ],
-      max_tokens: 500,
+      max_tokens: 600,
       temperature: 0.8,
     });
 
@@ -35,8 +35,12 @@ export async function POST(request: Request) {
       throw new Error('No response from OpenAI');
     }
 
+    // Parse the response to extract story and choices
+    const parsedResponse = parseStoryResponse(response);
+
     return Response.json({
-      response,
+      response: parsedResponse.story,
+      choices: parsedResponse.choices,
       campaignId,
       timestamp: new Date().toISOString(),
     });
@@ -48,6 +52,32 @@ export async function POST(request: Request) {
       headers: { 'Content-Type': 'text/plain' },
     });
   }
+}
+
+function parseStoryResponse(response: string) {
+  // Look for choices section in the response
+  const choicesMatch = response.match(/\[CHOICES\](.*?)\[\/CHOICES\]/s);
+  
+  if (choicesMatch) {
+    // Extract story (everything before [CHOICES])
+    const story = response.split('[CHOICES]')[0].trim();
+    
+    // Extract and parse choices
+    const choicesText = choicesMatch[1].trim();
+    const choices = choicesText
+      .split('\n')
+      .map(line => line.replace(/^\d+\.\s*/, '').trim())
+      .filter(choice => choice.length > 0)
+      .slice(0, 4); // Limit to 4 choices max
+    
+    return { story, choices };
+  }
+  
+  // If no choices section found, return the full response as story with empty choices
+  return { 
+    story: response.trim(), 
+    choices: [] 
+  };
 }
 
 function buildSystemPrompt(context: any) {
@@ -68,7 +98,26 @@ DUNGEON MASTER GUIDELINES:
 4. Present meaningful choices that advance the story
 5. Maintain consistency with established story elements
 6. Keep responses concise but descriptive (2-3 paragraphs max)
-7. Always end with either a question, choice, or call for action
+
+RESPONSE FORMAT:
+Your response must follow this exact format:
+
+[Your narrative response describing what happens as a result of the player's action]
+
+[CHOICES]
+1. [First choice option]
+2. [Second choice option]
+3. [Third choice option]
+4. [Fourth choice option]
+[/CHOICES]
+
+CHOICE GUIDELINES:
+- Provide exactly 3-4 meaningful choice options
+- Each choice should lead to different story outcomes
+- Make choices specific and actionable
+- Vary the types of choices (combat, exploration, social, creative solutions)
+- Ensure choices fit the current situation and campaign tone
+- Keep each choice concise (one sentence maximum)
 
 STORY CONTEXT:`;
 
@@ -79,7 +128,7 @@ STORY CONTEXT:`;
     });
   }
 
-  prompt += '\n\nRespond as the Dungeon Master, continuing the story based on the player\'s action or input.';
+  prompt += '\n\nRespond as the Dungeon Master, continuing the story based on the player\'s action or input. Remember to include the [CHOICES] section with 3-4 options.';
 
   return prompt;
 }

@@ -15,6 +15,7 @@ export type StoryState = {
   events: StoryEvent[];
   isLoading: boolean;
   error: string | null;
+  currentChoices: string[];
 };
 
 export function useStoryAI() {
@@ -30,6 +31,12 @@ export function useStoryAI() {
     ],
     isLoading: false,
     error: null,
+    currentChoices: [
+      'Explore deeper into the forest',
+      'Search for signs of civilization',
+      'Set up camp for the night',
+      'Listen carefully for any sounds',
+    ],
   });
 
   const sendPlayerAction = useCallback(async (action: string, playerId: string = 'player1', playerName: string = 'Player') => {
@@ -50,6 +57,7 @@ export function useStoryAI() {
       events: [...prev.events, playerEvent],
       isLoading: true,
       error: null,
+      currentChoices: [], // Clear choices while loading
     }));
 
     try {
@@ -91,6 +99,7 @@ export function useStoryAI() {
         ...prev,
         events: [...prev.events, dmEvent],
         isLoading: false,
+        currentChoices: data.choices || [], // Use choices from AI response
       }));
 
     } catch (error) {
@@ -99,6 +108,7 @@ export function useStoryAI() {
         ...prev,
         isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to get DM response',
+        currentChoices: [], // Clear choices on error
       }));
     }
   }, [currentCampaign, storyState.events]);
@@ -116,6 +126,7 @@ export function useStoryAI() {
       events: [],
       isLoading: false,
       error: null,
+      currentChoices: [],
     });
   }, []);
 
