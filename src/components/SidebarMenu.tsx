@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image } from 'react-native';
 import { LogOut, X, User, Settings, Info } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
@@ -122,10 +122,14 @@ export default function SidebarMenu({ isVisible, onClose }: SidebarMenuProps) {
           
           <View style={styles.userInfo}>
             <View style={styles.avatar}>
-              <User size={32} color="#4CAF50" />
+              <Image
+                source={{ uri: 'https://images.pexels.com/photos/1670977/pexels-photo-1670977.jpeg?auto=compress&cs=tinysrgb&w=400' }}
+                style={styles.avatarImage}
+                defaultSource={{ uri: 'https://images.pexels.com/photos/1670977/pexels-photo-1670977.jpeg?auto=compress&cs=tinysrgb&w=400' }}
+              />
             </View>
             <Text style={styles.userName}>
-              {user?.username || user?.email || 'User'}
+              {user?.username || user?.email || 'Adventurer'}
             </Text>
             <Text style={styles.userEmail}>
               {user?.email}
@@ -225,8 +229,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#4CAF50',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 37,
   },
   userName: {
     fontSize: 20,
