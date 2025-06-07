@@ -59,12 +59,11 @@ export default function HomeScreen() {
           <View style={styles.titleContainer}>
             <TouchableOpacity 
               onPress={handleTitlePress}
-              disabled={!__DEV__}
-              activeOpacity={__DEV__ ? 0.7 : 1}
+              disabled={!showDev}
             >
               <Text style={[styles.logo, __DEV__ && styles.logoClickable]}>
                 Storylines
-                {__DEV__ && <Text style={styles.devIndicator}> 🔧</Text>}
+                {showDev && <Text style={styles.devIndicator}> 🔧</Text>}
               </Text>
             </TouchableOpacity>
             {user && (
