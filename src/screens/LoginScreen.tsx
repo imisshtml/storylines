@@ -211,7 +211,7 @@ export default function LoginScreen() {
               disabled={!isValid() || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small\" color="#fff" />
               ) : (
                 <>
                   {isSignUp ? (
