@@ -109,9 +109,38 @@ export default function CreationScreen() {
     loadData();
   }, []);
 
+  // Check if current class has spellcasting
+  const hasSpellcasting = selectedClass?.spellcasting !== undefined;
+
+  // Get the actual step index, skipping spells if not a spellcaster
+  const getActualStepIndex = (step: number) => {
+    if (!hasSpellcasting && step >= 5) {
+      return step + 1; // Skip spells step (index 5)
+    }
+    return step;
+  };
+
+  // Get the display step index for progress
+  const getDisplayStepIndex = (step: number) => {
+    if (!hasSpellcasting && step > 5) {
+      return step - 1; // Adjust for skipped spells step
+    }
+    return step;
+  };
+
+  // Get total steps (7 if no spellcasting, 8 if spellcasting)
+  const getTotalSteps = () => {
+    return hasSpellcasting ? CREATION_STEPS.length : CREATION_STEPS.length - 1;
+  };
+
   const handleBack = () => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+      let newStep = currentStep - 1;
+      // Skip spells step when going back if not a spellcaster
+      if (!hasSpellcasting && newStep === 5) {
+        newStep = 4;
+      }
+      setCurrentStep(newStep);
     } else {
       resetCreation();
       router.back();
@@ -119,8 +148,15 @@ export default function CreationScreen() {
   };
 
   const handleNext = () => {
-    if (currentStep < CREATION_STEPS.length - 1) {
-      setCurrentStep(currentStep + 1);
+    let newStep = currentStep + 1;
+    
+    // Skip spells step if not a spellcaster
+    if (!hasSpellcasting && newStep === 5) {
+      newStep = 6;
+    }
+    
+    if (newStep < CREATION_STEPS.length) {
+      setCurrentStep(newStep);
     }
   };
 
@@ -239,9 +275,9 @@ export default function CreationScreen() {
                   <Text style={styles.optionDescription}>
                     Size: {race.size} • Speed: {race.speed}ft
                   </Text>
-                  {race.ability_score_increases.length > 0 && (
+                  {race.ability_score_increases?.length > 0 && (
                     <Text style={styles.optionBonus}>
-                      +{race.ability_score_increases[0].bonus} {race.ability_score_increases[0].ability_score.name}
+                      +{race.ability_score_increases?.[0].bonus} {race.ability_score_increases?.[0].ability_score.name}
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -297,9 +333,9 @@ export default function CreationScreen() {
                   <Text style={styles.optionDescription}>
                     {bg.feature.name}
                   </Text>
-                  {bg.skill_proficiencies.length > 0 && (
+                  {bg.skill_proficiencies?.length > 0 && (
                     <Text style={styles.optionBonus}>
-                      Skills: {bg.skill_proficiencies.map(s => s.name).join(', ')}
+                      Skills: {bg.skill_proficiencies?.map(s => s.name).join(', ')}
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -343,65 +379,64 @@ export default function CreationScreen() {
             </Text>
             
             <ScrollView style={styles.optionsList}>
-              {selectedClass?.proficiency_choices?.[0]?.from?.map((prof) => (
+              {selectedClass?.proficiency_choices?.[0]?.from?.options?.map((prof) => (
                 <TouchableOpacity
-                  key={prof.index}
+                  key={prof.item.index}
                   style={[
                     styles.skillCard,
-                    selectedSkills.includes(prof.name) && styles.selectedSkill,
+                    selectedSkills.includes(prof.item.name) && styles.selectedSkill,
                   ]}
                   onPress={() => {
-                    if (selectedSkills.includes(prof.name)) {
-                      setSelectedSkills(selectedSkills.filter(s => s !== prof.name));
+                    if (selectedSkills.includes(prof.item.name)) {
+                      setSelectedSkills(selectedSkills.filter(s => s !== prof.item.name));
                     } else {
-                      setSelectedSkills([...selectedSkills, prof.name]);
+                      setSelectedSkills([...selectedSkills, prof.item.name]);
                     }
                   }}
                 >
-                  <Text style={styles.skillName}>{prof.name}</Text>
+                  <Text style={styles.skillName}>{prof.item.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
         );
 
-      case 5: // Spells
+      case 5: // Spells (only shown for spellcasters)
+        if (!hasSpellcasting) {
+          return null; // This step should be skipped
+        }
+        
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Choose Spells</Text>
             <Text style={styles.stepDescription}>
-              {selectedClass?.spellcasting 
-                ? 'Select cantrips and 1st level spells for your spellcaster'
-                : 'Your class does not have spellcasting abilities'
-              }
+              Select cantrips and 1st level spells for your spellcaster
             </Text>
             
-            {selectedClass?.spellcasting && (
-              <ScrollView style={styles.optionsList}>
-                {spells.filter(spell => spell.level <= 1).map((spell) => (
-                  <TouchableOpacity
-                    key={spell.index}
-                    style={[
-                      styles.spellCard,
-                      selectedSpells.some(s => s.index === spell.index) && styles.selectedSpell,
-                    ]}
-                    onPress={() => {
-                      if (selectedSpells.some(s => s.index === spell.index)) {
-                        setSelectedSpells(selectedSpells.filter(s => s.index !== spell.index));
-                      } else {
-                        setSelectedSpells([...selectedSpells, spell]);
-                      }
-                    }}
-                  >
-                    <Text style={styles.spellName}>{spell.name}</Text>
-                    <Text style={styles.spellLevel}>
-                      {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
-                    </Text>
-                    <Text style={styles.spellSchool}>{spell.school}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
+            <ScrollView style={styles.optionsList}>
+              {spells.filter(spell => spell.level <= 1).map((spell) => (
+                <TouchableOpacity
+                  key={spell.index}
+                  style={[
+                    styles.spellCard,
+                    selectedSpells.some(s => s.index === spell.index) && styles.selectedSpell,
+                  ]}
+                  onPress={() => {
+                    if (selectedSpells.some(s => s.index === spell.index)) {
+                      setSelectedSpells(selectedSpells.filter(s => s.index !== spell.index));
+                    } else {
+                      setSelectedSpells([...selectedSpells, spell]);
+                    }
+                  }}
+                >
+                  <Text style={styles.spellName}>{spell.name}</Text>
+                  <Text style={styles.spellLevel}>
+                    {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
+                  </Text>
+                  <Text style={styles.spellSchool}>{spell.school}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         );
 
@@ -450,6 +485,9 @@ export default function CreationScreen() {
               <View style={styles.reviewSection}>
                 <Text style={styles.reviewLabel}>Class:</Text>
                 <Text style={styles.reviewValue}>{selectedClass?.name}</Text>
+                {hasSpellcasting && (
+                  <Text style={styles.reviewSubtext}>Spellcaster</Text>
+                )}
               </View>
               
               <View style={styles.reviewSection}>
@@ -475,12 +513,14 @@ export default function CreationScreen() {
                 </Text>
               </View>
               
-              <View style={styles.reviewSection}>
-                <Text style={styles.reviewLabel}>Spells:</Text>
-                <Text style={styles.reviewValue}>
-                  {selectedSpells.length > 0 ? selectedSpells.map(s => s.name).join(', ') : 'None selected'}
-                </Text>
-              </View>
+              {hasSpellcasting && (
+                <View style={styles.reviewSection}>
+                  <Text style={styles.reviewLabel}>Spells:</Text>
+                  <Text style={styles.reviewValue}>
+                    {selectedSpells.length > 0 ? selectedSpells.map(s => s.name).join(', ') : 'None selected'}
+                  </Text>
+                </View>
+              )}
             </ScrollView>
             
             <TouchableOpacity
@@ -514,6 +554,9 @@ export default function CreationScreen() {
     );
   }
 
+  const displayStep = getDisplayStepIndex(currentStep);
+  const totalSteps = getTotalSteps();
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -529,12 +572,12 @@ export default function CreationScreen() {
           <View 
             style={[
               styles.progressFill, 
-              { width: `${((currentStep + 1) / CREATION_STEPS.length) * 100}%` }
+              { width: `${((displayStep + 1) / totalSteps) * 100}%` }
             ]} 
           />
         </View>
         <Text style={styles.progressText}>
-          Step {currentStep + 1} of {CREATION_STEPS.length}: {CREATION_STEPS[currentStep].title}
+          Step {displayStep + 1} of {totalSteps}: {CREATION_STEPS[currentStep].title}
         </Text>
       </View>
 
@@ -800,6 +843,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
     fontFamily: 'Inter-Regular',
+  },
+  reviewSubtext: {
+    fontSize: 14,
+    color: '#888',
+    fontFamily: 'Inter-Regular',
+    marginTop: 2,
   },
   reviewAbilities: {
     flexDirection: 'row',
