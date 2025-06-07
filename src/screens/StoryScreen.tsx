@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,23 +11,91 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import { Send, Home, User2, X } from 'lucide-react-native';
+import { Send, Home, User2, X, AlertCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
+import { userAtom } from '../atoms/authAtoms';
 import CharacterView from '../components/CharacterView';
+import StoryEventItem from '../components/StoryEventItem';
+import StoryChoices from '../components/StoryChoices';
+import { useStoryAI } from '../hooks/useStoryAI';
+
+const DEFAULT_CHOICES = [
+  'Explore deeper into the forest',
+  'Search for signs of civilization',
+  'Set up camp for the night',
+  'Listen carefully for any sounds',
+];
 
 export default function StoryScreen() {
   const [userInput, setUserInput] = useState('');
   const [currentCampaign] = useAtom(currentCampaignAtom);
+  const [user] = useAtom(userAtom);
   const [isCharacterSheetVisible, setIsCharacterSheetVisible] = useState(false);
+  const [showChoices, setShowChoices] = useState(true);
+  
+  const scrollViewRef = useRef<ScrollView>(null);
+  const { storyState, sendPlayerAction, sendChoice, clearError } = useStoryAI();
 
-  const handleSend = () => {
-    if (userInput.trim()) {
-      // Handle sending the user's input
-      setUserInput('');
+  useEffect(() => {
+    if (!currentCampaign) {
+      router.replace('/home');
     }
+  }, [currentCampaign]);
+
+  useEffect(() => {
+    // Auto-scroll to bottom when new events are added
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollToEnd({ animated: true });
+    }
+  }, [storyState.events]);
+
+  useEffect(() => {
+    // Show error alert if there's an error
+    if (storyState.error) {
+      Alert.alert(
+        'Connection Error',
+        'Failed to get response from Dungeon Master. Please check your internet connection and try again.',
+        [
+          { text: 'OK', onPress: clearError }
+        ]
+      );
+    }
+  }, [storyState.error, clearError]);
+
+  const handleSend = async () => {
+    if (!userInput.trim() || storyState.isLoading) return;
+
+    const action = userInput.trim();
+    setUserInput('');
+    setShowChoices(false);
+
+    await sendPlayerAction(
+      action,
+      user?.id || 'player1',
+      user?.username || user?.email || 'Player'
+    );
+
+    // Show choices again after DM responds
+    setTimeout(() => setShowChoices(true), 1000);
+  };
+
+  const handleChoiceSelect = async (choice: string) => {
+    if (storyState.isLoading) return;
+
+    setShowChoices(false);
+    await sendChoice(
+      choice,
+      user?.id || 'player1',
+      user?.username || user?.email || 'Player'
+    );
+
+    // Show choices again after DM responds
+    setTimeout(() => setShowChoices(true), 1000);
   };
 
   const handleHomePress = () => {
@@ -37,6 +105,15 @@ export default function StoryScreen() {
   const handleCharacterPress = () => {
     setIsCharacterSheetVisible(true);
   };
+
+  if (!currentCampaign) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text style={styles.loadingText}>Loading campaign...</Text>
+      </View>
+    );
+  }
 
   return (
     <ImageBackground
@@ -50,8 +127,10 @@ export default function StoryScreen() {
           </TouchableOpacity>
           
           <View style={styles.headerTitle}>
-            <Text style={styles.title}>{currentCampaign?.name || 'The Dark Forest'}</Text>
-            <Text style={styles.subtitle}>Chapter 1: The Beginning</Text>
+            <Text style={styles.title}>{currentCampaign.name}</Text>
+            <Text style={styles.subtitle}>
+              {storyState.events.length > 0 ? 'Adventure in Progress' : 'Chapter 1: The Beginning'}
+            </Text>
           </View>
 
           <TouchableOpacity onPress={handleCharacterPress} style={styles.headerButton}>
@@ -64,22 +143,51 @@ export default function StoryScreen() {
           style={styles.content}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          <ScrollView style={styles.storyContainer}>
-            <Text style={styles.storyText}>
-              The ancient trees loomed overhead, their branches intertwining to form a dense canopy that barely allowed any sunlight to penetrate. The air was thick with an otherworldly presence, and the silence was deafening. Your journey begins here, in the heart of the Dark Forest...
-            </Text>
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.storyContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            {storyState.events.length === 0 ? (
+              <View style={styles.welcomeContainer}>
+                <Text style={styles.welcomeText}>
+                  Welcome to {currentCampaign.name}! Your adventure is about to begin...
+                </Text>
+                <Text style={styles.instructionText}>
+                  Choose an action below or write your own to start the story.
+                </Text>
+              </View>
+            ) : (
+              storyState.events.map((event) => (
+                <StoryEventItem key={event.id} event={event} />
+              ))
+            )}
 
-            <View style={styles.choicesContainer}>
-              <TouchableOpacity style={styles.choiceButton}>
-                <Text style={styles.choiceText}>Explore deeper into the forest</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.choiceButton}>
-                <Text style={styles.choiceText}>Search for signs of civilization</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.choiceButton}>
-                <Text style={styles.choiceText}>Set up camp for the night</Text>
-              </TouchableOpacity>
-            </View>
+            {storyState.isLoading && (
+              <View style={styles.loadingEvent}>
+                <ActivityIndicator size="small" color="#FFD700" />
+                <Text style={styles.loadingEventText}>
+                  The Dungeon Master is thinking...
+                </Text>
+              </View>
+            )}
+
+            {storyState.error && (
+              <View style={styles.errorContainer}>
+                <AlertCircle size={20} color="#f44336" />
+                <Text style={styles.errorText}>
+                  Failed to connect to Dungeon Master. Please try again.
+                </Text>
+              </View>
+            )}
+
+            {showChoices && !storyState.isLoading && (
+              <StoryChoices
+                choices={DEFAULT_CHOICES}
+                onChoiceSelect={handleChoiceSelect}
+                disabled={storyState.isLoading}
+              />
+            )}
           </ScrollView>
 
           <View style={styles.inputContainer}>
@@ -90,13 +198,22 @@ export default function StoryScreen() {
               placeholder="Write your own action..."
               placeholderTextColor="#666"
               multiline
+              maxLength={500}
+              editable={!storyState.isLoading}
             />
             <TouchableOpacity
-              style={[styles.sendButton, !userInput.trim() && styles.sendButtonDisabled]}
+              style={[
+                styles.sendButton,
+                (!userInput.trim() || storyState.isLoading) && styles.sendButtonDisabled
+              ]}
               onPress={handleSend}
-              disabled={!userInput.trim()}
+              disabled={!userInput.trim() || storyState.isLoading}
             >
-              <Send size={24} color={userInput.trim() ? '#fff' : '#666'} />
+              {storyState.isLoading ? (
+                <ActivityIndicator size="small" color="#666" />
+              ) : (
+                <Send size={24} color={userInput.trim() ? '#fff' : '#666'} />
+              )}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -137,6 +254,18 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+  },
+  loadingText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    marginTop: 16,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -176,27 +305,60 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  storyText: {
+  welcomeContainer: {
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFD700',
+  },
+  welcomeText: {
     fontSize: 18,
     color: '#1a1a1a',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  instructionText: {
+    fontSize: 16,
+    color: '#1a1a1a',
     fontFamily: 'Inter-Regular',
-    lineHeight: 28,
-    marginBottom: 24,
+    textAlign: 'center',
+    opacity: 0.8,
   },
-  choicesContainer: {
-    gap: 12,
-  },
-  choiceButton: {
-    backgroundColor: 'rgba(26, 26, 26, 0.9)',
+  loadingEvent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#333',
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderRadius: 12,
+    marginVertical: 8,
   },
-  choiceText: {
-    color: '#fff',
+  loadingEventText: {
+    color: '#1a1a1a',
     fontSize: 16,
     fontFamily: 'Inter-Regular',
+    marginLeft: 12,
+    fontStyle: 'italic',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#f44336',
+  },
+  errorText: {
+    color: '#f44336',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    marginLeft: 8,
+    flex: 1,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -262,7 +424,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   sheetHeader: {
-    //padding: 16,
-    
+    // padding: 16,
   },
 });
