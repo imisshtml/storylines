@@ -89,7 +89,10 @@ export default function LoginScreen() {
               onPress={handleTitlePress}
               disabled={!__DEV__}
             >
-            <Text style={styles.logo}>Storylines</Text>
+            <Text style={styles.logo}>
+              Storylines
+              {__DEV__ && <Text style={styles.devIndicator}> 🔧</Text>}
+            </Text>
           </TouchableOpacity>
           
           <View style={styles.form}>
