@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
     // Create the conversation with OpenAI
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: message }
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
 
 function buildSystemPrompt(context: any) {
   const { campaign, storyHistory = [] } = context;
-  
+
   let prompt = `You are an expert Dungeon Master for a ${campaign?.theme || 'fantasy'} tabletop RPG campaign called "${campaign?.name || 'Adventure'}".
 
 CAMPAIGN DETAILS:
