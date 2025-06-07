@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Send, Home, User2, X, AlertCircle } from 'lucide-react-native';
+import { Send, Chrome as Home, User as User2, X, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
@@ -210,7 +210,7 @@ export default function StoryScreen() {
               disabled={!userInput.trim() || storyState.isLoading}
             >
               {storyState.isLoading ? (
-                <ActivityIndicator size="small" color="#666" />
+                <ActivityIndicator size="small\" color="#666" />
               ) : (
                 <Send size={24} color={userInput.trim() ? '#fff' : '#666'} />
               )}
