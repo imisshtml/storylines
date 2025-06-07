@@ -16,6 +16,7 @@ interface SidebarMenuProps {
 export default function SidebarMenu({ isVisible, onClose }: SidebarMenuProps) {
   const [user] = useAtom(userAtom);
   const [, signOut] = useAtom(signOutAtom);
+  const [imageError, setImageError] = React.useState(false);
   const slideAnim = React.useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
 
@@ -57,6 +58,11 @@ export default function SidebarMenu({ isVisible, onClose }: SidebarMenuProps) {
     } catch (error) {
       console.error('Logout error:', error);
     }
+  };
+
+  const getUserInitial = () => {
+    const name = user?.username || user?.email || 'A';
+    return name.charAt(0).toUpperCase();
   };
 
   const menuItems = [
@@ -122,11 +128,15 @@ export default function SidebarMenu({ isVisible, onClose }: SidebarMenuProps) {
           
           <View style={styles.userInfo}>
             <View style={styles.avatar}>
-              <Image
-                source={{ uri: 'https://images.pexels.com/photos/1670977/pexels-photo-1670977.jpeg?auto=compress&cs=tinysrgb&w=400' }}
-                style={styles.avatarImage}
-                defaultSource={{ uri: 'https://images.pexels.com/photos/1670977/pexels-photo-1670977.jpeg?auto=compress&cs=tinysrgb&w=400' }}
-              />
+              {!imageError ? (
+                <Image
+                  source={{ uri: 'https://images.pexels.com/photos/1670977/pexels-photo-1670977.jpeg?auto=compress&cs=tinysrgb&w=400' }}
+                  style={styles.avatarImage}
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <Text style={styles.avatarText}>{getUserInitial()}</Text>
+              )}
             </View>
             <Text style={styles.userName}>
               {user?.username || user?.email || 'Adventurer'}
@@ -237,6 +247,11 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 37,
+  },
+  avatarText: {
+    fontSize: 32,
+    fontFamily: 'Inter-Bold',
+    color: '#4CAF50',
   },
   userName: {
     fontSize: 20,
