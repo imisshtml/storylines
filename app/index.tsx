@@ -11,8 +11,10 @@ export default function Index() {
   useEffect(() => {
     if (!authLoading) {
       if (user) {
+        // User is authenticated, go to home
         router.replace('/home');
       } else {
+        // User is not authenticated, go to login
         router.replace('/login');
       }
     }
