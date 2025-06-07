@@ -123,18 +123,16 @@ export default function LoginScreen() {
             )}
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                {isSignUp ? 'Email' : 'Email or Username'}
-              </Text>
+              <Text style={styles.label}>Email</Text>
               <TextInput
                 style={styles.input}
                 value={emailOrUsername}
                 onChangeText={setEmailOrUsername}
-                placeholder={isSignUp ? "Enter your email" : "Enter email or username"}
+                placeholder="Enter your email"
                 placeholderTextColor="#666"
                 autoCapitalize="none"
                 autoCorrect={false}
-                keyboardType={isSignUp ? "email-address" : "default"}
+                keyboardType="email-address"
               />
               {emailOrUsername.length > 0 && (
                 isSignUp ? (
@@ -213,7 +211,7 @@ export default function LoginScreen() {
               disabled={!isValid() || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   {isSignUp ? (
@@ -284,7 +282,7 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
   },
   form: {
-    backgroundColor: 'rgba(26, 26, 26, 0.9)',
+    backgroundColor: 'rgba(26, 26, 26, 0.45)',
     borderRadius: 12,
     padding: 20,
     gap: 20,
