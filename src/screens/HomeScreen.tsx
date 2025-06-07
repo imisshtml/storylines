@@ -58,9 +58,6 @@ export default function HomeScreen() {
               </Text>
             )}
           </View>
-          
-          {/* Empty view for layout balance */}
-          <View style={styles.menuButton} />
         </View>
         
         <View style={styles.campaignsContainer}>
