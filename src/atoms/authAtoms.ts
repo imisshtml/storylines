@@ -6,6 +6,7 @@ export type AuthUser = {
   id: string;
   email: string;
   username?: string;
+  phone?: string;
 };
 
 export const userAtom = atom<AuthUser | null>(null);
@@ -13,13 +14,33 @@ export const sessionAtom = atom<Session | null>(null);
 export const authLoadingAtom = atom(true);
 export const authErrorAtom = atom<string | null>(null);
 
+// Helper function to find user by username or email
+const findUserByUsernameOrEmail = async (identifier: string) => {
+  // First try to find by username
+  const { data: profileData } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('username', identifier)
+    .single();
+
+  if (profileData) {
+    return profileData.email;
+  }
+
+  // If not found by username, assume it's an email
+  return identifier;
+};
+
 // Atom to handle sign in
 export const signInAtom = atom(
   null,
-  async (get, set, { email, password }: { email: string; password: string }) => {
+  async (get, set, { emailOrUsername, password }: { emailOrUsername: string; password: string }) => {
     try {
       set(authLoadingAtom, true);
       set(authErrorAtom, null);
+
+      // Find the actual email if username was provided
+      const email = await findUserByUsernameOrEmail(emailOrUsername);
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -34,7 +55,7 @@ export const signInAtom = atom(
         // Fetch user profile
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, phone')
           .eq('id', data.user.id)
           .single();
 
@@ -42,6 +63,7 @@ export const signInAtom = atom(
           id: data.user.id,
           email: data.user.email!,
           username: profile?.username,
+          phone: profile?.phone,
         });
       }
 
@@ -58,10 +80,23 @@ export const signInAtom = atom(
 // Atom to handle sign up
 export const signUpAtom = atom(
   null,
-  async (get, set, { email, password, username }: { email: string; password: string; username?: string }) => {
+  async (get, set, { email, password, username, phone }: { email: string; password: string; username?: string; phone?: string }) => {
     try {
       set(authLoadingAtom, true);
       set(authErrorAtom, null);
+
+      // Check if username already exists
+      if (username) {
+        const { data: existingUser } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', username)
+          .single();
+
+        if (existingUser) {
+          throw new Error('Username already taken');
+        }
+      }
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -69,6 +104,7 @@ export const signUpAtom = atom(
         options: {
           data: {
             username: username || email.split('@')[0],
+            phone: phone || null,
           },
         },
       });
@@ -123,7 +159,7 @@ export const initializeAuthAtom = atom(
         // Fetch user profile
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, phone')
           .eq('id', session.user.id)
           .single();
 
@@ -131,6 +167,7 @@ export const initializeAuthAtom = atom(
           id: session.user.id,
           email: session.user.email!,
           username: profile?.username,
+          phone: profile?.phone,
         });
       }
 
@@ -142,7 +179,7 @@ export const initializeAuthAtom = atom(
           // Fetch user profile
           const { data: profile } = await supabase
             .from('profiles')
-            .select('username')
+            .select('username, phone')
             .eq('id', session.user.id)
             .single();
 
@@ -150,6 +187,7 @@ export const initializeAuthAtom = atom(
             id: session.user.id,
             email: session.user.email!,
             username: profile?.username,
+            phone: profile?.phone,
           });
         } else {
           set(userAtom, null);

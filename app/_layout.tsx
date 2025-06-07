@@ -4,12 +4,14 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { useAtom } from 'jotai';
 import { fetchCampaignsAtom } from '../src/atoms/campaignAtoms';
-import { initializeAuthAtom } from '../src/atoms/authAtoms';
+import { initializeAuthAtom } from '../src/atoms/authAtoms'
+import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  useFrameworkReady();
   const [fontsLoaded, fontError] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Bold': Inter_700Bold,
