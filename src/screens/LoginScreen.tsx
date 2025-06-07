@@ -211,7 +211,7 @@ export default function LoginScreen() {
               disabled={!isValid() || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   {isSignUp ? (
@@ -239,13 +239,14 @@ export default function LoginScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </View>
 
-          <View style={styles.footer}>
-            <View style={styles.builtWithContainer}>
-              <Text style={styles.builtWithText}>Built with Bolt</Text>
-              <Zap size={16} color="#FFD700" />
-            </View>
-          </View>
+      {/* Fixed Footer */}
+      <View style={styles.footer}>
+        <View style={styles.builtWithContainer}>
+          <Text style={styles.builtWithText}>Built with Bolt</Text>
+          <Zap size={16} color="#FFD700" />
         </View>
       </View>
     </ImageBackground>
@@ -384,13 +385,22 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
   },
   footer: {
-    marginTop: 30,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     alignItems: 'center',
+    paddingBottom: 20,
+    paddingHorizontal: 20,
   },
   builtWithContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   builtWithText: {
     color: '#888',
