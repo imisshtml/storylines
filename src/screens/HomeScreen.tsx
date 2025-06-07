@@ -1,16 +1,17 @@
 import { router } from 'expo-router';
-import { Play, Users, Settings, LogOut } from 'lucide-react-native';
-import React from 'react';
+import { Play, Users, Settings, Menu } from 'lucide-react-native';
+import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground } from 'react-native';
 import { useAtom } from 'jotai';
 import { campaignsAtom, currentCampaignAtom } from '../atoms/campaignAtoms';
-import { signOutAtom, userAtom } from '../atoms/authAtoms';
+import { userAtom } from '../atoms/authAtoms';
+import SidebarMenu from '../components/SidebarMenu';
 
 export default function HomeScreen() {
   const [campaigns] = useAtom(campaignsAtom);
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [user] = useAtom(userAtom);
-  const [, signOut] = useAtom(signOutAtom);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(false);
 
   const handleCampaignPress = (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
@@ -33,13 +34,13 @@ export default function HomeScreen() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      router.replace('/creation');
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+  const toggleSidebar = () => {
+    setIsSidebarVisible(!isSidebarVisible);
+  };
+
+  const handleTitlePress = () => {
+    // Only navigate to dev screen in development mode
+    router.push('/dev');
   };
 
   return (
@@ -50,21 +51,30 @@ export default function HomeScreen() {
     >
       <View style={styles.overlay}>
         <View style={styles.header}>
+          <TouchableOpacity onPress={toggleSidebar} style={styles.menuButton}>
+            <Menu size={24} color="#fff" />
+          </TouchableOpacity>
+          
           <View style={styles.titleContainer}>
-            <Text style={styles.logo}>Storylines</Text>
+            <TouchableOpacity 
+              onPress={handleTitlePress}
+              disabled={!__DEV__}
+            >
+              <Text style={[styles.logo, __DEV__ && styles.logoClickable]}>
+                Storylines
+                {__DEV__ && <Text style={styles.devIndicator}> 🔧</Text>}
+              </Text>
+            </TouchableOpacity>
             {user && (
               <Text style={styles.welcomeText}>
                 Welcome back, {user.username || user.email}!
               </Text>
             )}
           </View>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-            <LogOut size={24} color="#fff" />
-          </TouchableOpacity>
         </View>
         
         <View style={styles.campaignsContainer}>
-          <Text style={styles.sectionTitle}>Campaigns Happening Now!</Text>
+          <Text style={styles.sectionTitle}>My Campaigns</Text>
           {campaigns.map(campaign => (
             <View key={campaign.id} style={styles.campaignCard}>
               <View style={styles.campaignHeader}>
@@ -123,6 +133,11 @@ export default function HomeScreen() {
           <Text style={styles.buttonText}>Join via Code</Text>
         </TouchableOpacity>
       </View>
+
+      <SidebarMenu 
+        isVisible={isSidebarVisible}
+        onClose={() => setIsSidebarVisible(false)}
+      />
     </ImageBackground>
   );
 }
@@ -142,12 +157,21 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginVertical: 20,
   },
+  menuButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+  },
   titleContainer: {
-    marginTop: 20,
     flex: 1,
     alignItems: 'center',
+    marginTop: 20,
   },
   logo: {
     fontSize: 32,
@@ -157,6 +181,14 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
+  logoClickable: {
+    textDecorationLine: 'underline',
+    textDecorationColor: '#4CAF50',
+  },
+  devIndicator: {
+    fontSize: 16,
+    color: '#4CAF50',
+  },
   welcomeText: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
@@ -165,14 +197,6 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
-  },
-  logoutButton: {
-    padding: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
   },
   campaignsContainer: {
     flex: 1,

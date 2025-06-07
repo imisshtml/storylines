@@ -71,6 +71,11 @@ export default function LoginScreen() {
     setUsername('');
     setPhone('');
   };
+  
+  const handleTitlePress = () => {
+    // Only navigate to dev screen in development mode
+    router.push('/dev');
+  };
 
   return (
     <ImageBackground
@@ -79,8 +84,16 @@ export default function LoginScreen() {
       imageStyle={styles.backgroundImage}
     >
       <View style={styles.overlay}>
-        <View style={styles.content}>
-          <Text style={styles.logo}>Storylines</Text>
+        <View style={styles.content}>            
+          <TouchableOpacity 
+              onPress={handleTitlePress}
+              disabled={!__DEV__}
+            >
+            <Text style={styles.logo}>
+              Storylines
+              {__DEV__ && <Text style={styles.devIndicator}> 🔧</Text>}
+            </Text>
+          </TouchableOpacity>
           
           <View style={styles.form}>
             {error && (
