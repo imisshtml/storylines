@@ -43,16 +43,38 @@ export const fetchCampaignsAtom = atom(
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
-      // Fetch campaigns where user is either owner OR a player
-      const { data: allCampaigns, error: campaignError } = await supabase
+      // First, get campaigns where user is the owner
+      const { data: ownedCampaigns, error: ownedError } = await supabase
         .from('campaigns')
         .select('*')
-        .or(`owner.eq.${user.id},players.cs.[{"id":"${user.id}"}]`)
-        .order('created_at', { ascending: false });
+        .eq('owner', user.id);
 
-      if (campaignError) throw campaignError;
+      if (ownedError) throw ownedError;
 
-      set(campaignsAtom, allCampaigns || []);
+      // Then, get all campaigns and filter client-side for ones where user is a player
+      const { data: allCampaigns, error: allError } = await supabase
+        .from('campaigns')
+        .select('*');
+
+      if (allError) throw allError;
+
+      // Filter campaigns where user is a player (but not owner to avoid duplicates)
+      const playerCampaigns = allCampaigns?.filter(campaign => {
+        // Skip if user is already the owner (already included in ownedCampaigns)
+        if (campaign.owner === user.id) return false;
+        
+        // Check if user is in the players array
+        const players = campaign.players || [];
+        return players.some((player: Player) => player.id === user.id);
+      }) || [];
+
+      // Combine owned and player campaigns
+      const userCampaigns = [...(ownedCampaigns || []), ...playerCampaigns];
+
+      // Sort by created_at descending
+      userCampaigns.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+
+      set(campaignsAtom, userCampaigns);
     } catch (error) {
       set(campaignsErrorAtom, (error as Error).message);
       console.error('Campaign fetch error:', error);
@@ -139,24 +161,10 @@ export const initializeRealtimeAtom = atom(
           table: 'campaigns'
         },
         async (payload) => {
-          // Fetch fresh data to ensure we have the complete state
-          const { data: campaigns } = await supabase
-            .from('campaigns')
-            .select('*')
-            .or(`owner.eq.${user.id},players.cs.[{"id":"${user.id}"}]`)
-            .order('created_at', { ascending: false });
-
-          if (campaigns) {
-            set(campaignsAtom, campaigns);
-            
-            // Update current campaign if it was modified
-            const currentCampaign = get(currentCampaignAtom);
-            if (currentCampaign) {
-              const updatedCampaign = campaigns.find(c => c.id === currentCampaign.id);
-              if (updatedCampaign) {
-                set(currentCampaignAtom, updatedCampaign);
-              }
-            }
+          // Refresh campaigns when any change occurs
+          const fetchCampaigns = get(fetchCampaignsAtom);
+          if (fetchCampaigns) {
+            await fetchCampaigns();
           }
         }
       )
