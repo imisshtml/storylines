@@ -15,6 +15,7 @@ export type Campaign = {
   content_level: 'kids' | 'teens' | 'adults';
   rp_focus: 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heavy_combat';
   created_at?: string;
+  updated_at?: string; // Make this optional since it might not exist
 };
 
 export type Player = {
@@ -69,9 +70,12 @@ export const upsertCampaignAtom = atom(
       set(campaignsLoadingAtom, true);
       set(campaignsErrorAtom, null);
 
+      // Remove updated_at from the campaign data to avoid the error
+      const { updated_at, ...campaignData } = campaign;
+
       const { data, error } = await supabase
         .from('campaigns')
-        .upsert(campaign)
+        .upsert(campaignData)
         .select()
         .single();
 
