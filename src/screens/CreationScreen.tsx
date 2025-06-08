@@ -744,7 +744,7 @@ export default function CreationScreen() {
                   </View>
                 )}
 
-                {selectedRaceForDetails.subraces && selectedRaceForDetails.subraces.length > 0 && (
+                {false && selectedRaceForDetails.subraces && selectedRaceForDetails.subraces.length > 0 && (
                   <View style={styles.raceDetailSection}>
                     <Text style={styles.raceDetailLabel}>Subraces</Text>
                     {selectedRaceForDetails.subraces.map((subrace, index) => (
