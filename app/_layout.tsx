@@ -6,6 +6,10 @@ import { useAtom } from 'jotai';
 import { fetchCampaignsAtom } from '../src/atoms/campaignAtoms';
 import { initializeAuthAtom } from '../src/atoms/authAtoms'
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import 'react-native-reanimated';
+import { View } from 'react-native';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -41,22 +45,28 @@ export default function RootLayout() {
   }
 
   return (
-    <>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="home" />
-        <Stack.Screen name="login" />
-        <Stack.Screen name="creation" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen 
-          name="story" 
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'fade',
-          }}
-        />
-      </Stack>
-      <StatusBar style="auto" />
-    </>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <BottomSheetModalProvider>
+        <View style={{ flex: 1, backgroundColor: '#121212' }}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="home" />
+            <Stack.Screen name="login" />
+            <Stack.Screen name="creation" />
+            <Stack.Screen name="settings" />
+            <Stack.Screen name="profile" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen 
+              name="story" 
+              options={{
+                presentation: 'fullScreenModal',
+                animation: 'fade',
+              }}
+            />
+          </Stack>
+          <StatusBar style="auto" />
+        </View>
+      </BottomSheetModalProvider>
+    </GestureHandlerRootView>
   );
 }

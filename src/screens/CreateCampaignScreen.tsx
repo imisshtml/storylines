@@ -1,25 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { ChevronRight, CircleAlert as AlertCircle, Save, ArrowLeft } from 'lucide-react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView } from 'react-native';
+import { CircleAlert as AlertCircle, Save, ArrowLeft, ChevronDown } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { campaignsLoadingAtom, campaignsErrorAtom, currentCampaignAtom, upsertCampaignAtom, type Campaign } from '../atoms/campaignAtoms';
+import { userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
-import { supabase } from '../config/supabase';
-
-type Theme = {
-  id: string;
-  name: string;
-  description: string;
-};
+import AdventureSelectSheet, { type Adventure, ADVENTURES } from '../components/AdventureSelectSheet';
 
 type Tone = 'serious' | 'humorous' | 'grimdark';
-
-const themes: Theme[] = [
-  { id: 'fantasy', name: 'Fantasy', description: 'Dragons, magic, and epic quests' },
-  { id: 'scifi', name: 'Sci-Fi', description: 'Space exploration and advanced technology' },
-  { id: 'horror', name: 'Horror', description: 'Suspense and supernatural encounters' },
-  { id: 'western', name: 'Western', description: 'Cowboys, outlaws, and frontier adventures' },
-];
+type ContentLevel = 'kids' | 'teens' | 'adults';
+type RPFocus = 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heavy_combat';
 
 const contentTags = [
   'Gore',
@@ -30,33 +20,57 @@ const contentTags = [
   'Romance',
 ];
 
+const rpFocusLabels: Record<RPFocus, string> = {
+  'heavy_rp': 'Heavy Roleplay',
+  'rp_focused': 'Roleplay Focused',
+  'balanced': 'Balanced',
+  'combat_focused': 'Combat Focused',
+  'heavy_combat': 'Heavy Combat',
+};
+
+const contentLevelDescriptions: Record<ContentLevel, string> = {
+  'kids': 'Suitable for children. No mature themes or violence.',
+  'teens': 'Mild themes and fantasy violence. Similar to YA content.',
+  'adults': 'Mature themes and content. Default setting.',
+};
+
 export default function CreateCampaignScreen() {
   const [currentCampaign, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [isLoading] = useAtom(campaignsLoadingAtom);
   const [error] = useAtom(campaignsErrorAtom);
   const [, upsertCampaign] = useAtom(upsertCampaignAtom);
+  const [user] = useAtom(userAtom);
   
   const [campaignName, setCampaignName] = useState('');
-  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  const [selectedAdventure, setSelectedAdventure] = useState<Adventure | null>(null);
   const [startingLevel, setStartingLevel] = useState('1');
   const [selectedTone, setSelectedTone] = useState<Tone | null>(null);
   const [excludedTags, setExcludedTags] = useState<string[]>([]);
+  const [contentLevel, setContentLevel] = useState<ContentLevel>('adults');
+  const [rpFocus, setRpFocus] = useState<RPFocus>('balanced');
+  const [isAdventureSheetVisible, setIsAdventureSheetVisible] = useState(false);
 
   const isEditing = currentCampaign !== null;
 
   useEffect(() => {
     if (currentCampaign) {
       setCampaignName(currentCampaign.name);
-      setSelectedTheme(currentCampaign.theme);
       setStartingLevel(currentCampaign.level.toString());
       setSelectedTone(currentCampaign.tone);
       setExcludedTags(currentCampaign.exclude || []);
+      setContentLevel(currentCampaign.content_level);
+      setRpFocus(currentCampaign.rp_focus);
+      // Set the selected adventure from the campaign's adventure ID
+      const adventure = ADVENTURES.find((a: Adventure) => a.id === currentCampaign.adventure);
+      if (adventure) {
+        setSelectedAdventure(adventure);
+      }
     }
   }, [currentCampaign]);
 
   const handleBack = () => {
     setCurrentCampaign(null);
-    router.back();
+    router.push('/');
   };
 
   const toggleTag = (tag: string) => {
@@ -67,24 +81,34 @@ export default function CreateCampaignScreen() {
     );
   };
 
+  const handleAdventurePress = useCallback(() => {
+    setIsAdventureSheetVisible(true);
+  }, []);
+
+  const handleAdventureSelect = useCallback((adventure: Adventure) => {
+    setSelectedAdventure(adventure);
+  }, []);
+
   const handleSave = async () => {
-    if (!campaignName || !selectedTheme || !selectedTone) return;
+    if (!campaignName || !selectedAdventure || !selectedTone || !user) return;
 
     try {
       const campaignData: Partial<Campaign> = {
         name: campaignName,
-        theme: selectedTheme,
+        adventure: selectedAdventure.id,
         level: parseInt(startingLevel, 10),
         tone: selectedTone,
         exclude: excludedTags,
         status: 'creation',
         players: [{
-          id: 'anon',
-          name: 'Game Master',
+          id: user.id,
+          name: user.username || '',
           ready: false,
         }],
         invite_code: Math.random().toString(36).substring(2, 8).toUpperCase(),
-        owner: 'anon',
+        owner: user.id,
+        content_level: contentLevel,
+        rp_focus: rpFocus,
       };
 
       // If editing, include the ID
@@ -109,11 +133,12 @@ export default function CreateCampaignScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <ArrowLeft color="#fff" size={24} />
-        </TouchableOpacity>
+          <View style={styles.backButton}>
+            <TouchableOpacity onPress={handleBack} style={styles.touchable} />
+            <ArrowLeft color="#fff" size={24} />
+          </View>
         <Text style={styles.title}>{isEditing ? 'Edit Campaign' : 'Create New Campaign'}</Text>
       </View>
       
@@ -124,170 +149,220 @@ export default function CreateCampaignScreen() {
         </View>
       )}
 
-      <View style={styles.section}>
-        <Text style={styles.label}>Campaign Name</Text>
-        <TextInput
-          style={styles.input}
-          value={campaignName}
-          onChangeText={setCampaignName}
-          placeholder="Enter campaign name"
-          placeholderTextColor="#666"
-        />
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>Choose Theme</Text>
-        <View style={styles.themeGrid}>
-          {themes.map(theme => (
-            <TouchableOpacity
-              key={theme.id}
-              style={[
-                styles.themeCard,
-                selectedTheme === theme.id && styles.selectedTheme
-              ]}
-              onPress={() => setSelectedTheme(theme.id)}
-            >
-              <Text style={styles.themeName}>{theme.name}</Text>
-              <Text style={styles.themeDescription}>{theme.description}</Text>
-            </TouchableOpacity>
-          ))}
+      <ScrollView style={styles.content}>
+        <View style={styles.section}>
+          <Text style={styles.label}>Campaign Name</Text>
+          <TextInput
+            style={styles.input}
+            value={campaignName}
+            onChangeText={setCampaignName}
+            placeholder="Enter campaign name"
+            placeholderTextColor="#666"
+          />
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.label}>Starting Level</Text>
-        <TextInput
-          style={styles.input}
-          value={startingLevel}
-          onChangeText={setStartingLevel}
-          keyboardType="numeric"
-          placeholder="Enter starting level"
-          placeholderTextColor="#666"
-        />
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>Campaign Tone</Text>
-        <View style={styles.toneContainer}>
-          {(['serious', 'humorous', 'grimdark'] as Tone[]).map(tone => (
-            <TouchableOpacity
-              key={tone}
-              style={[
-                styles.toneButton,
-                selectedTone === tone && styles.selectedTone
-              ]}
-              onPress={() => setSelectedTone(tone)}
-            >
-              <Text style={[
-                styles.toneText,
-                selectedTone === tone && styles.selectedToneText
-              ]}>
-                {tone.charAt(0).toUpperCase() + tone.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.section}>
+          <Text style={styles.label}>Choose Adventure</Text>
+          <TouchableOpacity
+            style={styles.adventureSelector}
+            onPress={handleAdventurePress}
+          >
+            <Text style={styles.adventureSelectorText}>
+              {selectedAdventure ? selectedAdventure.title : 'Select Adventure'}
+            </Text>
+            <ChevronDown color="#fff" size={20} />
+          </TouchableOpacity>
+          {selectedAdventure && (
+            <Text style={styles.adventureDescription}>
+              {selectedAdventure.description}
+            </Text>
+          )}
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.label}>Content to Exclude</Text>
-        <View style={styles.tagsContainer}>
-          {contentTags.map(tag => (
-            <TouchableOpacity
-              key={tag}
-              style={[
-                styles.tagButton,
-                excludedTags.includes(tag) && styles.selectedTag
-              ]}
-              onPress={() => toggleTag(tag)}
-            >
-              {excludedTags.includes(tag) && (
-                <AlertCircle size={16} color="#fff" style={styles.tagIcon} />
-              )}
-              <Text style={[
-                styles.tagText,
-                excludedTags.includes(tag) && styles.selectedTagText
-              ]}>
-                {tag}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.section}>
+          <Text style={styles.label}>Starting Level</Text>
+          <TextInput
+            style={styles.input}
+            value={startingLevel}
+            onChangeText={setStartingLevel}
+            keyboardType="numeric"
+            placeholder="Enter starting level"
+            placeholderTextColor="#666"
+          />
         </View>
-      </View>
 
-      <TouchableOpacity 
-        style={[
-          styles.actionButton,
-          (!campaignName || !selectedTheme || !selectedTone) && styles.actionButtonDisabled
-        ]}
-        onPress={handleSave}
-        disabled={!campaignName || !selectedTheme || !selectedTone}
-      >
-        {isEditing ? (
-          <>
-            <Save size={20} color="#fff" />
-            <Text style={styles.actionButtonText}>Save Changes</Text>
-          </>
-        ) : (
-          <>
-            <Text style={styles.actionButtonText}>Create Campaign</Text>
-            <ChevronRight size={20} color="#fff" />
-          </>
-        )}
-      </TouchableOpacity>
-    </ScrollView>
+        <View style={styles.section}>
+          <Text style={styles.label}>Campaign Tone</Text>
+          <View style={styles.toneContainer}>
+            {(['serious', 'humorous', 'grimdark'] as Tone[]).map(tone => (
+              <TouchableOpacity
+                key={tone}
+                style={[
+                  styles.toneButton,
+                  selectedTone === tone && styles.selectedTone
+                ]}
+                onPress={() => setSelectedTone(tone)}
+              >
+                <Text style={[
+                  styles.toneText,
+                  selectedTone === tone && styles.selectedToneText
+                ]}>
+                  {tone.charAt(0).toUpperCase() + tone.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Content Level</Text>
+          <View style={styles.contentLevelContainer}>
+            {(['kids', 'teens', 'adults'] as ContentLevel[]).map(level => (
+              <TouchableOpacity
+                key={level}
+                style={[
+                  styles.contentLevelButton,
+                  contentLevel === level && styles.selectedContentLevel
+                ]}
+                onPress={() => setContentLevel(level)}
+              >
+                <Text style={[
+                  styles.contentLevelText,
+                  contentLevel === level && styles.selectedContentLevelText
+                ]}>
+                  {level.charAt(0).toUpperCase() + level.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.contentLevelDescription}>
+            {contentLevelDescriptions[contentLevel]}
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Roleplay vs Combat Focus</Text>
+          <View style={styles.rpFocusContainer}>
+            {(['heavy_rp', 'rp_focused', 'balanced', 'combat_focused', 'heavy_combat'] as RPFocus[]).map(focus => (
+              <TouchableOpacity
+                key={focus}
+                style={[
+                  styles.rpFocusButton,
+                  rpFocus === focus && styles.selectedRpFocus
+                ]}
+                onPress={() => setRpFocus(focus)}
+              >
+                <Text style={[
+                  styles.rpFocusText,
+                  rpFocus === focus && styles.selectedRpFocusText
+                ]}>
+                  {rpFocusLabels[focus]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Content to Exclude</Text>
+          <View style={styles.tagsContainer}>
+            {contentTags.map(tag => (
+              <TouchableOpacity
+                key={tag}
+                style={[
+                  styles.tagButton,
+                  excludedTags.includes(tag) && styles.selectedTag
+                ]}
+                onPress={() => toggleTag(tag)}
+              >
+                {excludedTags.includes(tag) && (
+                  <AlertCircle size={16} color="#fff" style={styles.tagIcon} />
+                )}
+                <Text style={[
+                  styles.tagText,
+                  excludedTags.includes(tag) && styles.selectedTagText
+                ]}>
+                  {tag}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.saveButton,
+            (!campaignName || !selectedAdventure || !selectedTone) && styles.saveButtonDisabled
+          ]}
+          onPress={handleSave}
+          disabled={!campaignName || !selectedAdventure || !selectedTone}
+        >
+          <Save color="#fff" size={20} />
+          <Text style={styles.saveButtonText}>
+            {isEditing ? 'Save Changes' : 'Create Campaign'}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      <AdventureSelectSheet
+        isVisible={isAdventureSheetVisible}
+        onClose={() => setIsAdventureSheetVisible(false)}
+        onSelect={handleAdventureSelect}
+        selectedId={selectedAdventure?.id}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#121212',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    paddingTop: 40,
+    paddingHorizontal: 16,
+    height: 52,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+    backgroundColor: '#121212',
   },
   backButton: {
-    marginRight: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'absolute',
+    left: 16,
   },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2a1515',
-    padding: 12,
-    borderRadius: 8,
-    marginHorizontal: 20,
-    marginBottom: 20,
-  },
-  errorText: {
-    color: '#f44336',
-    marginLeft: 8,
-    fontFamily: 'Inter-Regular',
+  touchable: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
     fontFamily: 'Inter-Bold',
+    flex: 1,
+    textAlign: 'center',
+  },
+  content: {
+    flex: 1,
   },
   section: {
-    marginBottom: 24,
-    paddingHorizontal: 20,
+    padding: 16,
   },
   label: {
     fontSize: 16,
     color: '#fff',
     marginBottom: 8,
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Inter-Bold',
   },
   input: {
     backgroundColor: '#2a2a2a',
@@ -297,41 +372,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
   },
-  themeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  themeCard: {
+  adventureSelector: {
     backgroundColor: '#2a2a2a',
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
-    width: '48%',
-    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  selectedTheme: {
-    backgroundColor: '#4CAF50',
-  },
-  themeName: {
+  adventureSelectorText: {
     color: '#fff',
-    fontSize: 18,
-    marginBottom: 4,
-    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
   },
-  themeDescription: {
-    color: '#888',
+  adventureDescription: {
+    color: '#999',
     fontSize: 14,
+    marginTop: 8,
     fontFamily: 'Inter-Regular',
   },
   toneContainer: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
   },
   toneButton: {
+    flex: 1,
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
     padding: 12,
-    flex: 1,
+    marginHorizontal: 4,
     alignItems: 'center',
   },
   selectedTone: {
@@ -348,18 +417,19 @@ const styles = StyleSheet.create({
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    marginTop: 8,
   },
   tagButton: {
     backgroundColor: '#2a2a2a',
     borderRadius: 20,
     paddingVertical: 8,
     paddingHorizontal: 16,
+    margin: 4,
     flexDirection: 'row',
     alignItems: 'center',
   },
   selectedTag: {
-    backgroundColor: '#E53935',
+    backgroundColor: '#f44336',
   },
   tagIcon: {
     marginRight: 4,
@@ -372,24 +442,94 @@ const styles = StyleSheet.create({
   selectedTagText: {
     fontFamily: 'Inter-Bold',
   },
-  actionButton: {
+  saveButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 8,
     padding: 16,
+    margin: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
-    marginBottom: 40,
-    marginHorizontal: 20,
   },
-  actionButtonDisabled: {
+  saveButtonDisabled: {
     backgroundColor: '#666',
   },
-  actionButtonText: {
+  saveButtonText: {
     color: '#fff',
-    fontSize: 18,
-    marginHorizontal: 8,
+    fontSize: 16,
+    marginLeft: 8,
+    fontFamily: 'Inter-Bold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#121212',
+  },
+  errorContainer: {
+    backgroundColor: '#f443361a',
+    borderRadius: 8,
+    padding: 16,
+    margin: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#f44336',
+    marginLeft: 8,
+    fontSize: 14,
+    flex: 1,
+    fontFamily: 'Inter-Regular',
+  },
+  contentLevelContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  contentLevelButton: {
+    flex: 1,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  selectedContentLevel: {
+    backgroundColor: '#4CAF50',
+  },
+  contentLevelText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  selectedContentLevelText: {
+    fontFamily: 'Inter-Bold',
+  },
+  contentLevelDescription: {
+    color: '#999',
+    fontSize: 14,
+    marginTop: 8,
+    fontFamily: 'Inter-Regular',
+  },
+  rpFocusContainer: {
+    flexDirection: 'column',
+    gap: 8,
+  },
+  rpFocusButton: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  selectedRpFocus: {
+    backgroundColor: '#4CAF50',
+  },
+  rpFocusText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  selectedRpFocusText: {
     fontFamily: 'Inter-Bold',
   },
 });
