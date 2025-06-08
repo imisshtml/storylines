@@ -1,9 +1,12 @@
 import { router } from 'expo-router';
-import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, ActivityIndicator } from 'react-native';
+import React from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAtom } from 'jotai';
 
 export default function ProfileScreen() {
+  const handleBack = () => {
+    router.push('/');
+  };
 
   return (
     <View style={styles.container}>
