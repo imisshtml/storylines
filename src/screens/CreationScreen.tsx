@@ -428,20 +428,20 @@ export default function CreationScreen() {
             <ScrollView style={styles.optionsList}>
               {selectedClass?.proficiency_choices?.[0]?.from?.options?.map((prof) => (
                 <TouchableOpacity
-                  key={prof.index}
+                  key={prof.item.index}
                   style={[
                     styles.skillCard,
-                    selectedSkills.includes(prof.name) && styles.selectedSkill,
+                    selectedSkills.includes(prof.item.name) && styles.selectedSkill,
                   ]}
                   onPress={() => {
-                    if (selectedSkills.includes(prof.name)) {
-                      setSelectedSkills(selectedSkills.filter(s => s !== prof.name));
+                    if (selectedSkills.includes(prof.item.name)) {
+                      setSelectedSkills(selectedSkills.filter(s => s !== prof.item.name));
                     } else {
-                      setSelectedSkills([...selectedSkills, prof.name]);
+                      setSelectedSkills([...selectedSkills, prof.item.name]);
                     }
                   }}
                 >
-                  <Text style={styles.skillName}>{prof.name}</Text>
+                  <Text style={styles.skillName}>{prof.item.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
