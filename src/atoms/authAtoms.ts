@@ -1,5 +1,6 @@
 import { atom } from 'jotai';
 import { supabase } from '../config/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { User, Session } from '@supabase/supabase-js';
 
 export type AuthUser = {
@@ -13,6 +14,12 @@ export const userAtom = atom<AuthUser | null>(null);
 export const sessionAtom = atom<Session | null>(null);
 export const authLoadingAtom = atom(true);
 export const authErrorAtom = atom<string | null>(null);
+
+// AsyncStorage keys
+const STORAGE_KEYS = {
+  USER_SESSION: 'user_session',
+  USER_DATA: 'user_data',
+};
 
 // Helper function to find user by username or email
 const findUserByUsernameOrEmail = async (identifier: string) => {
@@ -29,6 +36,40 @@ const findUserByUsernameOrEmail = async (identifier: string) => {
 
   // If not found by username, assume it's an email
   return identifier;
+};
+
+// Helper functions for AsyncStorage
+const saveUserSession = async (session: Session, user: AuthUser) => {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.USER_SESSION, JSON.stringify(session));
+    await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+  } catch (error) {
+    console.error('Error saving user session:', error);
+  }
+};
+
+const getUserSession = async (): Promise<{ session: Session | null; user: AuthUser | null }> => {
+  try {
+    const sessionData = await AsyncStorage.getItem(STORAGE_KEYS.USER_SESSION);
+    const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
+    
+    return {
+      session: sessionData ? JSON.parse(sessionData) : null,
+      user: userData ? JSON.parse(userData) : null,
+    };
+  } catch (error) {
+    console.error('Error getting user session:', error);
+    return { session: null, user: null };
+  }
+};
+
+const clearUserSession = async () => {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEYS.USER_SESSION);
+    await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
+  } catch (error) {
+    console.error('Error clearing user session:', error);
+  }
 };
 
 // Atom to handle sign in
@@ -59,12 +100,17 @@ export const signInAtom = atom(
           .eq('id', data.user.id)
           .single();
 
-        set(userAtom, {
+        const userData: AuthUser = {
           id: data.user.id,
           email: data.user.email!,
           username: profile?.username,
           phone: profile?.phone,
-        });
+        };
+
+        set(userAtom, userData);
+
+        // Save to AsyncStorage for persistence
+        await saveUserSession(data.session, userData);
       }
 
       return data;
@@ -132,6 +178,9 @@ export const signOutAtom = atom(
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
+      // Clear AsyncStorage
+      await clearUserSession();
+
       set(userAtom, null);
       set(sessionAtom, null);
     } catch (error) {
@@ -143,32 +192,79 @@ export const signOutAtom = atom(
   }
 );
 
-// Initialize auth state
+// Initialize auth state with persistence
 export const initializeAuthAtom = atom(
   null,
   async (get, set) => {
     try {
       set(authLoadingAtom, true);
 
-      // Get initial session
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        set(sessionAtom, session);
-        
-        // Fetch user profile
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('username, phone')
-          .eq('id', session.user.id)
-          .single();
+      // First, check AsyncStorage for saved session
+      const { session: savedSession, user: savedUser } = await getUserSession();
 
-        set(userAtom, {
-          id: session.user.id,
-          email: session.user.email!,
-          username: profile?.username,
-          phone: profile?.phone,
+      if (savedSession && savedUser) {
+        // Verify the saved session is still valid with Supabase
+        await supabase.auth.setSession({
+          access_token: savedSession.access_token,
+          refresh_token: savedSession.refresh_token,
         });
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        
+        if (currentSession?.user) {
+          // Session is still valid, use it
+          set(sessionAtom, currentSession);
+          set(userAtom, savedUser);
+        } else {
+          // Session expired, clear AsyncStorage and get fresh session
+          await clearUserSession();
+          
+          const { data: { session: freshSession } } = await supabase.auth.getSession();
+          
+          if (freshSession?.user) {
+            set(sessionAtom, freshSession);
+            
+            // Fetch user profile
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('username, phone')
+              .eq('id', freshSession.user.id)
+              .single();
+
+            const userData: AuthUser = {
+              id: freshSession.user.id,
+              email: freshSession.user.email!,
+              username: profile?.username,
+              phone: profile?.phone,
+            };
+
+            set(userAtom, userData);
+            await saveUserSession(freshSession, userData);
+          }
+        }
+      } else {
+        // No saved session, check Supabase directly
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          set(sessionAtom, session);
+          
+          // Fetch user profile
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username, phone')
+            .eq('id', session.user.id)
+            .single();
+
+          const userData: AuthUser = {
+            id: session.user.id,
+            email: session.user.email!,
+            username: profile?.username,
+            phone: profile?.phone,
+          };
+
+          set(userAtom, userData);
+          await saveUserSession(session, userData);
+        }
       }
 
       // Listen for auth changes
@@ -183,19 +279,26 @@ export const initializeAuthAtom = atom(
             .eq('id', session.user.id)
             .single();
 
-          set(userAtom, {
+          const userData: AuthUser = {
             id: session.user.id,
             email: session.user.email!,
             username: profile?.username,
             phone: profile?.phone,
-          });
+          };
+
+          set(userAtom, userData);
+          await saveUserSession(session, userData);
         } else {
+          // User signed out
+          await clearUserSession();
           set(userAtom, null);
           set(sessionAtom, null);
         }
       });
     } catch (error) {
       set(authErrorAtom, (error as Error).message);
+      // Clear potentially corrupted data
+      await clearUserSession();
     } finally {
       set(authLoadingAtom, false);
     }

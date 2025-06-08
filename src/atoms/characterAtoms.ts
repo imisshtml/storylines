@@ -196,7 +196,6 @@ export const fetchBackgroundsAtom = atom(
     try {
       const response = await fetch('https://www.dnd5eapi.co/api/backgrounds');
       const data = await response.json();
-      
       const detailedBackgrounds = await Promise.all(
         data.results.map(async (bg: any) => {
           const bgResponse = await fetch(`https://www.dnd5eapi.co${bg.url}`);
@@ -216,11 +215,15 @@ export const fetchSpellsAtom = atom(
   null,
   async (get, set) => {
     try {
-      const response = await fetch('https://www.dnd5eapi.co/api/spells?level=0,1');
+      const response = await fetch('https://www.dnd5eapi.co/api/spells');
       const data = await response.json();
-      
+      console.log('::: spells', data)
+      const level0or1Spells = data.results.filter(spell =>
+        spell.level === 0 || spell.level === 1
+      );
       const detailedSpells = await Promise.all(
-        data.results.slice(0, 50).map(async (spell: any) => { // Limit to first 50 spells
+        level0or1Spells.slice(0, 10).map(async (spell: any) => { // Limit to first 50 spells
+          console.log('::: spell... ', spell.index)
           const spellResponse = await fetch(`https://www.dnd5eapi.co${spell.url}`);
           return await spellResponse.json();
         })
