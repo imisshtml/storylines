@@ -218,7 +218,7 @@ export const fetchSpellsAtom = atom(
     try {
       const response = await fetch('https://www.dnd5eapi.co/api/spells?level=0,1');
       const data = await response.json();
-      
+      console.log('::: spells', data)
       const detailedSpells = await Promise.all(
         data.results.slice(0, 50).map(async (spell: any) => { // Limit to first 50 spells
           const spellResponse = await fetch(`https://www.dnd5eapi.co${spell.url}`);
