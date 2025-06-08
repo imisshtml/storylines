@@ -12,7 +12,7 @@ export default function Index() {
     if (!authLoading) {
       if (user) {
         // User is authenticated, go to home
-        router.replace('/home');
+        router.replace('/index');
       } else {
         // User is not authenticated, go to login
         router.replace('/login');
