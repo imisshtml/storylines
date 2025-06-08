@@ -23,7 +23,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/storylines_splash.j",
+          "image": "./assets/images/storylines_splash.jpg",
           "imageWidth": 1024,
           "resizeMode": "cover",
           "backgroundColor": "#1a1a1a"
