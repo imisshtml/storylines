@@ -877,7 +877,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   raceCardContainer: {
-    marginBottom: 12,
+    marginBottom: 0,
   },
   optionCard: {
     backgroundColor: '#2a2a2a',
