@@ -51,4 +51,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 1,
   },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    flex: 1,
+    textAlign: 'center',
+  },
 });
