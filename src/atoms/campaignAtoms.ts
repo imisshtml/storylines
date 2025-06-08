@@ -43,15 +43,16 @@ export const fetchCampaignsAtom = atom(
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
-      const { data: userCampaigns, error: userError } = await supabase
+      // Fetch campaigns where user is either owner OR a player
+      const { data: allCampaigns, error: campaignError } = await supabase
         .from('campaigns')
         .select('*')
-        .eq('owner', user.id)
+        .or(`owner.eq.${user.id},players.cs.[{"id":"${user.id}"}]`)
         .order('created_at', { ascending: false });
 
-      if (userError) throw userError;
+      if (campaignError) throw campaignError;
 
-      set(campaignsAtom, userCampaigns || []);
+      set(campaignsAtom, allCampaigns || []);
     } catch (error) {
       set(campaignsErrorAtom, (error as Error).message);
       console.error('Campaign fetch error:', error);
@@ -125,6 +126,9 @@ export const currentCampaignAtom = atom<Campaign | null>(null);
 export const initializeRealtimeAtom = atom(
   null,
   async (get, set) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
     const subscription = supabase
       .channel('campaigns')
       .on(
@@ -139,6 +143,7 @@ export const initializeRealtimeAtom = atom(
           const { data: campaigns } = await supabase
             .from('campaigns')
             .select('*')
+            .or(`owner.eq.${user.id},players.cs.[{"id":"${user.id}"}]`)
             .order('created_at', { ascending: false });
 
           if (campaigns) {
