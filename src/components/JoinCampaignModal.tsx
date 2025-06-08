@@ -199,7 +199,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
               disabled={!validateCode(inviteCode) || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small\" color="#fff" />
               ) : (
                 <Text style={styles.buttonText}>Join Campaign</Text>
               )}
