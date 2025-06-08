@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -51,10 +51,13 @@ import {
 } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
 
+// Feature flags
+const ENABLE_BACKGROUNDS = false; // Set to true to enable backgrounds step
+
 const CREATION_STEPS = [
   { title: 'Name & Race', icon: User },
   { title: 'Class', icon: Shield },
-  { title: 'Background', icon: Book },
+  ...(ENABLE_BACKGROUNDS ? [{ title: 'Background', icon: Book }] : []),
   { title: 'Abilities', icon: Dice6 },
   { title: 'Skills', icon: Zap },
   { title: 'Spells', icon: Sword },
@@ -93,12 +96,18 @@ export default function CreationScreen() {
     const loadData = async () => {
       setLoading(true);
       try {
-        await Promise.all([
+        const promises = [
           fetchRaces(),
           fetchClasses(),
-          fetchBackgrounds(),
           fetchSpells(),
-        ]);
+        ];
+        
+        // Only fetch backgrounds if enabled
+        if (ENABLE_BACKGROUNDS) {
+          promises.push(fetchBackgrounds());
+        }
+        
+        await Promise.all(promises);
       } catch (error) {
         console.error('Error loading D&D data:', error);
       } finally {
@@ -112,34 +121,62 @@ export default function CreationScreen() {
   // Check if current class has spellcasting
   const hasSpellcasting = selectedClass?.spellcasting !== undefined;
 
-  // Get the actual step index, skipping spells if not a spellcaster
+  // Get the actual step index, skipping disabled steps
   const getActualStepIndex = (step: number) => {
-    if (!hasSpellcasting && step >= 5) {
-      return step + 1; // Skip spells step (index 5)
+    let actualStep = step;
+    
+    // Skip backgrounds if disabled
+    if (!ENABLE_BACKGROUNDS && step >= 2) {
+      actualStep += 1;
     }
-    return step;
+    
+    // Skip spells if not a spellcaster
+    if (!hasSpellcasting && actualStep >= (ENABLE_BACKGROUNDS ? 5 : 4)) {
+      actualStep += 1;
+    }
+    
+    return actualStep;
   };
 
   // Get the display step index for progress
   const getDisplayStepIndex = (step: number) => {
-    if (!hasSpellcasting && step > 5) {
-      return step - 1; // Adjust for skipped spells step
+    let displayStep = step;
+    
+    // Adjust for skipped spells step
+    if (!hasSpellcasting && step > (ENABLE_BACKGROUNDS ? 5 : 4)) {
+      displayStep -= 1;
     }
-    return step;
+    
+    return displayStep;
   };
 
-  // Get total steps (7 if no spellcasting, 8 if spellcasting)
+  // Get total steps (adjusting for disabled features)
   const getTotalSteps = () => {
-    return hasSpellcasting ? CREATION_STEPS.length : CREATION_STEPS.length - 1;
+    let total = CREATION_STEPS.length;
+    
+    // Subtract 1 if spells are disabled for this class
+    if (!hasSpellcasting) {
+      total -= 1;
+    }
+    
+    return total;
   };
 
   const handleBack = () => {
     if (currentStep > 0) {
       let newStep = currentStep - 1;
-      // Skip spells step when going back if not a spellcaster
-      if (!hasSpellcasting && newStep === 5) {
-        newStep = 4;
+      
+      // Skip backgrounds step when going back if disabled
+      if (!ENABLE_BACKGROUNDS && newStep === 2) {
+        newStep = 1;
       }
+      
+      // Skip spells step when going back if not a spellcaster
+      const spellsStepIndex = ENABLE_BACKGROUNDS ? 5 : 4;
+      if (!hasSpellcasting && newStep === spellsStepIndex) {
+        newStep = spellsStepIndex - 1;
+      }
+      
       setCurrentStep(newStep);
     } else {
       resetCreation();
@@ -150,9 +187,15 @@ export default function CreationScreen() {
   const handleNext = () => {
     let newStep = currentStep + 1;
     
+    // Skip backgrounds step if disabled
+    if (!ENABLE_BACKGROUNDS && newStep === 2) {
+      newStep = 3;
+    }
+    
     // Skip spells step if not a spellcaster
-    if (!hasSpellcasting && newStep === 5) {
-      newStep = 6;
+    const spellsStepIndex = ENABLE_BACKGROUNDS ? 5 : 4;
+    if (!hasSpellcasting && newStep === spellsStepIndex) {
+      newStep = spellsStepIndex + 1;
     }
     
     if (newStep < CREATION_STEPS.length) {
@@ -164,7 +207,7 @@ export default function CreationScreen() {
     switch (currentStep) {
       case 0: return characterName.length >= 2 && selectedRace;
       case 1: return selectedClass;
-      case 2: return selectedBackground;
+      case 2: return ENABLE_BACKGROUNDS ? selectedBackground : true; // Skip if disabled
       case 3: return true; // Abilities always valid
       case 4: return true; // Skills can be empty
       case 5: return true; // Spells can be empty
@@ -207,7 +250,7 @@ export default function CreationScreen() {
         name: characterName,
         race: selectedRace!.name,
         class: selectedClass!.name,
-        background: selectedBackground!.name,
+        background: ENABLE_BACKGROUNDS && selectedBackground ? selectedBackground.name : 'None',
         level: 1,
         abilities,
         skills: selectedSkills.map(skill => ({ name: skill, proficient: true })),
@@ -216,7 +259,7 @@ export default function CreationScreen() {
         character_data: {
           race: selectedRace,
           class: selectedClass,
-          background: selectedBackground,
+          background: ENABLE_BACKGROUNDS ? selectedBackground : null,
         },
       };
 
@@ -315,7 +358,11 @@ export default function CreationScreen() {
           </View>
         );
 
-      case 2: // Background
+      case 2: // Background (only if enabled)
+        if (!ENABLE_BACKGROUNDS) {
+          return null; // This step should be skipped
+        }
+        
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Choose Background</Text>
@@ -375,26 +422,26 @@ export default function CreationScreen() {
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Choose Skills</Text>
             <Text style={styles.stepDescription}>
-              Select skills based on your class and background proficiencies
+              Select skills based on your class proficiencies
             </Text>
             
             <ScrollView style={styles.optionsList}>
-              {selectedClass?.proficiency_choices?.[0]?.from?.options?.map((prof) => (
+              {selectedClass?.proficiency_choices?.[0]?.from?.map((prof) => (
                 <TouchableOpacity
-                  key={prof.item.index}
+                  key={prof.index}
                   style={[
                     styles.skillCard,
-                    selectedSkills.includes(prof.item.name) && styles.selectedSkill,
+                    selectedSkills.includes(prof.name) && styles.selectedSkill,
                   ]}
                   onPress={() => {
-                    if (selectedSkills.includes(prof.item.name)) {
-                      setSelectedSkills(selectedSkills.filter(s => s !== prof.item.name));
+                    if (selectedSkills.includes(prof.name)) {
+                      setSelectedSkills(selectedSkills.filter(s => s !== prof.name));
                     } else {
-                      setSelectedSkills([...selectedSkills, prof.item.name]);
+                      setSelectedSkills([...selectedSkills, prof.name]);
                     }
                   }}
                 >
-                  <Text style={styles.skillName}>{prof.item.name}</Text>
+                  <Text style={styles.skillName}>{prof.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -445,7 +492,7 @@ export default function CreationScreen() {
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Starting Equipment</Text>
             <Text style={styles.stepDescription}>
-              Your starting equipment is determined by your class and background
+              Your starting equipment is determined by your class{ENABLE_BACKGROUNDS ? ' and background' : ''}
             </Text>
             
             <View style={styles.equipmentSummary}>
@@ -456,12 +503,16 @@ export default function CreationScreen() {
                 </Text>
               ))}
               
-              <Text style={styles.equipmentTitle}>Background Equipment:</Text>
-              {selectedBackground?.equipment?.map((item, index) => (
-                <Text key={index} style={styles.equipmentItem}>
-                  • {item.equipment.name} x{item.quantity}
-                </Text>
-              ))}
+              {ENABLE_BACKGROUNDS && selectedBackground && (
+                <>
+                  <Text style={styles.equipmentTitle}>Background Equipment:</Text>
+                  {selectedBackground.equipment?.map((item, index) => (
+                    <Text key={index} style={styles.equipmentItem}>
+                      • {item.equipment.name} x{item.quantity}
+                    </Text>
+                  ))}
+                </>
+              )}
             </View>
           </View>
         );
@@ -490,10 +541,12 @@ export default function CreationScreen() {
                 )}
               </View>
               
-              <View style={styles.reviewSection}>
-                <Text style={styles.reviewLabel}>Background:</Text>
-                <Text style={styles.reviewValue}>{selectedBackground?.name}</Text>
-              </View>
+              {ENABLE_BACKGROUNDS && (
+                <View style={styles.reviewSection}>
+                  <Text style={styles.reviewLabel}>Background:</Text>
+                  <Text style={styles.reviewValue}>{selectedBackground?.name || 'None'}</Text>
+                </View>
+              )}
               
               <View style={styles.reviewSection}>
                 <Text style={styles.reviewLabel}>Abilities:</Text>
