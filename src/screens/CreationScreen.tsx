@@ -52,7 +52,7 @@ import {
 import { userAtom } from '../atoms/authAtoms';
 
 // Feature flags
-const ENABLE_BACKGROUNDS = false; // Set to true to enable backgrounds step
+const ENABLE_BACKGROUNDS = true; // Set to true to enable backgrounds step
 
 const CREATION_STEPS = [
   { title: 'Name & Race', icon: User },
