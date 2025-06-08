@@ -885,6 +885,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 2,
     borderColor: 'transparent',
+    marginBottom: 12,
   },
   selectedOption: {
     borderColor: '#4CAF50',
