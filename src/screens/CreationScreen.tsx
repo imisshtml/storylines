@@ -293,6 +293,24 @@ export default function CreationScreen() {
     return Math.floor((score - 10) / 2);
   };
 
+  // Get racial bonus for a specific ability
+  const getRacialBonus = (abilityName: string): number => {
+    if (!selectedRace?.ability_bonuses) return 0;
+    
+    const bonus = selectedRace.ability_bonuses.find(
+      bonus => bonus.ability_score.index === abilityName.substring(0, 3).toLowerCase()
+    );
+    
+    return bonus ? bonus.bonus : 0;
+  };
+
+  // Get final ability score (base + racial bonus)
+  const getFinalAbilityScore = (abilityName: keyof DnDAbilities): number => {
+    const baseScore = abilities[abilityName];
+    const racialBonus = getRacialBonus(abilityName);
+    return baseScore + racialBonus;
+  };
+
   // Helper function to format ability bonuses
   const formatAbilityBonuses = (race: Race) => {
     if (!race.ability_bonuses || race.ability_bonuses.length === 0) {
@@ -355,6 +373,16 @@ export default function CreationScreen() {
     try {
       setLoading(true);
       
+      // Calculate final abilities with racial bonuses
+      const finalAbilities = {
+        strength: getFinalAbilityScore('strength'),
+        dexterity: getFinalAbilityScore('dexterity'),
+        constitution: getFinalAbilityScore('constitution'),
+        intelligence: getFinalAbilityScore('intelligence'),
+        wisdom: getFinalAbilityScore('wisdom'),
+        charisma: getFinalAbilityScore('charisma'),
+      };
+      
       const characterData = {
         user_id: user.id,
         name: characterName,
@@ -362,7 +390,7 @@ export default function CreationScreen() {
         class: selectedClass!.name,
         background: ENABLE_BACKGROUNDS && selectedBackground ? selectedBackground.name : 'None',
         level: 1,
-        abilities,
+        abilities: finalAbilities, // Save final abilities with racial bonuses
         skills: selectedSkills.map(skill => ({ name: skill, proficient: true })),
         spells: selectedSpells,
         equipment,
@@ -370,6 +398,7 @@ export default function CreationScreen() {
           race: selectedRace,
           class: selectedClass,
           background: ENABLE_BACKGROUNDS ? selectedBackground : null,
+          baseAbilities: abilities, // Also save base abilities for reference
         },
       };
 
@@ -531,18 +560,40 @@ export default function CreationScreen() {
               <Text style={styles.rollButtonText}>Roll All Abilities</Text>
             </TouchableOpacity>
 
+            {selectedRace && (
+              <View style={styles.racialBonusInfo}>
+                <Text style={styles.racialBonusTitle}>
+                  {selectedRace.name} Racial Bonuses:
+                </Text>
+                <Text style={styles.racialBonusText}>
+                  {formatAbilityBonuses(selectedRace)}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.abilitiesGrid}>
-              {Object.entries(abilities).map(([ability, score]) => (
-                <View key={ability} style={styles.abilityCard}>
-                  <Text style={styles.abilityName}>
-                    {ability.charAt(0).toUpperCase() + ability.slice(1, 3).toUpperCase()}
-                  </Text>
-                  <Text style={styles.abilityScore}>{score}</Text>
-                  <Text style={styles.abilityModifier}>
-                    {getModifier(score) >= 0 ? '+' : ''}{getModifier(score)}
-                  </Text>
-                </View>
-              ))}
+              {Object.entries(abilities).map(([ability, score]) => {
+                const racialBonus = getRacialBonus(ability);
+                const finalScore = getFinalAbilityScore(ability as keyof DnDAbilities);
+                
+                return (
+                  <View key={ability} style={styles.abilityCard}>
+                    <Text style={styles.abilityName}>
+                      {ability.charAt(0).toUpperCase() + ability.slice(1, 3).toUpperCase()}
+                    </Text>
+                    <View style={styles.abilityScoreContainer}>
+                      <Text style={styles.abilityScore}>{score}</Text>
+                      {racialBonus > 0 && (
+                        <Text style={styles.racialBonusScore}>+{racialBonus}</Text>
+                      )}
+                    </View>
+                    <Text style={styles.finalScore}>= {finalScore}</Text>
+                    <Text style={styles.abilityModifier}>
+                      {getModifier(finalScore) >= 0 ? '+' : ''}{getModifier(finalScore)}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
           </View>
         );
@@ -679,13 +730,22 @@ export default function CreationScreen() {
               )}
               
               <View style={styles.reviewSection}>
-                <Text style={styles.reviewLabel}>Abilities:</Text>
+                <Text style={styles.reviewLabel}>Final Abilities (with racial bonuses):</Text>
                 <View style={styles.reviewAbilities}>
-                  {Object.entries(abilities).map(([ability, score]) => (
-                    <Text key={ability} style={styles.reviewAbility}>
-                      {ability.charAt(0).toUpperCase() + ability.slice(1, 3).toUpperCase()}: {score} ({getModifier(score) >= 0 ? '+' : ''}{getModifier(score)})
-                    </Text>
-                  ))}
+                  {Object.entries(abilities).map(([ability, score]) => {
+                    const finalScore = getFinalAbilityScore(ability as keyof DnDAbilities);
+                    const racialBonus = getRacialBonus(ability);
+                    
+                    return (
+                      <Text key={ability} style={styles.reviewAbility}>
+                        {ability.charAt(0).toUpperCase() + ability.slice(1, 3).toUpperCase()}: {finalScore} 
+                        {racialBonus > 0 && (
+                          <Text style={styles.reviewRacialBonus}> ({score}+{racialBonus})</Text>
+                        )}
+                        {' '}({getModifier(finalScore) >= 0 ? '+' : ''}{getModifier(finalScore)})
+                      </Text>
+                    );
+                  })}
                 </View>
               </View>
               
@@ -712,7 +772,7 @@ export default function CreationScreen() {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   <Save size={20} color="#fff" />
@@ -1080,6 +1140,25 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     marginLeft: 8,
   },
+  racialBonusInfo: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  racialBonusTitle: {
+    fontSize: 16,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  racialBonusText: {
+    fontSize: 14,
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+  },
   abilitiesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1098,15 +1177,31 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     marginBottom: 4,
   },
+  abilityScoreContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   abilityScore: {
-    fontSize: 24,
+    fontSize: 20,
     color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  racialBonusScore: {
+    fontSize: 16,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Bold',
+    marginLeft: 4,
+  },
+  finalScore: {
+    fontSize: 24,
+    color: '#4CAF50',
     fontFamily: 'Inter-Bold',
     marginBottom: 4,
   },
   abilityModifier: {
     fontSize: 16,
-    color: '#4CAF50',
+    color: '#888',
     fontFamily: 'Inter-Regular',
   },
   skillCard: {
@@ -1208,6 +1303,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     padding: 8,
     borderRadius: 6,
+  },
+  reviewRacialBonus: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Regular',
   },
   saveButton: {
     backgroundColor: '#4CAF50',
