@@ -8,7 +8,7 @@ import {
   SafeAreaView,
   ImageBackground,
 } from 'react-native';
-import { X } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 export default function AboutScreen() {
