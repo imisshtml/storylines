@@ -66,6 +66,27 @@ const CREATION_STEPS = [
   { title: 'Review', icon: Save },
 ];
 
+const raceDesc = {
+  dragonborn: 'Dragonborn are proud, honorable beings with draconic ancestry. They often possess strong physiques, a breath weapon tied to their lineage, and a natural sense of leadership and loyalty. Their appearance resembles upright dragons, with scales, tails, and a draconic snout.',
+  
+  dwarf: 'Dwarves are a stout and resilient people known for their craftsmanship, traditions, and strong sense of community. They typically live in mountainous or underground strongholds and have a natural affinity for stonework, mining, and forging.',
+  
+  elf: 'Elves are graceful and long-lived beings attuned to magic and nature. Known for their keen senses and agility, elves often live in forested or mystical regions and maintain deep cultural traditions rooted in beauty, artistry, and longevity.',
+  
+  gnome: 'Gnomes are clever and curious folk, often driven by a thirst for knowledge and invention. They are small in stature but energetic in personality, frequently engaging in magical experimentation or intricate mechanical designs.',
+  
+  'half-elf': 'Half-elves combine traits from both elves and humans, blending adaptability with grace. They often serve as bridges between cultures, showing a talent for diplomacy, creativity, and a deep personal drive.',
+  
+  'half-orc': 'Half-orcs inherit strength and resilience from their orcish ancestry and ambition from their human side. They are often formidable warriors or survivors, driven by personal purpose and inner strength.',
+  
+  halfling: 'Halflings are cheerful, nimble folk known for their optimism and quiet resourcefulness. They value home and community, often living in rural areas, and possess a knack for staying out of trouble—or escaping it quickly.',
+  
+  human: 'Humans are the most adaptable and ambitious of the common races. They thrive in diverse environments and cultures, often driven by a desire to explore, build, and lead. Their diversity makes them capable of great innovation.',
+  
+  tiefling: 'Tieflings are descended from ancient pacts with infernal powers, marked by their horns, tails, and other features. Despite their appearance, tieflings have the same capacity for good or evil as any other race and often live with a strong sense of self-determination.',
+};
+
+
 export default function CreationScreen() {
   const [user] = useAtom(userAtom);
   const [currentStep, setCurrentStep] = useAtom(characterCreationStepAtom);
@@ -709,6 +730,9 @@ export default function CreationScreen() {
               </View>
               
               <BottomSheetScrollView style={styles.bottomSheetScroll}>
+                <View style={styles.raceDetailSection}>
+                  <Text style={styles.raceDetailText}>{raceDesc.selectedRaceForDetails.index}</Text>
+                </View>
                 <View style={styles.raceDetailSection}>
                   <Text style={styles.raceDetailLabel}>Basic Information</Text>
                   <Text style={styles.raceDetailText}>Size: {selectedRaceForDetails.size}</Text>
