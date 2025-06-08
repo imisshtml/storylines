@@ -631,7 +631,7 @@ export default function CreationScreen() {
 
       case 5: // Spells (only shown for spellcasters)
         if (!hasSpellcasting) {
-          //return null; // This step should be skipped
+          return null; // This step should be skipped
         }
         
         return (
