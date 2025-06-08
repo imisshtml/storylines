@@ -72,7 +72,7 @@ export default function SidebarMenu({ isVisible, onClose }: SidebarMenuProps) {
       subtitle: 'Manage your account',
       onPress: () => {
         onClose();
-        // Navigate to profile when implemented
+        router.push('/profile');
       },
     },
     {
@@ -81,7 +81,7 @@ export default function SidebarMenu({ isVisible, onClose }: SidebarMenuProps) {
       subtitle: 'App preferences',
       onPress: () => {
         onClose();
-        // Navigate to settings when implemented
+        router.push('/setting');
       },
     },
     {
