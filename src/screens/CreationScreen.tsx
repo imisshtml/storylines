@@ -239,6 +239,21 @@ export default function CreationScreen() {
     return Math.floor((score - 10) / 2);
   };
 
+  // Helper function to format ability bonuses
+  const formatAbilityBonuses = (race: Race) => {
+    if (!race.ability_score_increases || race.ability_score_increases.length === 0) {
+      return 'No ability bonuses';
+    }
+
+    return race.ability_score_increases
+      .map(increase => {
+        const abilityName = increase.ability_score.name;
+        const bonus = increase.bonus;
+        return `+${bonus} ${abilityName}`;
+      })
+      .join(', ');
+  };
+
   const handleSaveCharacter = async () => {
     if (!user) return;
 
@@ -318,11 +333,9 @@ export default function CreationScreen() {
                   <Text style={styles.optionDescription}>
                     Size: {race.size} • Speed: {race.speed}ft
                   </Text>
-                  {race.ability_score_increases?.length > 0 && (
-                    <Text style={styles.optionBonus}>
-                      +{race.ability_score_increases?.[0].bonus} {race.ability_score_increases?.[0].ability_score.name}
-                    </Text>
-                  )}
+                  <Text style={styles.optionBonus}>
+                    {formatAbilityBonuses(race)}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -582,7 +595,7 @@ export default function CreationScreen() {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   <Save size={20} color="#fff" />
@@ -770,7 +783,7 @@ const styles = StyleSheet.create({
   optionBonus: {
     fontSize: 14,
     color: '#4CAF50',
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Inter-Bold',
   },
   rollButton: {
     backgroundColor: '#4CAF50',
