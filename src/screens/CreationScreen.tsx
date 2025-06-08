@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -50,6 +50,7 @@ import {
   type DnDAbilities,
 } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
+import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 
 // Feature flags
 const ENABLE_BACKGROUNDS = false; // Set to true to enable backgrounds step
@@ -90,6 +91,11 @@ export default function CreationScreen() {
   const [, resetCreation] = useAtom(resetCharacterCreationAtom);
 
   const [loading, setLoading] = useState(false);
+  const [selectedRaceForDetails, setSelectedRaceForDetails] = useState<Race | null>(null);
+
+  // Bottom sheet ref and snap points
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const snapPoints = ['50%', '90%'];
 
   useEffect(() => {
     // Fetch all D&D data when component mounts
@@ -254,6 +260,16 @@ export default function CreationScreen() {
       .join(', ');
   };
 
+  // Handle race details bottom sheet
+  const handleRaceDetailsPress = useCallback((race: Race) => {
+    setSelectedRaceForDetails(race);
+    bottomSheetRef.current?.expand();
+  }, []);
+
+  const handleCloseBottomSheet = useCallback(() => {
+    bottomSheetRef.current?.close();
+  }, []);
+
   const handleSaveCharacter = async () => {
     if (!user) return;
 
@@ -321,22 +337,33 @@ export default function CreationScreen() {
             <Text style={styles.label}>Choose Race</Text>
             <ScrollView style={styles.optionsList}>
               {races.map((race) => (
-                <TouchableOpacity
-                  key={race.index}
-                  style={[
-                    styles.optionCard,
-                    selectedRace?.index === race.index && styles.selectedOption,
-                  ]}
-                  onPress={() => setSelectedRace(race)}
-                >
-                  <Text style={styles.optionTitle}>{race.name}</Text>
-                  <Text style={styles.optionDescription}>
-                    Size: {race.size} • Speed: {race.speed}ft
-                  </Text>
-                  <Text style={styles.optionBonus}>
-                    {formatAbilityBonuses(race)}
-                  </Text>
-                </TouchableOpacity>
+                <View key={race.index} style={styles.raceCardContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.optionCard,
+                      selectedRace?.index === race.index && styles.selectedOption,
+                    ]}
+                    onPress={() => setSelectedRace(race)}
+                  >
+                    <View style={styles.raceCardContent}>
+                      <View style={styles.raceInfo}>
+                        <Text style={styles.optionTitle}>{race.name}</Text>
+                        <Text style={styles.optionDescription}>
+                          Size: {race.size} • Speed: {race.speed}ft
+                        </Text>
+                        <Text style={styles.optionBonus}>
+                          {formatAbilityBonuses(race)}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.bookIcon}
+                        onPress={() => handleRaceDetailsPress(race)}
+                      >
+                        <Book size={20} color="#4CAF50" />
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               ))}
             </ScrollView>
           </View>
@@ -595,7 +622,7 @@ export default function CreationScreen() {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   <Save size={20} color="#fff" />
@@ -661,6 +688,75 @@ export default function CreationScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Race Details Bottom Sheet */}
+      <BottomSheet
+        ref={bottomSheetRef}
+        index={-1}
+        snapPoints={snapPoints}
+        enablePanDownToClose={true}
+        backgroundStyle={styles.bottomSheetBackground}
+        handleIndicatorStyle={styles.bottomSheetIndicator}
+      >
+        <BottomSheetView style={styles.bottomSheetContent}>
+          {selectedRaceForDetails && (
+            <>
+              <View style={styles.bottomSheetHeader}>
+                <Text style={styles.bottomSheetTitle}>{selectedRaceForDetails.name}</Text>
+                <TouchableOpacity onPress={handleCloseBottomSheet} style={styles.closeButton}>
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <BottomSheetScrollView style={styles.bottomSheetScroll}>
+                <View style={styles.raceDetailSection}>
+                  <Text style={styles.raceDetailLabel}>Basic Information</Text>
+                  <Text style={styles.raceDetailText}>Size: {selectedRaceForDetails.size}</Text>
+                  <Text style={styles.raceDetailText}>Speed: {selectedRaceForDetails.speed} feet</Text>
+                </View>
+
+                {selectedRaceForDetails.ability_bonuses && selectedRaceForDetails.ability_bonuses.length > 0 && (
+                  <View style={styles.raceDetailSection}>
+                    <Text style={styles.raceDetailLabel}>Ability Score Increases</Text>
+                    {selectedRaceForDetails.ability_bonuses.map((bonus, index) => (
+                      <Text key={index} style={styles.raceDetailText}>
+                        +{bonus.bonus} {bonus.ability_score.name}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+
+                {selectedRaceForDetails.languages && selectedRaceForDetails.languages.length > 0 && (
+                  <View style={styles.raceDetailSection}>
+                    <Text style={styles.raceDetailLabel}>Languages</Text>
+                    {selectedRaceForDetails.languages.map((language, index) => (
+                      <Text key={index} style={styles.raceDetailText}>• {language.name}</Text>
+                    ))}
+                  </View>
+                )}
+
+                {selectedRaceForDetails.traits && selectedRaceForDetails.traits.length > 0 && (
+                  <View style={styles.raceDetailSection}>
+                    <Text style={styles.raceDetailLabel}>Racial Traits</Text>
+                    {selectedRaceForDetails.traits.map((trait, index) => (
+                      <Text key={index} style={styles.raceDetailText}>• {trait.name}</Text>
+                    ))}
+                  </View>
+                )}
+
+                {selectedRaceForDetails.subraces && selectedRaceForDetails.subraces.length > 0 && (
+                  <View style={styles.raceDetailSection}>
+                    <Text style={styles.raceDetailLabel}>Subraces</Text>
+                    {selectedRaceForDetails.subraces.map((subrace, index) => (
+                      <Text key={index} style={styles.raceDetailText}>• {subrace.name}</Text>
+                    ))}
+                  </View>
+                )}
+              </BottomSheetScrollView>
+            </>
+          )}
+        </BottomSheetView>
+      </BottomSheet>
     </View>
   );
 }
@@ -756,17 +852,31 @@ const styles = StyleSheet.create({
   optionsList: {
     flex: 1,
   },
+  raceCardContainer: {
+    marginBottom: 12,
+  },
   optionCard: {
     backgroundColor: '#2a2a2a',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
     borderWidth: 2,
     borderColor: 'transparent',
   },
   selectedOption: {
     borderColor: '#4CAF50',
     backgroundColor: '#1a3a1a',
+  },
+  raceCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  raceInfo: {
+    flex: 1,
+  },
+  bookIcon: {
+    padding: 8,
+    marginLeft: 8,
   },
   optionTitle: {
     fontSize: 18,
@@ -963,5 +1073,62 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Bold',
     marginRight: 8,
+  },
+  // Bottom Sheet Styles
+  bottomSheetBackground: {
+    backgroundColor: '#1a1a1a',
+  },
+  bottomSheetIndicator: {
+    backgroundColor: '#666',
+  },
+  bottomSheetContent: {
+    flex: 1,
+    padding: 16,
+  },
+  bottomSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  bottomSheetTitle: {
+    fontSize: 24,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#333',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+  },
+  bottomSheetScroll: {
+    flex: 1,
+  },
+  raceDetailSection: {
+    marginBottom: 20,
+  },
+  raceDetailLabel: {
+    fontSize: 18,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
+  raceDetailText: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 4,
+    lineHeight: 22,
   },
 });
