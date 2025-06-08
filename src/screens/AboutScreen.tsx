@@ -12,7 +12,7 @@ import { X } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 export default function AboutScreen() {
-  const handleClose = () => {
+  const handleBack = () => {
     router.back();
   };
 
@@ -23,12 +23,11 @@ export default function AboutScreen() {
     >
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <Text style={styles.title}>About</Text>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <X size={24} color="#2a2a2a" />
-            </TouchableOpacity>
+          <View style={styles.backButton}>
+            <TouchableOpacity onPress={handleBack} style={styles.touchable} />
+            <ArrowLeft color="#fff" size={24} />
           </View>
+          <Text style={styles.title}>About</Text>
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
