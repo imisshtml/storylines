@@ -83,7 +83,7 @@ function parseStoryResponse(response: string) {
 function buildSystemPrompt(context: any) {
   const { campaign, storyHistory = [] } = context;
 
-  let prompt = `You are an expert Dungeon Master for a ${campaign?.theme || 'fantasy'} tabletop RPG campaign called "${campaign?.name || 'Adventure'}".
+  let prompt = `You are an expert Dungeon Master for a D&D 5e fantasy tabletop RPG campaign called "${campaign?.name || 'Adventure'}".
 
 CAMPAIGN DETAILS:
 - Theme: ${campaign?.theme || 'fantasy'}

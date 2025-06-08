@@ -4,7 +4,7 @@ import { supabase } from '../config/supabase';
 export type Campaign = {
   id: string;
   name: string;
-  theme: string;
+  adventure: string;
   level: number;
   tone: 'serious' | 'humorous' | 'grimdark';
   exclude: string[];
@@ -12,6 +12,8 @@ export type Campaign = {
   players: Player[];
   invite_code: string;
   owner: string;
+  content_level: 'kids' | 'teens' | 'adults';
+  rp_focus: 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heavy_combat';
   created_at?: string;
 };
 
@@ -38,16 +40,21 @@ export const fetchCampaignsAtom = atom(
       set(campaignsLoadingAtom, true);
       set(campaignsErrorAtom, null);
 
-      const { data, error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
+      const { data: userCampaigns, error: userError } = await supabase
         .from('campaigns')
         .select('*')
+        .eq('owner', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (userError) throw userError;
 
-      set(campaignsAtom, data || []);
+      set(campaignsAtom, userCampaigns || []);
     } catch (error) {
       set(campaignsErrorAtom, (error as Error).message);
+      console.error('Campaign fetch error:', error);
     } finally {
       set(campaignsLoadingAtom, false);
     }

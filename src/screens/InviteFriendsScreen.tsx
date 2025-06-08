@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator, TextInput, SafeAreaView } from 'react-native';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
 import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send } from 'lucide-react-native';
@@ -29,16 +29,18 @@ export default function InviteFriendsScreen() {
   };
 
   const handleBack = () => {
-    router.back();
+    router.push('/');
   };
 
   const handleCopyCode = async () => {
+    if (!currentCampaign) return;
     await Clipboard.setStringAsync(currentCampaign.invite_code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleShare = async () => {
+    if (!currentCampaign) return;
     try {
       await Share.share({
         message: `Join my Storylines campaign! Use code: ${currentCampaign.invite_code}`,
@@ -49,6 +51,7 @@ export default function InviteFriendsScreen() {
   };
 
   const handleStartCampaign = async () => {
+    if (!currentCampaign) return;
     try {
       await upsertCampaign({
         ...currentCampaign,
@@ -61,7 +64,7 @@ export default function InviteFriendsScreen() {
   };
 
   const handleSendSMS = async () => {
-    if (!phoneNumbers.trim()) return;
+    if (!currentCampaign || !phoneNumbers.trim()) return;
 
     const numbers = phoneNumbers.split(',').map(num => num.trim()).filter(Boolean);
     if (numbers.length === 0) return;
@@ -88,12 +91,21 @@ export default function InviteFriendsScreen() {
     );
   }
 
+  if (!currentCampaign) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Campaign not found</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+        <View style={styles.backButton}>
+          <TouchableOpacity onPress={handleBack} style={styles.touchable} />
           <ArrowLeft color="#fff" size={24} />
-        </TouchableOpacity>
+        </View>
         <Text style={styles.title}>{currentCampaign.name}</Text>
       </View>
       
@@ -125,7 +137,7 @@ export default function InviteFriendsScreen() {
 
       {smsAvailable && (
         <View style={styles.smsContainer}>
-          <Text style={styles.smsLabel}>Invite via SMS</Text>
+          <Text style={styles.smsLabel}>Send SMS Invite</Text>
           <View style={styles.smsInputContainer}>
             <TextInput
               style={styles.smsInput}
@@ -133,105 +145,135 @@ export default function InviteFriendsScreen() {
               onChangeText={setPhoneNumbers}
               placeholder="Enter phone numbers (comma-separated)"
               placeholderTextColor="#666"
-              keyboardType="phone-pad"
             />
             <TouchableOpacity
-              style={[styles.smsButton, !phoneNumbers.trim() && styles.smsButtonDisabled]}
+              style={[styles.smsButton, !phoneNumbers && styles.smsButtonDisabled]}
               onPress={handleSendSMS}
-              disabled={!phoneNumbers.trim()}
+              disabled={!phoneNumbers}
             >
-              <Send size={20} color={phoneNumbers.trim() ? '#fff' : '#666'} />
+              <Send size={20} color="#fff" />
             </TouchableOpacity>
           </View>
         </View>
       )}
 
-      <View style={styles.waitingRoom}>
-        <View style={styles.waitingHeader}>
-          <Users size={20} color="#fff" />
-          <Text style={styles.waitingTitle}>Waiting Room</Text>
-        </View>
-        
+      <View style={styles.playersContainer}>
+        <Text style={styles.playersLabel}>
+          Players ({currentCampaign.players.length})
+        </Text>
         <ScrollView style={styles.playersList}>
-          {currentCampaign.players.map(player => (
+          {currentCampaign.players.map((player, index) => (
             <View key={player.id} style={styles.playerItem}>
-              <Text style={styles.playerName}>{player.name}</Text>
+              <Users size={20} color="#4CAF50" />
+              <Text style={styles.playerName}>{player.name || `Player ${index + 1}`}</Text>
               {player.ready && (
-                <CheckCircle2 size={20} color="#4CAF50" />
+                <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
               )}
             </View>
           ))}
         </ScrollView>
       </View>
 
-      <TouchableOpacity 
-        style={styles.readyButton}
+      <TouchableOpacity
+        style={[
+          styles.startButton,
+          currentCampaign.players.length < 2 && styles.startButtonDisabled
+        ]}
         onPress={handleStartCampaign}
+        disabled={currentCampaign.players.length < 2}
       >
-        <Text style={styles.readyButtonText}>Start Campaign</Text>
+        <Text style={styles.startButtonText}>
+          {currentCampaign.players.length < 2
+            ? 'Waiting for Players...'
+            : 'Start Campaign'}
+        </Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#121212',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    paddingTop: 40,
+    paddingHorizontal: 16,
+    height: 52,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+    backgroundColor: '#121212',
   },
   backButton: {
-    marginRight: 16,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    left: 16,
+  },
+  touchable: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    flex: 1,
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#121212',
+  },
+  loadingText: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Regular',
   },
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2a1515',
-    padding: 12,
+    backgroundColor: '#f443361a',
+    padding: 16,
+    margin: 16,
     borderRadius: 8,
-    marginHorizontal: 20,
-    marginBottom: 20,
   },
   errorText: {
     color: '#f44336',
     marginLeft: 8,
+    flex: 1,
     fontFamily: 'Inter-Regular',
-  },
-  title: {
-    fontSize: 24,
-    color: '#fff',
-    fontFamily: 'Inter-Bold',
   },
   codeContainer: {
     marginHorizontal: 20,
-    marginBottom: 24,
+    marginTop: 20,
   },
   codeLabel: {
     fontSize: 16,
-    color: '#888',
+    color: '#fff',
     marginBottom: 8,
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Inter-Bold',
   },
   codeBox: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 16,
   },
   code: {
+    flex: 1,
     fontSize: 24,
     color: '#fff',
     fontFamily: 'Inter-Bold',
@@ -241,34 +283,35 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   shareButton: {
-    backgroundColor: '#2196F3',
-    borderRadius: 8,
-    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
+    backgroundColor: '#2196F3',
     marginHorizontal: 20,
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 8,
+    gap: 8,
   },
   shareButtonText: {
     color: '#fff',
     fontSize: 16,
-    marginLeft: 8,
     fontFamily: 'Inter-Bold',
   },
   smsContainer: {
     marginHorizontal: 20,
-    marginBottom: 24,
+    marginTop: 20,
   },
   smsLabel: {
     fontSize: 16,
-    color: '#888',
+    color: '#fff',
     marginBottom: 8,
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Inter-Bold',
   },
   smsInputContainer: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    gap: 8,
   },
   smsInput: {
     flex: 1,
@@ -283,29 +326,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   smsButtonDisabled: {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: '#666',
   },
-  waitingRoom: {
+  playersContainer: {
     flex: 1,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
     marginHorizontal: 20,
+    marginTop: 20,
   },
-  waitingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  waitingTitle: {
-    fontSize: 18,
+  playersLabel: {
+    fontSize: 16,
     color: '#fff',
-    marginLeft: 8,
+    marginBottom: 8,
     fontFamily: 'Inter-Bold',
   },
   playersList: {
@@ -314,28 +350,34 @@ const styles = StyleSheet.create({
   playerItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    backgroundColor: '#2a2a2a',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
   },
   playerName: {
-    fontSize: 16,
+    flex: 1,
     color: '#fff',
+    fontSize: 16,
+    marginLeft: 12,
     fontFamily: 'Inter-Regular',
   },
-  readyButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 24,
-    marginHorizontal: 20,
+  readyIcon: {
+    marginLeft: 8,
   },
-  readyButtonText: {
+  startButton: {
+    backgroundColor: '#4CAF50',
+    margin: 20,
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  startButtonDisabled: {
+    backgroundColor: '#666',
+  },
+  startButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: 'Inter-Bold',
   },
 });
