@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { X, Users, AlertCircle } from 'lucide-react-native';
+import { X, Users, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { userAtom } from '../atoms/authAtoms';
 import { supabase } from '../config/supabase';
@@ -197,7 +197,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
               disabled={!validateCode(inviteCode) || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small\" color="#fff" />
               ) : (
                 <>
                   <Users size={20} color="#fff" />
