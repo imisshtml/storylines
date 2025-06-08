@@ -9,10 +9,11 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { X, Users, CircleAlert as AlertCircle, Search } from 'lucide-react-native';
+import { X, Users } from 'lucide-react-native';
 import { useAtom } from 'jotai';
-import { userAtom } from '../atoms/authAtoms';
 import { supabase } from '../config/supabase';
+import { userAtom } from '../atoms/authAtoms';
+import { fetchCampaignsAtom } from '../atoms/campaignAtoms';
 import { router } from 'expo-router';
 
 interface JoinCampaignModalProps {
@@ -21,148 +22,166 @@ interface JoinCampaignModalProps {
 }
 
 export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignModalProps) {
-  const [user] = useAtom(userAtom);
   const [inviteCode, setInviteCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [user] = useAtom(userAtom);
+  const [, fetchCampaigns] = useAtom(fetchCampaignsAtom);
 
   const validateCode = (code: string): boolean => {
-    // Exactly 6 characters, alphanumeric only
+    // Must be exactly 6 characters and alphanumeric
     const codeRegex = /^[A-Za-z0-9]{6}$/;
     return codeRegex.test(code);
   };
 
   const handleCodeChange = (text: string) => {
     // Convert to uppercase and limit to 6 characters
-    const formattedCode = text.toUpperCase().slice(0, 6);
-    setInviteCode(formattedCode);
+    const upperText = text.toUpperCase().slice(0, 6);
+    setInviteCode(upperText);
     
     // Clear error when user starts typing
     if (error) {
       setError(null);
     }
-    if (debugInfo) {
-      setDebugInfo(null);
-    }
   };
 
-  const handleTestQuery = async () => {
-    if (!inviteCode.trim()) {
-      setError('Please enter a code first');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    setDebugInfo(null);
-
+  const testQuery = async () => {
     try {
-      console.log('Testing query for code:', inviteCode);
-      console.log('Current user:', user);
+      setIsLoading(true);
+      setError(null);
 
-      // Use RPC function to bypass RLS for public campaign lookup
-      const { data: campaign, error: rpcError } = await supabase
-        .rpc('find_campaign_by_invite_code', { 
-          code: inviteCode 
-        });
+      console.log('Testing database query...');
+      
+      // Test basic connection
+      const { data: testData, error: testError } = await supabase
+        .from('campaigns')
+        .select('id, name, invite_code')
+        .limit(5);
 
-      console.log('RPC result:', campaign);
-      console.log('RPC error:', rpcError);
-
-      if (rpcError) {
-        console.error('RPC error:', rpcError);
-        setError(`Database error: ${rpcError.message}`);
+      if (testError) {
+        console.error('Test query error:', testError);
+        setError(`Database error: ${testError.message}`);
         return;
       }
 
-      if (!campaign || campaign.length === 0) {
-        // Get some sample codes for debugging
-        const { data: sampleCampaigns, error: sampleError } = await supabase
-          .rpc('find_campaign_by_invite_code', { code: 'SAMPLE' }); // This will fail but might give us insight
+      console.log('Available campaigns:', testData);
+      
+      // Test specific code query
+      if (inviteCode && validateCode(inviteCode)) {
+        const { data: codeData, error: codeError } = await supabase
+          .from('campaigns')
+          .select('id, name, invite_code, players, owner')
+          .eq('invite_code', inviteCode)
+          .single();
 
-        setError(`No campaign found with code "${inviteCode}"`);
-        setDebugInfo('💡 Make sure the code is exactly 6 characters and matches a campaign in the database');
-        return;
+        if (codeError) {
+          console.error('Code query error:', codeError);
+          if (codeError.code === 'PGRST116') {
+            setError(`No campaign found with code "${inviteCode}". Available codes: ${testData?.map(c => c.invite_code).join(', ') || 'none'}`);
+          } else {
+            setError(`Query error: ${codeError.message}`);
+          }
+        } else {
+          console.log('Found campaign:', codeData);
+          setError(`Campaign found: ${codeData.name}`);
+        }
+      } else {
+        setError(`Available codes: ${testData?.map(c => c.invite_code).join(', ') || 'none'}`);
       }
-
-      const foundCampaign = Array.isArray(campaign) ? campaign[0] : campaign;
-      setDebugInfo(`✅ Found campaign: "${foundCampaign.name}" (Status: ${foundCampaign.status})`);
 
     } catch (err) {
-      console.error('Test query error:', err);
-      setError(`Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error('Test query exception:', err);
+      setError(`Exception: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleJoinCampaign = async () => {
+    if (!validateCode(inviteCode)) {
+      setError('Please enter a valid 6-character code');
+      return;
+    }
+
     if (!user) {
       setError('You must be logged in to join a campaign');
       return;
     }
 
-    if (!validateCode(inviteCode)) {
-      setError('Code must be exactly 6 alphanumeric characters');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    setDebugInfo(null);
-
     try {
-      console.log('Attempting to join with code:', inviteCode);
-      console.log('Current user:', user);
+      setIsLoading(true);
+      setError(null);
 
-      // Use RPC function to find and join campaign
-      const { data: result, error: joinError } = await supabase
-        .rpc('join_campaign_by_code', {
-          code: inviteCode,
-          player_id: user.id,
-          player_name: user.username || user.email || 'Player'
-        });
+      console.log('Attempting to join campaign with code:', inviteCode);
 
-      console.log('Join campaign result:', result);
-      console.log('Join campaign error:', joinError);
+      // Query campaign by invite code
+      const { data: campaign, error: queryError } = await supabase
+        .from('campaigns')
+        .select('*')
+        .eq('invite_code', inviteCode)
+        .single();
 
-      if (joinError) {
-        console.error('Join error details:', joinError);
-        setError(`Database error: ${joinError.message}`);
+      if (queryError) {
+        console.error('Campaign query error:', queryError);
+        if (queryError.code === 'PGRST116') {
+          setError('Campaign not found. Please check the invite code.');
+        } else {
+          setError(`Database error: ${queryError.message}`);
+        }
         return;
       }
 
-      if (!result) {
-        setError('No response from server');
+      if (!campaign) {
+        setError('Campaign not found. Please check the invite code.');
         return;
       }
 
-      // Handle the JSON response
-      if (!result.success) {
-        setError(result.message || 'Failed to join campaign');
+      console.log('Found campaign:', campaign);
+
+      // Check if user is already in the campaign
+      const currentPlayers = campaign.players || [];
+      const isAlreadyMember = currentPlayers.some((player: any) => player.id === user.id);
+
+      if (isAlreadyMember) {
+        setError('You are already a member of this campaign');
         return;
       }
 
-      // Success! Close modal and redirect to character creation
+      // Add user to campaign players
+      const newPlayer = {
+        id: user.id,
+        name: user.username || user.email || 'Player',
+        ready: false,
+      };
+
+      const updatedPlayers = [...currentPlayers, newPlayer];
+
+      // Update campaign with new player
+      const { error: updateError } = await supabase
+        .from('campaigns')
+        .update({ players: updatedPlayers })
+        .eq('id', campaign.id);
+
+      if (updateError) {
+        console.error('Campaign update error:', updateError);
+        setError(`Failed to join campaign: ${updateError.message}`);
+        return;
+      }
+
+      console.log('Successfully joined campaign');
+
+      // Refresh campaigns list
+      await fetchCampaigns();
+
+      // Close modal and navigate
       onClose();
       setInviteCode('');
-      setError(null);
-      setDebugInfo(null);
       
-      Alert.alert(
-        'Success!',
-        `You've joined "${result.campaign_name}"! Create your character to get started.`,
-        [
-          {
-            text: 'Create Character',
-            onPress: () => router.push('/creation'),
-          },
-        ]
-      );
+      // Navigate to character creation or campaign view
+      router.push('/creation');
 
     } catch (err) {
-      console.error('Error joining campaign:', err);
+      console.error('Join campaign exception:', err);
       setError(`Failed to join campaign: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
@@ -172,103 +191,92 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
   const handleClose = () => {
     setInviteCode('');
     setError(null);
-    setDebugInfo(null);
     onClose();
   };
 
   return (
     <Modal
       visible={isVisible}
-      animationType="fade"
+      animationType="slide"
       transparent
       onRequestClose={handleClose}
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.header}>
-            <View style={styles.headerIcon}>
-              <Users size={24} color="#4CAF50" />
-            </View>
             <Text style={styles.title}>Join Campaign</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <X size={24} color="#666" />
+              <X size={24} color="#fff" />
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.description}>
-            Enter the 6-character invite code to join a campaign
-          </Text>
+          <View style={styles.content}>
+            <View style={styles.iconContainer}>
+              <Users size={48} color="#4CAF50" />
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Invite Code</Text>
-            <TextInput
-              style={[styles.input, error && styles.inputError]}
-              value={inviteCode}
-              onChangeText={handleCodeChange}
-              placeholder="ABC123"
-              placeholderTextColor="#666"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              maxLength={6}
-              editable={!isLoading}
-            />
-            
+            <Text style={styles.description}>
+              Enter the 6-character invite code to join a campaign
+            </Text>
+
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={[
+                  styles.input,
+                  error && styles.inputError,
+                  inviteCode.length === 6 && validateCode(inviteCode) && styles.inputValid
+                ]}
+                value={inviteCode}
+                onChangeText={handleCodeChange}
+                placeholder="ABC123"
+                placeholderTextColor="#666"
+                maxLength={6}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                editable={!isLoading}
+              />
+              <Text style={styles.inputHelper}>
+                {inviteCode.length}/6 characters
+              </Text>
+            </View>
+
             {error && (
               <View style={styles.errorContainer}>
-                <AlertCircle size={16} color="#f44336" />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
 
-            {debugInfo && (
-              <View style={styles.debugContainer}>
-                <Search size={16} color="#4CAF50" />
-                <Text style={styles.debugText}>{debugInfo}</Text>
-              </View>
-            )}
-          </View>
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.testButton,
+                  isLoading && styles.buttonDisabled
+                ]}
+                onPress={testQuery}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Test Query</Text>
+                )}
+              </TouchableOpacity>
 
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.testButton}
-              onPress={handleTestQuery}
-              disabled={isLoading || !inviteCode.trim()}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small\" color="#fff" />
-              ) : (
-                <>
-                  <Search size={16} color="#fff" />
-                  <Text style={styles.testButtonText}>Test Query</Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleClose}
-              disabled={isLoading}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.joinButton,
-                (!validateCode(inviteCode) || isLoading) && styles.joinButtonDisabled
-              ]}
-              onPress={handleJoinCampaign}
-              disabled={!validateCode(inviteCode) || isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small\" color="#fff" />
-              ) : (
-                <>
-                  <Users size={20} color="#fff" />
-                  <Text style={styles.joinButtonText}>Join</Text>
-                </>
-              )}
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.joinButton,
+                  (!validateCode(inviteCode) || isLoading) && styles.buttonDisabled
+                ]}
+                onPress={handleJoinCampaign}
+                disabled={!validateCode(inviteCode) || isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Join Campaign</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -282,61 +290,52 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   modalContent: {
     backgroundColor: '#1a1a1a',
     borderRadius: 16,
-    padding: 24,
-    width: '100%',
+    width: '90%',
     maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  headerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(76, 175, 80, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
   },
   title: {
-    flex: 1,
     fontSize: 20,
     fontFamily: 'Inter-Bold',
     color: '#fff',
   },
   closeButton: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+  },
+  content: {
+    padding: 20,
+  },
+  iconContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
   },
   description: {
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     color: '#ccc',
-    marginBottom: 24,
     textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
   },
   inputContainer: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-    color: '#fff',
-    marginBottom: 8,
+    marginBottom: 20,
   },
   input: {
     backgroundColor: '#2a2a2a',
@@ -346,88 +345,56 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     color: '#fff',
     textAlign: 'center',
-    letterSpacing: 2,
+    letterSpacing: 4,
     borderWidth: 2,
     borderColor: 'transparent',
   },
   inputError: {
     borderColor: '#f44336',
   },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  inputValid: {
+    borderColor: '#4CAF50',
+  },
+  inputHelper: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#888',
+    textAlign: 'center',
     marginTop: 8,
-    paddingHorizontal: 4,
+  },
+  errorContainer: {
+    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#f44336',
   },
   errorText: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#f44336',
-    marginLeft: 6,
-    flex: 1,
-  },
-  debugContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    paddingHorizontal: 4,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    padding: 8,
-    borderRadius: 6,
-  },
-  debugText: {
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    color: '#4CAF50',
-    marginLeft: 6,
-    flex: 1,
+    lineHeight: 20,
   },
   buttonContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
+    gap: 12,
   },
   testButton: {
     backgroundColor: '#2196F3',
     borderRadius: 8,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    minWidth: 100,
-  },
-  testButtonText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Bold',
-    color: '#fff',
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
     padding: 16,
     alignItems: 'center',
   },
-  cancelButtonText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-    color: '#fff',
-  },
   joinButton: {
-    flex: 1,
     backgroundColor: '#4CAF50',
     borderRadius: 8,
     padding: 16,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
   },
-  joinButtonDisabled: {
+  buttonDisabled: {
     backgroundColor: '#666',
   },
-  joinButtonText: {
+  buttonText: {
     fontSize: 16,
     fontFamily: 'Inter-Bold',
     color: '#fff',
