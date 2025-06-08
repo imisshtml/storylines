@@ -622,7 +622,7 @@ export default function CreationScreen() {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small\" color="#fff" />
               ) : (
                 <>
                   <Save size={20} color="#fff" />
