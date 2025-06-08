@@ -52,12 +52,12 @@ import {
 import { userAtom } from '../atoms/authAtoms';
 
 // Feature flags
-const ENABLE_BACKGROUNDS = true; // Set to true to enable backgrounds step
+const ENABLE_BACKGROUNDS = false; // Set to true to enable backgrounds step
 
 const CREATION_STEPS = [
   { title: 'Name & Race', icon: User },
   { title: 'Class', icon: Shield },
-  ...(ENABLE_BACKGROUNDS ? [{ title: 'Background', icon: Book }] : []),
+  //...(ENABLE_BACKGROUNDS ? [{ title: 'Background', icon: Book }] : []),
   { title: 'Abilities', icon: Dice6 },
   { title: 'Skills', icon: Zap },
   { title: 'Spells', icon: Sword },
