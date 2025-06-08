@@ -194,9 +194,9 @@ export const fetchBackgroundsAtom = atom(
   null,
   async (get, set) => {
     try {
-      const response = await fetch('https://www.dnd5eapi.co/api/2014/backgrounds');
+      const response = await fetch('https://www.dnd5eapi.co/api/backgrounds');
       const data = await response.json();
-      console.log('::: background', data)
+      console.log('::: background::', data)
       const detailedBackgrounds = await Promise.all(
         data.results.map(async (bg: any) => {
           const bgResponse = await fetch(`https://www.dnd5eapi.co${bg.url}`);
