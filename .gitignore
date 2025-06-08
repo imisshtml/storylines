@@ -9,3 +9,4 @@ expo-env.d.ts
 
 # Expo Router type definitions
 .expo/types/
+.env
