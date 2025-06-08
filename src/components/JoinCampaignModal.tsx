@@ -58,45 +58,39 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
     setDebugInfo(null);
 
     try {
-      // First, let's see all campaigns to debug
-      const { data: allCampaigns, error: allError } = await supabase
-        .from('campaigns')
-        .select('id, name, invite_code, owner, players');
+      console.log('Testing query for code:', inviteCode);
+      console.log('Current user:', user);
 
-      console.log('All campaigns:', allCampaigns);
-      console.log('Looking for code:', inviteCode);
+      // Use RPC function to bypass RLS for public campaign lookup
+      const { data: campaign, error: rpcError } = await supabase
+        .rpc('find_campaign_by_invite_code', { 
+          code: inviteCode 
+        });
 
-      if (allError) {
-        console.error('Error fetching all campaigns:', allError);
-        setError(`Database error: ${allError.message}`);
+      console.log('RPC result:', campaign);
+      console.log('RPC error:', rpcError);
+
+      if (rpcError) {
+        console.error('RPC error:', rpcError);
+        setError(`Database error: ${rpcError.message}`);
         return;
       }
 
-      // Now try the specific query
-      const { data: campaign, error: fetchError } = await supabase
-        .from('campaigns')
-        .select('*')
-        .eq('invite_code', inviteCode)
-        .single();
+      if (!campaign || campaign.length === 0) {
+        // Fallback: Try to get all available codes for debugging
+        const { data: allCampaigns, error: allError } = await supabase
+          .from('campaigns')
+          .select('invite_code, name, owner')
+          .limit(10);
 
-      console.log('Specific campaign query result:', campaign);
-      console.log('Query error:', fetchError);
-
-      if (fetchError) {
-        if (fetchError.code === 'PGRST116') {
-          setDebugInfo(`No campaign found with code "${inviteCode}". Available codes: ${allCampaigns?.map(c => c.invite_code).join(', ') || 'none'}`);
-        } else {
-          setError(`Query error: ${fetchError.message}`);
-        }
+        console.log('All campaigns (for debugging):', allCampaigns);
+        
+        setDebugInfo(`No campaign found with code "${inviteCode}". Available codes: ${allCampaigns?.map(c => c.invite_code).join(', ') || 'none'}`);
         return;
       }
 
-      if (!campaign) {
-        setDebugInfo(`Campaign query returned null. Available codes: ${allCampaigns?.map(c => c.invite_code).join(', ') || 'none'}`);
-        return;
-      }
-
-      setDebugInfo(`Found campaign: "${campaign.name}" (ID: ${campaign.id})`);
+      const foundCampaign = Array.isArray(campaign) ? campaign[0] : campaign;
+      setDebugInfo(`✅ Found campaign: "${foundCampaign.name}" (Owner: ${foundCampaign.owner === user?.id ? 'You' : 'Other'})`);
 
     } catch (err) {
       console.error('Test query error:', err);
@@ -125,70 +119,33 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
       console.log('Attempting to join with code:', inviteCode);
       console.log('Current user:', user);
 
-      // Query for campaign with matching invite code
-      const { data: campaign, error: fetchError } = await supabase
-        .from('campaigns')
-        .select('*')
-        .eq('invite_code', inviteCode)
-        .single();
+      // Use RPC function to find and join campaign
+      const { data: result, error: joinError } = await supabase
+        .rpc('join_campaign_by_code', {
+          code: inviteCode,
+          player_id: user.id,
+          player_name: user.username || user.email || 'Player'
+        });
 
-      console.log('Campaign query result:', campaign);
-      console.log('Campaign query error:', fetchError);
+      console.log('Join campaign result:', result);
+      console.log('Join campaign error:', joinError);
 
-      if (fetchError) {
-        if (fetchError.code === 'PGRST116') {
+      if (joinError) {
+        if (joinError.message.includes('not found')) {
           setError('Campaign not found. Please check your code and try again.');
+        } else if (joinError.message.includes('already a member')) {
+          setError('You are already a member of this campaign');
+        } else if (joinError.message.includes('cannot join your own')) {
+          setError('You cannot join your own campaign');
         } else {
-          setError(`Database error: ${fetchError.message}`);
+          setError(`Error: ${joinError.message}`);
         }
         return;
       }
 
-      if (!campaign) {
-        setError('Campaign not found. Please check your code and try again.');
+      if (!result || !result.success) {
+        setError(result?.message || 'Failed to join campaign');
         return;
-      }
-
-      // Check if user is the owner
-      if (campaign.owner === user.id) {
-        setError('You cannot join your own campaign');
-        return;
-      }
-
-      // Check if user is already in the campaign
-      const existingPlayers = Array.isArray(campaign.players) ? campaign.players : [];
-      console.log('Existing players:', existingPlayers);
-      
-      const isAlreadyMember = existingPlayers.some((player: any) => player.id === user.id);
-
-      if (isAlreadyMember) {
-        setError('You are already a member of this campaign');
-        return;
-      }
-
-      // Add current user to the players array
-      const newPlayer = {
-        id: user.id,
-        name: user.username || user.email || 'Player',
-        ready: false,
-        avatar: null,
-      };
-
-      const updatedPlayers = [...existingPlayers, newPlayer];
-      console.log('Updated players array:', updatedPlayers);
-
-      // Update the campaign with the new player
-      const { data: updateResult, error: updateError } = await supabase
-        .from('campaigns')
-        .update({ players: updatedPlayers })
-        .eq('id', campaign.id)
-        .select();
-
-      console.log('Update result:', updateResult);
-      console.log('Update error:', updateError);
-
-      if (updateError) {
-        throw updateError;
       }
 
       // Success! Close modal and redirect to character creation
@@ -198,7 +155,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
       
       Alert.alert(
         'Success!',
-        `You've joined "${campaign.name}"! Create your character to get started.`,
+        `You've joined "${result.campaign_name}"! Create your character to get started.`,
         [
           {
             text: 'Create Character',
@@ -281,7 +238,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
               disabled={isLoading || !inviteCode.trim()}
             >
               {isLoading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   <Search size={16} color="#fff" />
@@ -307,7 +264,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
               disabled={!validateCode(inviteCode) || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   <Users size={20} color="#fff" />
