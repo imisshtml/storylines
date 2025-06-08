@@ -72,15 +72,13 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
           .from('campaigns')
           .select('id, name, invite_code, players, owner')
           .eq('invite_code', inviteCode)
-          .single();
+          .maybeSingle();
 
         if (codeError) {
           console.error('Code query error:', codeError);
-          if (codeError.code === 'PGRST116') {
-            setError(`No campaign found with code "${inviteCode}". Available codes: ${testData?.map(c => c.invite_code).join(', ') || 'none'}`);
-          } else {
-            setError(`Query error: ${codeError.message}`);
-          }
+          setError(`Query error: ${codeError.message}`);
+        } else if (!codeData) {
+          setError(`No campaign found with code "${inviteCode}". Available codes: ${testData?.map(c => c.invite_code).join(', ') || 'none'}`);
         } else {
           console.log('Found campaign:', codeData);
           setError(`Campaign found: ${codeData.name}`);
@@ -119,15 +117,11 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
         .from('campaigns')
         .select('*')
         .eq('invite_code', inviteCode)
-        .single();
+        .maybeSingle();
 
       if (queryError) {
         console.error('Campaign query error:', queryError);
-        if (queryError.code === 'PGRST116') {
-          setError('Campaign not found. Please check the invite code.');
-        } else {
-          setError(`Database error: ${queryError.message}`);
-        }
+        setError(`Database error: ${queryError.message}`);
         return;
       }
 
@@ -256,7 +250,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <ActivityIndicator size="small\" color="#fff" />
+                  <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <Text style={styles.buttonText}>Test Query</Text>
                 )}
@@ -271,7 +265,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
                 disabled={!validateCode(inviteCode) || isLoading}
               >
                 {isLoading ? (
-                  <ActivityIndicator size="small\" color="#fff" />
+                  <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <Text style={styles.buttonText}>Join Campaign</Text>
                 )}
