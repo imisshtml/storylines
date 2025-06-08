@@ -241,11 +241,11 @@ export default function CreationScreen() {
 
   // Helper function to format ability bonuses
   const formatAbilityBonuses = (race: Race) => {
-    if (!race.ability_score_increases || race.ability_score_increases.length === 0) {
+    if (!race.ability_bonuses || race.ability_bonuses.length === 0) {
       return 'No ability bonuses';
     }
 
-    return race.ability_score_increases
+    return race.ability_bonuses
       .map(increase => {
         const abilityName = increase.ability_score.name;
         const bonus = increase.bonus;
