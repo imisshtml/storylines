@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image } from 'react-native';
-import { LogOut, X, User, Settings, Info } from 'lucide-react-native';
+import { LogOut, X, User, Settings, Info, UserPlus } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
@@ -73,6 +73,15 @@ export default function SidebarMenu({ isVisible, onClose }: SidebarMenuProps) {
       onPress: () => {
         onClose();
         router.push('/profile');
+      },
+    },
+    {
+      icon: <UserPlus size={24} color="#fff" />,
+      title: 'Create Character',
+      subtitle: 'Build a new D&D character',
+      onPress: () => {
+        onClose();
+        router.push('/creation');
       },
     },
     {
