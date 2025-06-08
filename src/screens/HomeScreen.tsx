@@ -6,12 +6,14 @@ import { useAtom } from 'jotai';
 import { campaignsAtom, currentCampaignAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import SidebarMenu from '../components/SidebarMenu';
+import JoinCampaignModal from '../components/JoinCampaignModal';
 
 export default function HomeScreen() {
   const [campaigns] = useAtom(campaignsAtom);
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [user] = useAtom(userAtom);
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
+  const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
 
   const handleCampaignPress = (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
@@ -41,6 +43,10 @@ export default function HomeScreen() {
   const handleTitlePress = () => {
     // Only navigate to dev screen in development mode
     router.push('/dev');
+  };
+
+  const handleJoinCampaign = () => {
+    setIsJoinModalVisible(true);
   };
 
   return (
@@ -126,7 +132,7 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           style={styles.joinButton}
-          onPress={() => router.push('/join')}
+          onPress={handleJoinCampaign}
         >
           <Users size={20} color="#fff" />
           <Text style={styles.buttonText}>Join via Code</Text>
@@ -136,6 +142,11 @@ export default function HomeScreen() {
       <SidebarMenu
         isVisible={isSidebarVisible}
         onClose={() => setIsSidebarVisible(false)}
+      />
+
+      <JoinCampaignModal
+        isVisible={isJoinModalVisible}
+        onClose={() => setIsJoinModalVisible(false)}
       />
     </ImageBackground>
   );
