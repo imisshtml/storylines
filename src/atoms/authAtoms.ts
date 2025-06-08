@@ -204,6 +204,10 @@ export const initializeAuthAtom = atom(
       console.log('::: > ', savedSession, savedUser)
       if (savedSession && savedUser) {
         // Verify the saved session is still valid with Supabase
+        await supabase.auth.setSession({
+          access_token: savedSession.access_token,
+          refresh_token: savedSession.refresh_token,
+        });
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         
         if (currentSession?.user) {
