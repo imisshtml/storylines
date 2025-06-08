@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#121212',
   },
-   header: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -359,9 +359,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   title: {
-    fontSize: 24,
-    fontFamily: 'Inter-Bold',
+    fontSize: 20,
+    fontWeight: 'bold',
     color: '#fff',
+    fontFamily: 'Inter-Bold',
+    flex: 1,
+    textAlign: 'center',
   },
   closeButton: {
     width: 40,
