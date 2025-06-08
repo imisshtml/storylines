@@ -731,7 +731,7 @@ export default function CreationScreen() {
               
               <BottomSheetScrollView style={styles.bottomSheetScroll}>
                 <View style={styles.raceDetailSection}>
-                  <Text style={styles.raceDetailText}>{raceDesc.selectedRaceForDetails.index}</Text>
+                  <Text style={styles.raceDetailText}>{raceDesc.selectedRaceForDetails?.index}</Text>
                 </View>
                 <View style={styles.raceDetailSection}>
                   <Text style={styles.raceDetailLabel}>Basic Information</Text>
