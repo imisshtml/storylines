@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, SafeAreaView } from 'react-native';
 import { useAtom } from 'jotai';
 
 export default function ProfileScreen() {
@@ -9,7 +9,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
           <View style={styles.backButton}>
             <TouchableOpacity onPress={handleBack} style={styles.touchable} />
@@ -17,7 +17,7 @@ export default function ProfileScreen() {
           </View>
         <Text style={styles.title}>Profile</Text>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
