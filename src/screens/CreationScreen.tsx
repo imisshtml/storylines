@@ -86,6 +86,31 @@ const raceDesc = {
   tiefling: 'Tieflings are descended from ancient pacts with infernal powers, marked by their horns, tails, and other features. Despite their appearance, tieflings have the same capacity for good or evil as any other race and often live with a strong sense of self-determination.',
 };
 
+const classDesc = {
+  barbarian: 'A fierce warrior of primitive background who can enter a battle rage. Barbarians excel in melee combat and can take tremendous amounts of damage while dealing devastating attacks.',
+  
+  bard: 'A master of song, speech, and the magic they contain. Bards are versatile spellcasters and skilled performers who can inspire allies, control the battlefield, and solve problems with creativity.',
+  
+  cleric: 'A priestly champion who wields divine magic in service of a higher power. Clerics are powerful healers and support characters who can also hold their own in combat.',
+  
+  druid: 'A priest of nature, wielding elemental forces and transforming into animals. Druids are versatile spellcasters with a deep connection to the natural world.',
+  
+  fighter: 'A master of martial combat, skilled with a variety of weapons and armor. Fighters are the most versatile combatants, capable of adapting to any fighting style.',
+  
+  monk: 'A master of martial arts, harnessing inner power through discipline and training. Monks are agile combatants who can perform supernatural feats through ki.',
+  
+  paladin: 'A holy warrior bound to a sacred oath. Paladins combine martial prowess with divine magic, serving as champions of justice and righteousness.',
+  
+  ranger: 'A warrior of the wilderness, skilled in tracking, survival, and combat. Rangers are versatile fighters who excel in natural environments.',
+  
+  rogue: 'A scoundrel who uses stealth and trickery to accomplish goals. Rogues are skilled in infiltration, trap detection, and dealing massive damage from the shadows.',
+  
+  sorcerer: 'A spellcaster who draws on inherent magic from a draconic or other exotic bloodline. Sorcerers have fewer spells than wizards but can modify them with metamagic.',
+  
+  warlock: 'A wielder of magic derived from a bargain with an extraplanar entity. Warlocks have unique spellcasting abilities and powerful supernatural invocations.',
+  
+  wizard: 'A scholarly magic-user capable of manipulating the structures of spellcasting. Wizards have the largest spell selection and can prepare different spells each day.',
+};
 
 export default function CreationScreen() {
   const [user] = useAtom(userAtom);
@@ -113,9 +138,11 @@ export default function CreationScreen() {
 
   const [loading, setLoading] = useState(false);
   const [selectedRaceForDetails, setSelectedRaceForDetails] = useState<Race | null>(null);
+  const [selectedClassForDetails, setSelectedClassForDetails] = useState<Class | null>(null);
 
-  // Bottom sheet ref and snap points
-  const bottomSheetRef = useRef<BottomSheet>(null);
+  // Bottom sheet refs and snap points
+  const raceBottomSheetRef = useRef<BottomSheet>(null);
+  const classBottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = ['50%', '90%'];
 
   useEffect(() => {
@@ -281,14 +308,45 @@ export default function CreationScreen() {
       .join(', ');
   };
 
+  // Helper function to format class hit die
+  const formatHitDie = (cls: Class) => {
+    return `d${cls.hit_die}`;
+  };
+
+  // Helper function to format class proficiencies
+  const formatProficiencies = (cls: Class) => {
+    if (!cls.proficiencies || cls.proficiencies.length === 0) {
+      return 'None';
+    }
+    return cls.proficiencies.map(prof => prof.name).join(', ');
+  };
+
+  // Helper function to format saving throws
+  const formatSavingThrows = (cls: Class) => {
+    if (!cls.saving_throws || cls.saving_throws.length === 0) {
+      return 'None';
+    }
+    return cls.saving_throws.map(save => save.name).join(', ');
+  };
+
   // Handle race details bottom sheet
   const handleRaceDetailsPress = useCallback((race: Race) => {
     setSelectedRaceForDetails(race);
-    bottomSheetRef.current?.expand();
+    raceBottomSheetRef.current?.expand();
   }, []);
 
-  const handleCloseBottomSheet = useCallback(() => {
-    bottomSheetRef.current?.close();
+  const handleCloseRaceBottomSheet = useCallback(() => {
+    raceBottomSheetRef.current?.close();
+  }, []);
+
+  // Handle class details bottom sheet
+  const handleClassDetailsPress = useCallback((cls: Class) => {
+    setSelectedClassForDetails(cls);
+    classBottomSheetRef.current?.expand();
+  }, []);
+
+  const handleCloseClassBottomSheet = useCallback(() => {
+    classBottomSheetRef.current?.close();
   }, []);
 
   const handleSaveCharacter = async () => {
@@ -396,24 +454,35 @@ export default function CreationScreen() {
             <Text style={styles.stepTitle}>Choose Class</Text>
             <ScrollView style={styles.optionsList}>
               {classes.map((cls) => (
-                <TouchableOpacity
-                  key={cls.index}
-                  style={[
-                    styles.optionCard,
-                    selectedClass?.index === cls.index && styles.selectedOption,
-                  ]}
-                  onPress={() => setSelectedClass(cls)}
-                >
-                  <Text style={styles.optionTitle}>{cls.name}</Text>
-                  <Text style={styles.optionDescription}>
-                    Hit Die: d{cls.hit_die}
-                  </Text>
-                  {cls.spellcasting && (
-                    <Text style={styles.optionBonus}>
-                      Spellcaster (Level {cls.spellcasting.level})
-                    </Text>
-                  )}
-                </TouchableOpacity>
+                <View key={cls.index} style={styles.classCardContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.optionCard,
+                      selectedClass?.index === cls.index && styles.selectedOption,
+                    ]}
+                    onPress={() => setSelectedClass(cls)}
+                  >
+                    <View style={styles.classCardContent}>
+                      <View style={styles.classInfo}>
+                        <Text style={styles.optionTitle}>{cls.name}</Text>
+                        <Text style={styles.optionDescription}>
+                          Hit Die: {formatHitDie(cls)}
+                        </Text>
+                        {cls.spellcasting && (
+                          <Text style={styles.optionBonus}>
+                            Spellcaster (Level {cls.spellcasting.level})
+                          </Text>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        style={styles.bookIcon}
+                        onPress={() => handleClassDetailsPress(cls)}
+                      >
+                        <Book size={20} color="#4CAF50" />
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               ))}
             </ScrollView>
           </View>
@@ -643,7 +712,7 @@ export default function CreationScreen() {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   <Save size={20} color="#fff" />
@@ -712,7 +781,7 @@ export default function CreationScreen() {
 
       {/* Race Details Bottom Sheet */}
       <BottomSheet
-        ref={bottomSheetRef}
+        ref={raceBottomSheetRef}
         index={-1}
         snapPoints={snapPoints}
         enablePanDownToClose={true}
@@ -724,7 +793,7 @@ export default function CreationScreen() {
             <>
               <View style={styles.bottomSheetHeader}>
                 <Text style={styles.bottomSheetTitle}>{selectedRaceForDetails.name}</Text>
-                <TouchableOpacity onPress={handleCloseBottomSheet} style={styles.closeButton}>
+                <TouchableOpacity onPress={handleCloseRaceBottomSheet} style={styles.closeButton}>
                   <Text style={styles.closeButtonText}>✕</Text>
                 </TouchableOpacity>
               </View>
@@ -767,12 +836,77 @@ export default function CreationScreen() {
                     ))}
                   </View>
                 )}
+              </BottomSheetScrollView>
+            </>
+          )}
+        </BottomSheetView>
+      </BottomSheet>
 
-                {false && selectedRaceForDetails.subraces && selectedRaceForDetails.subraces.length > 0 && (
-                  <View style={styles.raceDetailSection}>
-                    <Text style={styles.raceDetailLabel}>Subraces</Text>
-                    {selectedRaceForDetails.subraces.map((subrace, index) => (
-                      <Text key={index} style={styles.raceDetailText}>• {subrace.name}</Text>
+      {/* Class Details Bottom Sheet */}
+      <BottomSheet
+        ref={classBottomSheetRef}
+        index={-1}
+        snapPoints={snapPoints}
+        enablePanDownToClose={true}
+        backgroundStyle={styles.bottomSheetBackground}
+        handleIndicatorStyle={styles.bottomSheetIndicator}
+      >
+        <BottomSheetView style={styles.bottomSheetContent}>
+          {selectedClassForDetails && (
+            <>
+              <View style={styles.bottomSheetHeader}>
+                <Text style={styles.bottomSheetTitle}>{selectedClassForDetails.name}</Text>
+                <TouchableOpacity onPress={handleCloseClassBottomSheet} style={styles.closeButton}>
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <BottomSheetScrollView style={styles.bottomSheetScroll}>
+                <View style={styles.classDetailSection}>
+                  <Text style={styles.classDetailText}>{classDesc[selectedClassForDetails?.index]}</Text>
+                </View>
+
+                <View style={styles.classDetailSection}>
+                  <Text style={styles.classDetailLabel}>Basic Information</Text>
+                  <Text style={styles.classDetailText}>Hit Die: {formatHitDie(selectedClassForDetails)}</Text>
+                  <Text style={styles.classDetailText}>Primary Ability: {formatSavingThrows(selectedClassForDetails)}</Text>
+                </View>
+
+                {selectedClassForDetails.proficiencies && selectedClassForDetails.proficiencies.length > 0 && (
+                  <View style={styles.classDetailSection}>
+                    <Text style={styles.classDetailLabel}>Proficiencies</Text>
+                    <Text style={styles.classDetailText}>{formatProficiencies(selectedClassForDetails)}</Text>
+                  </View>
+                )}
+
+                {selectedClassForDetails.saving_throws && selectedClassForDetails.saving_throws.length > 0 && (
+                  <View style={styles.classDetailSection}>
+                    <Text style={styles.classDetailLabel}>Saving Throw Proficiencies</Text>
+                    {selectedClassForDetails.saving_throws.map((save, index) => (
+                      <Text key={index} style={styles.classDetailText}>• {save.name}</Text>
+                    ))}
+                  </View>
+                )}
+
+                {selectedClassForDetails.spellcasting && (
+                  <View style={styles.classDetailSection}>
+                    <Text style={styles.classDetailLabel}>Spellcasting</Text>
+                    <Text style={styles.classDetailText}>
+                      Spellcasting begins at level {selectedClassForDetails.spellcasting.level}
+                    </Text>
+                    <Text style={styles.classDetailText}>
+                      Spellcasting Ability: {selectedClassForDetails.spellcasting.spellcasting_ability.name}
+                    </Text>
+                  </View>
+                )}
+
+                {selectedClassForDetails.starting_equipment && selectedClassForDetails.starting_equipment.length > 0 && (
+                  <View style={styles.classDetailSection}>
+                    <Text style={styles.classDetailLabel}>Starting Equipment</Text>
+                    {selectedClassForDetails.starting_equipment.map((item, index) => (
+                      <Text key={index} style={styles.classDetailText}>
+                        • {item.equipment.name} x{item.quantity}
+                      </Text>
                     ))}
                   </View>
                 )}
@@ -879,6 +1013,9 @@ const styles = StyleSheet.create({
   raceCardContainer: {
     marginBottom: 0,
   },
+  classCardContainer: {
+    marginBottom: 0,
+  },
   optionCard: {
     backgroundColor: '#2a2a2a',
     borderRadius: 12,
@@ -896,7 +1033,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
+  classCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   raceInfo: {
+    flex: 1,
+  },
+  classInfo: {
     flex: 1,
   },
   bookIcon: {
@@ -1143,13 +1288,29 @@ const styles = StyleSheet.create({
   raceDetailSection: {
     marginBottom: 20,
   },
+  classDetailSection: {
+    marginBottom: 20,
+  },
   raceDetailLabel: {
     fontSize: 18,
     color: '#4CAF50',
     fontFamily: 'Inter-Bold',
     marginBottom: 8,
   },
+  classDetailLabel: {
+    fontSize: 18,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
   raceDetailText: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 4,
+    lineHeight: 22,
+  },
+  classDetailText: {
     fontSize: 16,
     color: '#fff',
     fontFamily: 'Inter-Regular',
