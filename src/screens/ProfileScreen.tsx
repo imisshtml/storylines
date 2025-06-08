@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import React from 'react';
+import { ArrowLeft } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View, SafeAreaView } from 'react-native';
 import { useAtom } from 'jotai';
 
