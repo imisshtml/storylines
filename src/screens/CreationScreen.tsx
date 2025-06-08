@@ -426,7 +426,7 @@ export default function CreationScreen() {
             </Text>
             
             <ScrollView style={styles.optionsList}>
-              {selectedClass?.proficiency_choices?.[0]?.from?.map((prof) => (
+              {selectedClass?.proficiency_choices?.[0]?.from?.options?.map((prof) => (
                 <TouchableOpacity
                   key={prof.index}
                   style={[
