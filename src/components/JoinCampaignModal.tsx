@@ -281,7 +281,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
               disabled={isLoading || !inviteCode.trim()}
             >
               {isLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small\" color="#fff" />
               ) : (
                 <>
                   <Search size={16} color="#fff" />
@@ -307,7 +307,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
               disabled={!validateCode(inviteCode) || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small\" color="#fff" />
               ) : (
                 <>
                   <Users size={20} color="#fff" />
