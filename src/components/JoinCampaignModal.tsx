@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { X, Users, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { X, Users, CircleAlert as AlertCircle, Search } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { userAtom } from '../atoms/authAtoms';
 import { supabase } from '../config/supabase';
@@ -25,6 +25,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
   const [inviteCode, setInviteCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   const validateCode = (code: string): boolean => {
     // Exactly 6 characters, alphanumeric only
@@ -41,6 +42,68 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
     if (error) {
       setError(null);
     }
+    if (debugInfo) {
+      setDebugInfo(null);
+    }
+  };
+
+  const handleTestQuery = async () => {
+    if (!inviteCode.trim()) {
+      setError('Please enter a code first');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setDebugInfo(null);
+
+    try {
+      // First, let's see all campaigns to debug
+      const { data: allCampaigns, error: allError } = await supabase
+        .from('campaigns')
+        .select('id, name, invite_code, owner, players');
+
+      console.log('All campaigns:', allCampaigns);
+      console.log('Looking for code:', inviteCode);
+
+      if (allError) {
+        console.error('Error fetching all campaigns:', allError);
+        setError(`Database error: ${allError.message}`);
+        return;
+      }
+
+      // Now try the specific query
+      const { data: campaign, error: fetchError } = await supabase
+        .from('campaigns')
+        .select('*')
+        .eq('invite_code', inviteCode)
+        .single();
+
+      console.log('Specific campaign query result:', campaign);
+      console.log('Query error:', fetchError);
+
+      if (fetchError) {
+        if (fetchError.code === 'PGRST116') {
+          setDebugInfo(`No campaign found with code "${inviteCode}". Available codes: ${allCampaigns?.map(c => c.invite_code).join(', ') || 'none'}`);
+        } else {
+          setError(`Query error: ${fetchError.message}`);
+        }
+        return;
+      }
+
+      if (!campaign) {
+        setDebugInfo(`Campaign query returned null. Available codes: ${allCampaigns?.map(c => c.invite_code).join(', ') || 'none'}`);
+        return;
+      }
+
+      setDebugInfo(`Found campaign: "${campaign.name}" (ID: ${campaign.id})`);
+
+    } catch (err) {
+      console.error('Test query error:', err);
+      setError(`Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleJoinCampaign = async () => {
@@ -56,8 +119,12 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
 
     setIsLoading(true);
     setError(null);
+    setDebugInfo(null);
 
     try {
+      console.log('Attempting to join with code:', inviteCode);
+      console.log('Current user:', user);
+
       // Query for campaign with matching invite code
       const { data: campaign, error: fetchError } = await supabase
         .from('campaigns')
@@ -65,23 +132,37 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
         .eq('invite_code', inviteCode)
         .single();
 
-      if (fetchError || !campaign) {
-        setError('Campaign not found. Please check your code and try again.');
+      console.log('Campaign query result:', campaign);
+      console.log('Campaign query error:', fetchError);
+
+      if (fetchError) {
+        if (fetchError.code === 'PGRST116') {
+          setError('Campaign not found. Please check your code and try again.');
+        } else {
+          setError(`Database error: ${fetchError.message}`);
+        }
         return;
       }
 
-      // Check if user is already in the campaign
-      const existingPlayers = campaign.players || [];
-      const isAlreadyMember = existingPlayers.some((player: any) => player.id === user.id);
-
-      if (isAlreadyMember) {
-        setError('You are already a member of this campaign');
+      if (!campaign) {
+        setError('Campaign not found. Please check your code and try again.');
         return;
       }
 
       // Check if user is the owner
       if (campaign.owner === user.id) {
         setError('You cannot join your own campaign');
+        return;
+      }
+
+      // Check if user is already in the campaign
+      const existingPlayers = Array.isArray(campaign.players) ? campaign.players : [];
+      console.log('Existing players:', existingPlayers);
+      
+      const isAlreadyMember = existingPlayers.some((player: any) => player.id === user.id);
+
+      if (isAlreadyMember) {
+        setError('You are already a member of this campaign');
         return;
       }
 
@@ -94,12 +175,17 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
       };
 
       const updatedPlayers = [...existingPlayers, newPlayer];
+      console.log('Updated players array:', updatedPlayers);
 
       // Update the campaign with the new player
-      const { error: updateError } = await supabase
+      const { data: updateResult, error: updateError } = await supabase
         .from('campaigns')
         .update({ players: updatedPlayers })
-        .eq('id', campaign.id);
+        .eq('id', campaign.id)
+        .select();
+
+      console.log('Update result:', updateResult);
+      console.log('Update error:', updateError);
 
       if (updateError) {
         throw updateError;
@@ -108,6 +194,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
       // Success! Close modal and redirect to character creation
       onClose();
       setInviteCode('');
+      setDebugInfo(null);
       
       Alert.alert(
         'Success!',
@@ -122,7 +209,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
 
     } catch (err) {
       console.error('Error joining campaign:', err);
-      setError('Failed to join campaign. Please try again.');
+      setError(`Failed to join campaign: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -131,6 +218,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
   const handleClose = () => {
     setInviteCode('');
     setError(null);
+    setDebugInfo(null);
     onClose();
   };
 
@@ -177,9 +265,31 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
+
+            {debugInfo && (
+              <View style={styles.debugContainer}>
+                <Search size={16} color="#4CAF50" />
+                <Text style={styles.debugText}>{debugInfo}</Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.testButton}
+              onPress={handleTestQuery}
+              disabled={isLoading || !inviteCode.trim()}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Search size={16} color="#fff" />
+                  <Text style={styles.testButtonText}>Test Query</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.cancelButton}
               onPress={handleClose}
@@ -197,11 +307,11 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
               disabled={!validateCode(inviteCode) || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   <Users size={20} color="#fff" />
-                  <Text style={styles.joinButtonText}>Join Campaign</Text>
+                  <Text style={styles.joinButtonText}>Join</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -302,9 +412,41 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     flex: 1,
   },
+  debugContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingHorizontal: 4,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    padding: 8,
+    borderRadius: 6,
+  },
+  debugText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#4CAF50',
+    marginLeft: 6,
+    flex: 1,
+  },
   buttonContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  testButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minWidth: 100,
+  },
+  testButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
   },
   cancelButton: {
     flex: 1,
@@ -319,7 +461,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   joinButton: {
-    flex: 2,
+    flex: 1,
     backgroundColor: '#4CAF50',
     borderRadius: 8,
     padding: 16,
