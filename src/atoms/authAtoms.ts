@@ -201,7 +201,7 @@ export const initializeAuthAtom = atom(
 
       // First, check AsyncStorage for saved session
       const { session: savedSession, user: savedUser } = await getUserSession();
-      console.log('::: > ', savedSession, savedUser)
+
       if (savedSession && savedUser) {
         // Verify the saved session is still valid with Supabase
         await supabase.auth.setSession({
