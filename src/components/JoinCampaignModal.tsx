@@ -45,56 +45,6 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
     }
   };
 
-  const testQuery = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      console.log('Testing database query...');
-      
-      // Test basic connection
-      const { data: testData, error: testError } = await supabase
-        .from('campaigns')
-        .select('id, name, invite_code')
-        .limit(5);
-
-      if (testError) {
-        console.error('Test query error:', testError);
-        setError(`Database error: ${testError.message}`);
-        return;
-      }
-
-      console.log('Available campaigns:', testData);
-      
-      // Test specific code query
-      if (inviteCode && validateCode(inviteCode)) {
-        const { data: codeData, error: codeError } = await supabase
-          .from('campaigns')
-          .select('id, name, invite_code, players, owner')
-          .eq('invite_code', inviteCode)
-          .maybeSingle();
-
-        if (codeError) {
-          console.error('Code query error:', codeError);
-          setError(`Query error: ${codeError.message}`);
-        } else if (!codeData) {
-          setError(`No campaign found with code "${inviteCode}". Available codes: ${testData?.map(c => c.invite_code).join(', ') || 'none'}`);
-        } else {
-          console.log('Found campaign:', codeData);
-          setError(`Campaign found: ${codeData.name}`);
-        }
-      } else {
-        setError(`Available codes: ${testData?.map(c => c.invite_code).join(', ') || 'none'}`);
-      }
-
-    } catch (err) {
-      console.error('Test query exception:', err);
-      setError(`Exception: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleJoinCampaign = async () => {
     if (!validateCode(inviteCode)) {
       setError('Please enter a valid 6-character code');
@@ -240,37 +190,20 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
               </View>
             )}
 
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.testButton,
-                  isLoading && styles.buttonDisabled
-                ]}
-                onPress={testQuery}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator size="small\" color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Test Query</Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.joinButton,
-                  (!validateCode(inviteCode) || isLoading) && styles.buttonDisabled
-                ]}
-                onPress={handleJoinCampaign}
-                disabled={!validateCode(inviteCode) || isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator size="small\" color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Join Campaign</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={[
+                styles.joinButton,
+                (!validateCode(inviteCode) || isLoading) && styles.buttonDisabled
+              ]}
+              onPress={handleJoinCampaign}
+              disabled={!validateCode(inviteCode) || isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Join Campaign</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -369,15 +302,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#f44336',
     lineHeight: 20,
-  },
-  buttonContainer: {
-    gap: 12,
-  },
-  testButton: {
-    backgroundColor: '#2196F3',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
   },
   joinButton: {
     backgroundColor: '#4CAF50',
