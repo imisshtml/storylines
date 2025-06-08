@@ -77,20 +77,17 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
       }
 
       if (!campaign || campaign.length === 0) {
-        // Fallback: Try to get all available codes for debugging
-        const { data: allCampaigns, error: allError } = await supabase
-          .from('campaigns')
-          .select('invite_code, name, owner')
-          .limit(10);
+        // Get some sample codes for debugging
+        const { data: sampleCampaigns, error: sampleError } = await supabase
+          .rpc('find_campaign_by_invite_code', { code: 'SAMPLE' }); // This will fail but might give us insight
 
-        console.log('All campaigns (for debugging):', allCampaigns);
-        
-        setDebugInfo(`No campaign found with code "${inviteCode}". Available codes: ${allCampaigns?.map(c => c.invite_code).join(', ') || 'none'}`);
+        setError(`No campaign found with code "${inviteCode}"`);
+        setDebugInfo('💡 Make sure the code is exactly 6 characters and matches a campaign in the database');
         return;
       }
 
       const foundCampaign = Array.isArray(campaign) ? campaign[0] : campaign;
-      setDebugInfo(`✅ Found campaign: "${foundCampaign.name}" (Owner: ${foundCampaign.owner === user?.id ? 'You' : 'Other'})`);
+      setDebugInfo(`✅ Found campaign: "${foundCampaign.name}" (Status: ${foundCampaign.status})`);
 
     } catch (err) {
       console.error('Test query error:', err);
@@ -131,26 +128,26 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
       console.log('Join campaign error:', joinError);
 
       if (joinError) {
-        if (joinError.message.includes('not found')) {
-          setError('Campaign not found. Please check your code and try again.');
-        } else if (joinError.message.includes('already a member')) {
-          setError('You are already a member of this campaign');
-        } else if (joinError.message.includes('cannot join your own')) {
-          setError('You cannot join your own campaign');
-        } else {
-          setError(`Error: ${joinError.message}`);
-        }
+        console.error('Join error details:', joinError);
+        setError(`Database error: ${joinError.message}`);
         return;
       }
 
-      if (!result || !result.success) {
-        setError(result?.message || 'Failed to join campaign');
+      if (!result) {
+        setError('No response from server');
+        return;
+      }
+
+      // Handle the JSON response
+      if (!result.success) {
+        setError(result.message || 'Failed to join campaign');
         return;
       }
 
       // Success! Close modal and redirect to character creation
       onClose();
       setInviteCode('');
+      setError(null);
       setDebugInfo(null);
       
       Alert.alert(
@@ -238,7 +235,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
               disabled={isLoading || !inviteCode.trim()}
             >
               {isLoading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   <Search size={16} color="#fff" />
@@ -264,7 +261,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
               disabled={!validateCode(inviteCode) || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   <Users size={20} color="#fff" />
@@ -272,7 +269,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
                 </>
               )}
             </TouchableOpacity>
-          </View>
+          </div>
         </View>
       </View>
     </Modal>
