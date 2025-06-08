@@ -15,7 +15,6 @@ export type Campaign = {
   content_level: 'kids' | 'teens' | 'adults';
   rp_focus: 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heavy_combat';
   created_at?: string;
-  updated_at?: string; // Make this optional since it might not exist
 };
 
 export type Player = {
@@ -70,12 +69,30 @@ export const upsertCampaignAtom = atom(
       set(campaignsLoadingAtom, true);
       set(campaignsErrorAtom, null);
 
-      // Remove updated_at from the campaign data to avoid the error
-      const { updated_at, ...campaignData } = campaign;
+      // Clean the campaign data to only include fields that exist in the database
+      const cleanCampaignData = {
+        id: campaign.id,
+        name: campaign.name,
+        adventure: campaign.adventure,
+        level: campaign.level,
+        tone: campaign.tone,
+        exclude: campaign.exclude,
+        status: campaign.status,
+        players: campaign.players,
+        invite_code: campaign.invite_code,
+        owner: campaign.owner,
+        content_level: campaign.content_level,
+        rp_focus: campaign.rp_focus,
+      };
+
+      // Remove undefined values
+      const filteredData = Object.fromEntries(
+        Object.entries(cleanCampaignData).filter(([_, value]) => value !== undefined)
+      );
 
       const { data, error } = await supabase
         .from('campaigns')
-        .upsert(campaignData)
+        .upsert(filteredData)
         .select()
         .single();
 
