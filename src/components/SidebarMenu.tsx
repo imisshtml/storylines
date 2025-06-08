@@ -81,7 +81,7 @@ export default function SidebarMenu({ isVisible, onClose }: SidebarMenuProps) {
       subtitle: 'App preferences',
       onPress: () => {
         onClose();
-        router.push('/setting');
+        router.push('/settings');
       },
     },
     {
