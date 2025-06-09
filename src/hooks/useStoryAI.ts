@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
+import { addCampaignMessageAtom } from '../atoms/campaignHistoryAtoms';
 
 export type StoryEvent = {
   id: string;
@@ -12,7 +13,6 @@ export type StoryEvent = {
 };
 
 export type StoryState = {
-  events: StoryEvent[];
   isLoading: boolean;
   error: string | null;
   currentChoices: string[];
@@ -20,15 +20,8 @@ export type StoryState = {
 
 export function useStoryAI() {
   const [currentCampaign] = useAtom(currentCampaignAtom);
+  const [, addCampaignMessage] = useAtom(addCampaignMessageAtom);
   const [storyState, setStoryState] = useState<StoryState>({
-    events: [
-      {
-        id: '1',
-        type: 'dm',
-        content: 'The ancient trees loomed overhead, their branches intertwining to form a dense canopy that barely allowed any sunlight to penetrate. The air was thick with an otherworldly presence, and the silence was deafening. Your journey begins here, in the heart of the Dark Forest...',
-        timestamp: new Date().toISOString(),
-      }
-    ],
     isLoading: false,
     error: null,
     currentChoices: [
@@ -42,29 +35,26 @@ export function useStoryAI() {
   const sendPlayerAction = useCallback(async (action: string, playerId: string = 'player1', playerName: string = 'Player') => {
     if (!currentCampaign || !action.trim()) return;
 
-    // Add player action to story
-    const playerEvent: StoryEvent = {
-      id: Date.now().toString(),
-      type: 'player',
-      content: action,
-      timestamp: new Date().toISOString(),
-      playerId,
-      playerName,
-    };
-
     setStoryState(prev => ({
       ...prev,
-      events: [...prev.events, playerEvent],
       isLoading: true,
       error: null,
       currentChoices: [], // Clear choices while loading
     }));
 
     try {
+      // Add player message to campaign history
+      await addCampaignMessage({
+        campaign_id: currentCampaign.id,
+        message: action,
+        author: playerName,
+        message_type: 'player',
+      });
+
       // Prepare context for the AI
       const context = {
         campaign: currentCampaign,
-        storyHistory: storyState.events,
+        storyHistory: [], // We'll get this from campaign_history now
       };
 
       // Send request to our API route
@@ -87,17 +77,16 @@ export function useStoryAI() {
 
       const data = await response.json();
 
-      // Add DM response to story
-      const dmEvent: StoryEvent = {
-        id: (Date.now() + 1).toString(),
-        type: 'dm',
-        content: data.response,
-        timestamp: data.timestamp,
-      };
+      // Add DM response to campaign history
+      await addCampaignMessage({
+        campaign_id: currentCampaign.id,
+        message: data.response,
+        author: 'DM',
+        message_type: 'dm',
+      });
 
       setStoryState(prev => ({
         ...prev,
-        events: [...prev.events, dmEvent],
         isLoading: false,
         currentChoices: data.choices || [], // Use choices from AI response
       }));
@@ -111,7 +100,7 @@ export function useStoryAI() {
         currentChoices: [], // Clear choices on error
       }));
     }
-  }, [currentCampaign, storyState.events]);
+  }, [currentCampaign, addCampaignMessage]);
 
   const sendChoice = useCallback(async (choice: string, playerId: string = 'player1', playerName: string = 'Player') => {
     await sendPlayerAction(`I choose to: ${choice}`, playerId, playerName);
@@ -121,20 +110,10 @@ export function useStoryAI() {
     setStoryState(prev => ({ ...prev, error: null }));
   }, []);
 
-  const resetStory = useCallback(() => {
-    setStoryState({
-      events: [],
-      isLoading: false,
-      error: null,
-      currentChoices: [],
-    });
-  }, []);
-
   return {
     storyState,
     sendPlayerAction,
     sendChoice,
     clearError,
-    resetStory,
   };
 }
