@@ -211,39 +211,41 @@ export default function CreationScreen() {
   };
 
   const renderStepIndicator = () => (
-    <ScrollView 
-      horizontal 
-      showsHorizontalScrollIndicator={false}
-      style={styles.stepIndicator}
-      contentContainerStyle={styles.stepIndicatorContent}
-    >
-      {CREATION_STEPS.map((step, index) => {
-        const Icon = step.icon;
-        const isActive = index === currentStep;
-        const isCompleted = index < currentStep;
-        
-        return (
-          <View key={step.id} style={styles.stepItem}>
-            <View style={[
-              styles.stepCircle,
-              isActive && styles.stepCircleActive,
-              isCompleted && styles.stepCircleCompleted,
-            ]}>
-              <Icon 
-                size={16} 
-                color={isActive || isCompleted ? '#fff' : '#666'} 
-              />
+    <View style={styles.stepIndicatorContainer}>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.stepIndicator}
+        contentContainerStyle={styles.stepIndicatorContent}
+      >
+        {CREATION_STEPS.map((step, index) => {
+          const Icon = step.icon;
+          const isActive = index === currentStep;
+          const isCompleted = index < currentStep;
+          
+          return (
+            <View key={step.id} style={styles.stepItem}>
+              <View style={[
+                styles.stepCircle,
+                isActive && styles.stepCircleActive,
+                isCompleted && styles.stepCircleCompleted,
+              ]}>
+                <Icon 
+                  size={16} 
+                  color={isActive || isCompleted ? '#fff' : '#666'} 
+                />
+              </View>
+              <Text style={[
+                styles.stepText,
+                isActive && styles.stepTextActive,
+              ]}>
+                {step.title}
+              </Text>
             </View>
-            <Text style={[
-              styles.stepText,
-              isActive && styles.stepTextActive,
-            ]}>
-              {step.title}
-            </Text>
-          </View>
-        );
-      })}
-    </ScrollView>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 
   const renderBasicInfo = () => (
@@ -575,7 +577,7 @@ export default function CreationScreen() {
         disabled={isSaving}
       >
         {isSaving ? (
-          <ActivityIndicator size="small\" color="#fff" />
+          <ActivityIndicator size="small" color="#fff" />
         ) : (
           <>
             <Save size={20} color="#fff" />
@@ -634,7 +636,9 @@ export default function CreationScreen() {
 
       {renderStepIndicator()}
 
-      {renderCurrentStep()}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {renderCurrentStep()}
+      </ScrollView>
 
       {currentStep < CREATION_STEPS.length - 1 && (
         <View style={styles.footer}>
@@ -692,20 +696,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginRight: 40,
   },
-  stepIndicator: {
+  stepIndicatorContainer: {
     backgroundColor: '#1a1a1a',
     borderBottomWidth: 1,
     borderBottomColor: '#2a2a2a',
-    height: 30,
+    paddingVertical: 12,
+  },
+  stepIndicator: {
+    flexGrow: 0,
   },
   stepIndicatorContent: {
-    paddingHorizontal: 10,
-    paddingTop: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
   },
   stepItem: {
     alignItems: 'center',
     marginRight: 20,
-    minWidth: 25,
+    minWidth: 60,
   },
   stepCircle: {
     width: 32,
@@ -733,7 +740,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
   },
   content: {
-    //flex: 1,
+    flex: 1,
   },
   stepContent: {
     padding: 20,
