@@ -3,7 +3,6 @@ import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { useAtom } from 'jotai';
-import { fetchCampaignsAtom } from '../src/atoms/campaignAtoms';
 import { initializeAuthAtom } from '../src/atoms/authAtoms'
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
@@ -21,18 +20,16 @@ export default function RootLayout() {
     'Inter-Bold': Inter_700Bold,
   });
 
-  const [, fetchCampaigns] = useAtom(fetchCampaignsAtom);
   const [, initializeAuth] = useAtom(initializeAuthAtom);
 
   useEffect(() => {
-    // Initialize authentication and fetch campaigns
+    // Only initialize authentication, don't fetch campaigns here
     const initialize = async () => {
       await initializeAuth();
-      await fetchCampaigns();
     };
     
     initialize();
-  }, [initializeAuth, fetchCampaigns]);
+  }, [initializeAuth]);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
