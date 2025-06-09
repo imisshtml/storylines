@@ -12,7 +12,7 @@ import {
   Image,
   Platform,
 } from 'react-native';
-import { ArrowLeft, ArrowRight, Save, User, Dices, Scroll, Package, Camera, Upload } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Save, User, Dices, Scroll, Package, Camera, Upload, ShieldUser, DNA } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import * as ImagePicker from 'expo-image-picker';
@@ -43,8 +43,8 @@ import { userAtom } from '../atoms/authAtoms';
 
 const CREATION_STEPS = [
   { id: 0, title: 'Info', icon: User },
-  { id: 1, title: 'Class', icon: Dices },
-  { id: 2, title: 'Race', icon: User },
+  { id: 1, title: 'Class', icon: ShieldUser },
+  { id: 2, title: 'Race', icon: DNA },
   { id: 3, title: 'Stats', icon: Dices },
   { id: 4, title: 'Skills', icon: Scroll },
   { id: 5, title: 'Spells', icon: Scroll },
