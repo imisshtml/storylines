@@ -18,17 +18,12 @@
       },
       "edgeToEdgeEnabled": true
     },
-    "web": {
-      "bundler": "metro",
-      "output": "server",
-      "favicon": "./assets/images/favicon.png"
-    },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/storylines_splash.png",
+          "image": "./assets/images/storylines_splash.jpg",
           "imageWidth": 1024,
           "resizeMode": "cover",
           "backgroundColor": "#1a1a1a"
