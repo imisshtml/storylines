@@ -50,7 +50,7 @@ export const fetchCampaignsAtom = atom(
         .order('created_at', { ascending: false });
 
       if (userError) throw userError;
-console.log('::: camps', userCampaigns)
+
       set(campaignsAtom, userCampaigns || []);
     } catch (error) {
       set(campaignsErrorAtom, (error as Error).message);
