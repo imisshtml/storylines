@@ -1176,7 +1176,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
-    height: 60,
+    height: 70,
   },
   skillCounter: {
     backgroundColor: '#2a2a2a',
