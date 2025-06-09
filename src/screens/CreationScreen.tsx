@@ -9,10 +9,13 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
+  Image,
+  Platform,
 } from 'react-native';
-import { ArrowLeft, ArrowRight, Save, User, Dices, Scroll, Package } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Save, User, Dices, Scroll, Package, Camera, Upload } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
+import * as ImagePicker from 'expo-image-picker';
 import {
   characterCreationStepAtom,
   characterNameAtom,
@@ -40,12 +43,13 @@ import { userAtom } from '../atoms/authAtoms';
 
 const CREATION_STEPS = [
   { id: 0, title: 'Basic Info', icon: User },
-  { id: 1, title: 'Race & Class', icon: Dices },
-  { id: 2, title: 'Abilities', icon: Dices },
-  { id: 3, title: 'Skills', icon: Scroll },
-  { id: 4, title: 'Spells', icon: Scroll },
-  { id: 5, title: 'Equipment', icon: Package },
-  { id: 6, title: 'Review', icon: Save },
+  { id: 1, title: 'Class', icon: Dices },
+  { id: 2, title: 'Race', icon: User },
+  { id: 3, title: 'Abilities', icon: Dices },
+  { id: 4, title: 'Skills', icon: Scroll },
+  { id: 5, title: 'Spells', icon: Scroll },
+  { id: 6, title: 'Equipment', icon: Package },
+  { id: 7, title: 'Review', icon: Save },
 ];
 
 export default function CreationScreen() {
@@ -71,6 +75,7 @@ export default function CreationScreen() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -105,6 +110,52 @@ export default function CreationScreen() {
     }
   };
 
+  const pickImage = async () => {
+    if (Platform.OS === 'web') {
+      // For web, we'll use a placeholder image picker
+      Alert.alert(
+        'Avatar Selection',
+        'Choose an avatar option:',
+        [
+          {
+            text: 'Random Fantasy Portrait',
+            onPress: () => {
+              // Use a random fantasy portrait from Pexels
+              const portraits = [
+                'https://images.pexels.com/photos/1040881/pexels-photo-1040881.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'https://images.pexels.com/photos/1212984/pexels-photo-1212984.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
+                'https://images.pexels.com/photos/1300402/pexels-photo-1300402.jpeg?auto=compress&cs=tinysrgb&w=400',
+              ];
+              const randomPortrait = portraits[Math.floor(Math.random() * portraits.length)];
+              setAvatarUri(randomPortrait);
+            },
+          },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+    } else {
+      // For mobile platforms, use the image picker
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Sorry, we need camera roll permissions to select an avatar.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setAvatarUri(result.assets[0].uri);
+      }
+    }
+  };
+
   const handleSaveCharacter = async () => {
     if (!user || !characterName || !selectedRace || !selectedClass) {
       Alert.alert('Error', 'Please complete all required fields');
@@ -131,6 +182,7 @@ export default function CreationScreen() {
           skills: selectedSkills,
           spells: selectedSpells,
           equipment,
+          avatar: avatarUri,
         },
       };
 
@@ -144,6 +196,7 @@ export default function CreationScreen() {
             text: 'OK',
             onPress: () => {
               resetCharacterCreation();
+              setAvatarUri(null);
               router.back();
             },
           },
@@ -158,7 +211,12 @@ export default function CreationScreen() {
   };
 
   const renderStepIndicator = () => (
-    <View style={styles.stepIndicator}>
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false}
+      style={styles.stepIndicator}
+      contentContainerStyle={styles.stepIndicatorContent}
+    >
       {CREATION_STEPS.map((step, index) => {
         const Icon = step.icon;
         const isActive = index === currentStep;
@@ -185,12 +243,34 @@ export default function CreationScreen() {
           </View>
         );
       })}
-    </View>
+    </ScrollView>
   );
 
   const renderBasicInfo = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Character Name</Text>
+      <Text style={styles.stepTitle}>Character Details</Text>
+      
+      <View style={styles.avatarSection}>
+        <Text style={styles.avatarLabel}>Character Portrait</Text>
+        <TouchableOpacity style={styles.avatarContainer} onPress={pickImage}>
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Camera size={32} color="#666" />
+              <Text style={styles.avatarPlaceholderText}>Add Portrait</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
+          <Upload size={16} color="#4CAF50" />
+          <Text style={styles.uploadButtonText}>
+            {avatarUri ? 'Change Portrait' : 'Upload Portrait'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.inputLabel}>Character Name</Text>
       <TextInput
         style={styles.input}
         value={characterName}
@@ -201,46 +281,68 @@ export default function CreationScreen() {
     </View>
   );
 
-  const renderRaceAndClass = () => (
+  const renderClassSelection = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Choose Race</Text>
-      <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
-        {races.map((race) => (
-          <TouchableOpacity
-            key={race.index}
-            style={[
-              styles.optionItem,
-              selectedRace?.index === race.index && styles.optionItemSelected,
-            ]}
-            onPress={() => setSelectedRace(race)}
-          >
-            <Text style={[
-              styles.optionText,
-              selectedRace?.index === race.index && styles.optionTextSelected,
-            ]}>
-              {race.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      <Text style={styles.stepTitle}>Choose Class</Text>
+      <Text style={styles.stepTitle}>Choose Your Class</Text>
+      <Text style={styles.subtitle}>Your class determines your abilities, skills, and role in the party</Text>
       <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
         {classes.map((cls) => (
           <TouchableOpacity
             key={cls.index}
             style={[
-              styles.optionItem,
+              styles.classOptionItem,
               selectedClass?.index === cls.index && styles.optionItemSelected,
             ]}
             onPress={() => setSelectedClass(cls)}
           >
-            <Text style={[
-              styles.optionText,
-              selectedClass?.index === cls.index && styles.optionTextSelected,
-            ]}>
-              {cls.name}
-            </Text>
+            <View style={styles.classOptionContent}>
+              <Text style={[
+                styles.classOptionTitle,
+                selectedClass?.index === cls.index && styles.optionTextSelected,
+              ]}>
+                {cls.name}
+              </Text>
+              <Text style={[
+                styles.classOptionDescription,
+                selectedClass?.index === cls.index && styles.classOptionDescriptionSelected,
+              ]}>
+                Hit Die: d{cls.hit_die} • {cls.spellcasting ? 'Spellcaster' : 'Non-spellcaster'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  const renderRaceSelection = () => (
+    <View style={styles.stepContent}>
+      <Text style={styles.stepTitle}>Choose Your Race</Text>
+      <Text style={styles.subtitle}>Your race provides ability bonuses and special traits</Text>
+      <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
+        {races.map((race) => (
+          <TouchableOpacity
+            key={race.index}
+            style={[
+              styles.raceOptionItem,
+              selectedRace?.index === race.index && styles.optionItemSelected,
+            ]}
+            onPress={() => setSelectedRace(race)}
+          >
+            <View style={styles.raceOptionContent}>
+              <Text style={[
+                styles.raceOptionTitle,
+                selectedRace?.index === race.index && styles.optionTextSelected,
+              ]}>
+                {race.name}
+              </Text>
+              <Text style={[
+                styles.raceOptionDescription,
+                selectedRace?.index === race.index && styles.raceOptionDescriptionSelected,
+              ]}>
+                Size: {race.size} • Speed: {race.speed} ft
+              </Text>
+            </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -253,6 +355,7 @@ export default function CreationScreen() {
     return (
       <View style={styles.stepContent}>
         <Text style={styles.stepTitle}>Ability Scores</Text>
+        <Text style={styles.subtitle}>Distribute points between 8-15 for each ability</Text>
         {abilityNames.map((ability) => (
           <View key={ability} style={styles.abilityRow}>
             <Text style={styles.abilityLabel}>
@@ -298,7 +401,7 @@ export default function CreationScreen() {
     return (
       <View style={styles.stepContent}>
         <Text style={styles.stepTitle}>Choose Skills</Text>
-        <Text style={styles.subtitle}>Select up to 4 skills</Text>
+        <Text style={styles.subtitle}>Select up to 4 skills your character is proficient in</Text>
         <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
           {availableSkills.map((skill) => (
             <TouchableOpacity
@@ -336,6 +439,11 @@ export default function CreationScreen() {
         <View style={styles.stepContent}>
           <Text style={styles.stepTitle}>Spells</Text>
           <Text style={styles.subtitle}>This class doesn't have spellcasting abilities.</Text>
+          <View style={styles.noSpellsContainer}>
+            <Text style={styles.noSpellsText}>
+              {selectedClass?.name} is a martial class that relies on physical prowess rather than magic.
+            </Text>
+          </View>
         </View>
       );
     }
@@ -343,13 +451,13 @@ export default function CreationScreen() {
     return (
       <View style={styles.stepContent}>
         <Text style={styles.stepTitle}>Choose Spells</Text>
-        <Text style={styles.subtitle}>Select cantrips and 1st level spells</Text>
+        <Text style={styles.subtitle}>Select cantrips and 1st level spells for your spellcaster</Text>
         <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
           {spells.map((spell) => (
             <TouchableOpacity
               key={spell.index}
               style={[
-                styles.optionItem,
+                styles.spellOptionItem,
                 selectedSpells.some(s => s.index === spell.index) && styles.optionItemSelected,
               ]}
               onPress={() => {
@@ -361,13 +469,20 @@ export default function CreationScreen() {
               }}
               disabled={!selectedSpells.some(s => s.index === spell.index) && selectedSpells.length >= 6}
             >
-              <Text style={[
-                styles.optionText,
-                selectedSpells.some(s => s.index === spell.index) && styles.optionTextSelected,
-                !selectedSpells.some(s => s.index === spell.index) && selectedSpells.length >= 6 && styles.optionTextDisabled,
-              ]}>
-                {spell.name} ({spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`})
-              </Text>
+              <View style={styles.spellOptionContent}>
+                <Text style={[
+                  styles.spellOptionTitle,
+                  selectedSpells.some(s => s.index === spell.index) && styles.optionTextSelected,
+                ]}>
+                  {spell.name}
+                </Text>
+                <Text style={[
+                  styles.spellOptionLevel,
+                  selectedSpells.some(s => s.index === spell.index) && styles.spellOptionLevelSelected,
+                ]}>
+                  {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`} • {spell.school.name}
+                </Text>
+              </View>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -378,12 +493,15 @@ export default function CreationScreen() {
   const renderEquipment = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Starting Equipment</Text>
-      <Text style={styles.subtitle}>Basic equipment will be provided based on your class</Text>
+      <Text style={styles.subtitle}>Your class provides basic equipment to begin your adventure</Text>
       <View style={styles.equipmentPreview}>
-        <Text style={styles.equipmentText}>• Leather Armor</Text>
-        <Text style={styles.equipmentText}>• Simple Weapon</Text>
-        <Text style={styles.equipmentText}>• Adventuring Pack</Text>
+        <Text style={styles.equipmentText}>• Leather Armor (AC 11 + Dex modifier)</Text>
+        <Text style={styles.equipmentText}>• Simple Weapon (1d6 damage)</Text>
+        <Text style={styles.equipmentText}>• Adventuring Pack (rope, rations, etc.)</Text>
         <Text style={styles.equipmentText}>• 50 Gold Pieces</Text>
+        {selectedClass?.spellcasting && (
+          <Text style={styles.equipmentText}>• Spellcasting Focus</Text>
+        )}
       </View>
     </View>
   );
@@ -392,19 +510,25 @@ export default function CreationScreen() {
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Character Review</Text>
       
+      {avatarUri && (
+        <View style={styles.reviewAvatarContainer}>
+          <Image source={{ uri: avatarUri }} style={styles.reviewAvatar} />
+        </View>
+      )}
+      
       <View style={styles.reviewSection}>
         <Text style={styles.reviewLabel}>Name:</Text>
         <Text style={styles.reviewValue}>{characterName}</Text>
       </View>
 
       <View style={styles.reviewSection}>
-        <Text style={styles.reviewLabel}>Race:</Text>
-        <Text style={styles.reviewValue}>{selectedRace?.name}</Text>
+        <Text style={styles.reviewLabel}>Class:</Text>
+        <Text style={styles.reviewValue}>{selectedClass?.name}</Text>
       </View>
 
       <View style={styles.reviewSection}>
-        <Text style={styles.reviewLabel}>Class:</Text>
-        <Text style={styles.reviewValue}>{selectedClass?.name}</Text>
+        <Text style={styles.reviewLabel}>Race:</Text>
+        <Text style={styles.reviewValue}>{selectedRace?.name}</Text>
       </View>
 
       <View style={styles.reviewSection}>
@@ -441,6 +565,7 @@ export default function CreationScreen() {
         <Text style={styles.reviewLabel}>Equipment:</Text>
         <Text style={styles.reviewValue}>
           Leather Armor, Simple Weapon, Adventuring Pack, 50 Gold Pieces
+          {selectedClass?.spellcasting && ', Spellcasting Focus'}
         </Text>
       </View>
 
@@ -450,7 +575,7 @@ export default function CreationScreen() {
         disabled={isSaving}
       >
         {isSaving ? (
-          <ActivityIndicator size="small\" color="#fff" />
+          <ActivityIndicator size="small" color="#fff" />
         ) : (
           <>
             <Save size={20} color="#fff" />
@@ -464,12 +589,13 @@ export default function CreationScreen() {
   const renderCurrentStep = () => {
     switch (currentStep) {
       case 0: return renderBasicInfo();
-      case 1: return renderRaceAndClass();
-      case 2: return renderAbilities();
-      case 3: return renderSkills();
-      case 4: return renderSpells();
-      case 5: return renderEquipment();
-      case 6: return renderReview();
+      case 1: return renderClassSelection();
+      case 2: return renderRaceSelection();
+      case 3: return renderAbilities();
+      case 4: return renderSkills();
+      case 5: return renderSpells();
+      case 6: return renderEquipment();
+      case 7: return renderReview();
       default: return renderBasicInfo();
     }
   };
@@ -477,12 +603,13 @@ export default function CreationScreen() {
   const canProceed = () => {
     switch (currentStep) {
       case 0: return characterName.length > 0;
-      case 1: return selectedRace && selectedClass;
-      case 2: return true; // Abilities always have default values
-      case 3: return true; // Skills are optional
-      case 4: return true; // Spells are optional
-      case 5: return true; // Equipment is automatic
-      case 6: return true; // Review step
+      case 1: return selectedClass !== null;
+      case 2: return selectedRace !== null;
+      case 3: return true; // Abilities always have default values
+      case 4: return true; // Skills are optional
+      case 5: return true; // Spells are optional
+      case 6: return true; // Equipment is automatic
+      case 7: return true; // Review step
       default: return false;
     }
   };
@@ -568,16 +695,18 @@ const styles = StyleSheet.create({
     marginRight: 40,
   },
   stepIndicator: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     backgroundColor: '#1a1a1a',
     borderBottomWidth: 1,
     borderBottomColor: '#2a2a2a',
   },
+  stepIndicatorContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
   stepItem: {
-    flex: 1,
     alignItems: 'center',
+    marginRight: 20,
+    minWidth: 60,
   },
   stepCircle: {
     width: 32,
@@ -622,6 +751,65 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     marginBottom: 20,
   },
+  avatarSection: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  avatarLabel: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 12,
+  },
+  avatarContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#2a2a2a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    borderStyle: 'dashed',
+  },
+  avatarPlaceholderText: {
+    color: '#666',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    marginTop: 4,
+  },
+  uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  uploadButtonText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  inputLabel: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
   input: {
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
@@ -632,7 +820,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   optionsList: {
-    maxHeight: 300,
+    maxHeight: 400,
     marginBottom: 20,
   },
   optionItem: {
@@ -654,6 +842,94 @@ const styles = StyleSheet.create({
   },
   optionTextDisabled: {
     color: '#666',
+  },
+  classOptionItem: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  classOptionContent: {
+    flex: 1,
+  },
+  classOptionTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  classOptionDescription: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  classOptionDescriptionSelected: {
+    color: '#fff',
+  },
+  raceOptionItem: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  raceOptionContent: {
+    flex: 1,
+  },
+  raceOptionTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  raceOptionDescription: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  raceOptionDescriptionSelected: {
+    color: '#fff',
+  },
+  spellOptionItem: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  spellOptionContent: {
+    flex: 1,
+  },
+  spellOptionTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  spellOptionLevel: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  spellOptionLevelSelected: {
+    color: '#fff',
+  },
+  noSpellsContainer: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+  },
+  noSpellsText: {
+    color: '#888',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+    lineHeight: 24,
   },
   abilityRow: {
     flexDirection: 'row',
@@ -697,7 +973,7 @@ const styles = StyleSheet.create({
   },
   equipmentPreview: {
     backgroundColor: '#2a2a2a',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
   },
   equipmentText: {
@@ -705,6 +981,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     marginBottom: 8,
+  },
+  reviewAvatarContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  reviewAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   reviewSection: {
     backgroundColor: '#2a2a2a',
