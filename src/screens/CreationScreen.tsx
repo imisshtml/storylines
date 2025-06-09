@@ -634,9 +634,7 @@ export default function CreationScreen() {
 
       {renderStepIndicator()}
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {renderCurrentStep()}
-      </ScrollView>
+      {renderCurrentStep()}
 
       {currentStep < CREATION_STEPS.length - 1 && (
         <View style={styles.footer}>
