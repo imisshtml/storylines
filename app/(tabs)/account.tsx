@@ -1,6 +1,7 @@
 import React from 'react';
-import AccountScreen from '../../src/screens/AccountScreen';
+import ProfileScreen from '@/src/screens/ProfileScreen';
 
 export default function AccountTab() {
-  return <AccountScreen />;
+  // Not sure what the Account Tab is for, but this should stop the error.
+  return <ProfileScreen />;
 }
