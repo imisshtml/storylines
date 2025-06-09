@@ -193,6 +193,19 @@ export default function CreationScreen() {
     return total;
   };
 
+  // Get skill choice information
+  const getSkillChoiceInfo = () => {
+    if (!selectedClass?.proficiency_choices?.[0]) {
+      return { maxChoices: 0, availableSkills: [] };
+    }
+
+    const choiceData = selectedClass.proficiency_choices[0];
+    return {
+      maxChoices: choiceData.choose,
+      availableSkills: choiceData.from?.options || []
+    };
+  };
+
   const handleBack = () => {
     if (currentStep > 0) {
       let newStep = currentStep - 1;
@@ -227,7 +240,11 @@ export default function CreationScreen() {
       case 0: return characterName.length >= 2 && selectedRace;
       case 1: return selectedClass;
       case 2: return true; // Abilities always valid
-      case 3: return true; // Skills can be empty
+      case 3: {
+        // Skills - must select exactly the required number
+        const { maxChoices } = getSkillChoiceInfo();
+        return maxChoices === 0 || selectedSkills.length === maxChoices;
+      }
       case 4: return true; // Spells can be empty
       case 5: return true; // Equipment can be empty
       case 6: return true; // Review step
@@ -387,7 +404,7 @@ export default function CreationScreen() {
       setLoading(false);
     }
   };
-console.log('::: CURR STEP', currentStep)
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 0: // Name & Race
@@ -530,33 +547,70 @@ console.log('::: CURR STEP', currentStep)
         );
 
       case 3: // Skills
+        const { maxChoices, availableSkills } = getSkillChoiceInfo();
+        
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Choose Skills</Text>
-            <Text style={styles.stepDescription}>
-              Select skills based on your class proficiencies
-            </Text>
+            <View style={styles.skillsHeader}>
+              <Text style={styles.stepDescription}>
+                Select {maxChoices} skill{maxChoices !== 1 ? 's' : ''} from your class proficiencies
+              </Text>
+              <View style={styles.skillCounter}>
+                <Text style={styles.skillCounterText}>
+                  {selectedSkills.length} / {maxChoices}
+                </Text>
+              </View>
+            </View>
             
-            <ScrollView style={styles.optionsList}>
-              {selectedClass?.proficiency_choices?.[0]?.from?.options?.map((prof) => (
-                <TouchableOpacity
-                  key={prof.item.index}
-                  style={[
-                    styles.skillCard,
-                    selectedSkills.includes(prof.item.name) && styles.selectedSkill,
-                  ]}
-                  onPress={() => {
-                    if (selectedSkills.includes(prof.item.name)) {
-                      setSelectedSkills(selectedSkills.filter(s => s !== prof.item.name));
-                    } else {
-                      setSelectedSkills([...selectedSkills, prof.item.name]);
-                    }
-                  }}
-                >
-                  <Text style={styles.skillName}>{prof.item.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            {maxChoices === 0 ? (
+              <View style={styles.noSkillsContainer}>
+                <Text style={styles.noSkillsText}>
+                  Your class doesn't provide skill proficiency choices.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.optionsList}>
+                {availableSkills.map((skillOption) => {
+                  const isSelected = selectedSkills.includes(skillOption.item.name);
+                  const canSelect = selectedSkills.length < maxChoices || isSelected;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={skillOption.item.index}
+                      style={[
+                        styles.skillCard,
+                        isSelected && styles.selectedSkill,
+                        !canSelect && styles.disabledSkill,
+                      ]}
+                      onPress={() => {
+                        if (!canSelect) return;
+                        
+                        if (isSelected) {
+                          setSelectedSkills(selectedSkills.filter(s => s !== skillOption.item.name));
+                        } else {
+                          setSelectedSkills([...selectedSkills, skillOption.item.name]);
+                        }
+                      }}
+                      disabled={!canSelect}
+                    >
+                      <Text style={[
+                        styles.skillName,
+                        isSelected && styles.selectedSkillText,
+                        !canSelect && styles.disabledSkillText,
+                      ]}>
+                        {skillOption.item.name}
+                      </Text>
+                      {isSelected && (
+                        <View style={styles.selectedIndicator}>
+                          <Text style={styles.selectedIndicatorText}>✓</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
           </View>
         );
 
@@ -685,7 +739,7 @@ console.log('::: CURR STEP', currentStep)
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   <Save size={20} color="#fff" />
@@ -1117,22 +1171,81 @@ const styles = StyleSheet.create({
     color: '#888',
     fontFamily: 'Inter-Regular',
   },
+  skillsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  skillCounter: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
+  skillCounterText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  noSkillsContainer: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+  },
+  noSkillsText: {
+    color: '#888',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+  },
   skillCard: {
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
-    padding: 12,
+    padding: 16,
     marginBottom: 8,
     borderWidth: 2,
     borderColor: 'transparent',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   selectedSkill: {
     borderColor: '#4CAF50',
     backgroundColor: '#1a3a1a',
   },
+  disabledSkill: {
+    backgroundColor: '#1a1a1a',
+    opacity: 0.5,
+  },
   skillName: {
     fontSize: 16,
     color: '#fff',
     fontFamily: 'Inter-Regular',
+    flex: 1,
+  },
+  selectedSkillText: {
+    fontFamily: 'Inter-Bold',
+    color: '#4CAF50',
+  },
+  disabledSkillText: {
+    color: '#666',
+  },
+  selectedIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedIndicatorText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
   },
   spellCard: {
     backgroundColor: '#2a2a2a',
