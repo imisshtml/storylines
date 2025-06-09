@@ -1184,6 +1184,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderWidth: 2,
     borderColor: '#4CAF50',
+    marginTop: -10,
   },
   skillCounterText: {
     color: '#4CAF50',
