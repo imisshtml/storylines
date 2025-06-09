@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
   },
   content: {
-    flex: 1,
+    //flex: 1,
   },
   stepContent: {
     padding: 20,
