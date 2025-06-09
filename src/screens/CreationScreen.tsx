@@ -42,13 +42,13 @@ import {
 import { userAtom } from '../atoms/authAtoms';
 
 const CREATION_STEPS = [
-  { id: 0, title: 'Basic Info', icon: User },
+  { id: 0, title: 'Info', icon: User },
   { id: 1, title: 'Class', icon: Dices },
   { id: 2, title: 'Race', icon: User },
-  { id: 3, title: 'Abilities', icon: Dices },
+  { id: 3, title: 'Stats', icon: Dices },
   { id: 4, title: 'Skills', icon: Scroll },
   { id: 5, title: 'Spells', icon: Scroll },
-  { id: 6, title: 'Equipment', icon: Package },
+  { id: 6, title: 'Equip', icon: Package },
   { id: 7, title: 'Review', icon: Save },
 ];
 
