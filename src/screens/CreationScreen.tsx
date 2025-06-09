@@ -213,7 +213,8 @@ export default function CreationScreen() {
   const renderStepIndicator = () => (
     <View style={styles.stepIndicatorContainer}>
       <ScrollView 
-        horizontal 
+        horizontal
+        scrollEnabled={false}
         showsHorizontalScrollIndicator={false}
         style={styles.stepIndicator}
         contentContainerStyle={styles.stepIndicatorContent}
