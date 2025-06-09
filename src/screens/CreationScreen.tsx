@@ -347,7 +347,7 @@ export default function CreationScreen() {
   const handleCloseClassBottomSheet = useCallback(() => {
     classBottomSheetRef.current?.close();
   }, []);
-
+console.log('::: user', user)
   const handleSaveCharacter = async () => {
     if (!user) return;
 
