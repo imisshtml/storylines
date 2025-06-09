@@ -21,6 +21,7 @@ import {
   Zap,
   Sword,
   Package,
+  Book,
 } from 'lucide-react-native';
 import {
   characterCreationStepAtom,
