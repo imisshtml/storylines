@@ -701,7 +701,7 @@ const styles = StyleSheet.create({
   },
   stepIndicatorContent: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
   },
   stepItem: {
     alignItems: 'center',
