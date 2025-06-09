@@ -1,17 +1,19 @@
 import { router } from 'expo-router';
-import { Play, Users, Settings, Menu } from 'lucide-react-native';
+import { Play, Users, Settings, Menu, Crown, UserCheck } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground } from 'react-native';
 import { useAtom } from 'jotai';
 import { campaignsAtom, currentCampaignAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import SidebarMenu from '../components/SidebarMenu';
+import JoinCampaignModal from '../components/JoinCampaignModal';
 
 export default function HomeScreen() {
   const [campaigns] = useAtom(campaignsAtom);
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [user] = useAtom(userAtom);
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
+  const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
 
   const handleCampaignPress = (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
@@ -41,6 +43,21 @@ export default function HomeScreen() {
   const handleTitlePress = () => {
     // Only navigate to dev screen in development mode
     router.push('/dev');
+  };
+
+  const handleJoinCampaign = () => {
+    setIsJoinModalVisible(true);
+  };
+
+  // Helper function to check if user is the owner of a campaign
+  const isOwner = (campaign: any) => {
+    return user && campaign.owner === user.id;
+  };
+
+  // Helper function to get user's role in campaign
+  const getUserRole = (campaign: any) => {
+    if (isOwner(campaign)) return 'Owner';
+    return 'Player';
   };
 
   return (
@@ -77,8 +94,23 @@ export default function HomeScreen() {
           {campaigns.map(campaign => (
             <View key={campaign.id} style={styles.campaignCard}>
               <View style={styles.campaignHeader}>
-                <Text style={styles.campaignTitle}>{campaign.name}</Text>
-                {campaign.status === 'creation' && (
+                <View style={styles.campaignTitleRow}>
+                  <Text style={styles.campaignTitle}>{campaign.name}</Text>
+                  <View style={styles.roleContainer}>
+                    {isOwner(campaign) ? (
+                      <Crown size={16} color="#FFD700" />
+                    ) : (
+                      <UserCheck size={16} color="#4CAF50" />
+                    )}
+                    <Text style={[
+                      styles.roleText,
+                      isOwner(campaign) ? styles.ownerText : styles.playerText
+                    ]}>
+                      {getUserRole(campaign)}
+                    </Text>
+                  </View>
+                </View>
+                {campaign.status === 'creation' && isOwner(campaign) && (
                   <TouchableOpacity
                     style={styles.settingsButton}
                     onPress={() => handleSettingsPress(campaign.id)}
@@ -100,7 +132,9 @@ export default function HomeScreen() {
                 {campaign.status === 'creation' ? (
                   <>
                     <Users size={20} color="#fff" />
-                    <Text style={styles.buttonText}>Invite Friends</Text>
+                    <Text style={styles.buttonText}>
+                      {isOwner(campaign) ? 'Invite Friends' : 'Waiting for Start'}
+                    </Text>
                   </>
                 ) : (
                   <>
@@ -126,7 +160,7 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           style={styles.joinButton}
-          onPress={() => router.push('/join')}
+          onPress={handleJoinCampaign}
         >
           <Users size={20} color="#fff" />
           <Text style={styles.buttonText}>Join via Code</Text>
@@ -136,6 +170,11 @@ export default function HomeScreen() {
       <SidebarMenu
         isVisible={isSidebarVisible}
         onClose={() => setIsSidebarVisible(false)}
+      />
+
+      <JoinCampaignModal
+        isVisible={isJoinModalVisible}
+        onClose={() => setIsJoinModalVisible(false)}
       />
     </ImageBackground>
   );
@@ -241,11 +280,29 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
+  campaignCard: {
+    backgroundColor: 'rgba(42, 42, 42, 0.8)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
   campaignHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 4,
+  },
+  campaignTitleRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginRight: 8,
   },
   campaignTitle: {
     fontFamily: 'Inter-Bold',
@@ -254,6 +311,26 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+    flex: 1,
+  },
+  roleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  roleText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+  },
+  ownerText: {
+    color: '#FFD700',
+  },
+  playerText: {
+    color: '#4CAF50',
   },
   settingsButton: {
     padding: 4,
@@ -266,17 +343,6 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
-  },
-  campaignCard: {
-    backgroundColor: 'rgba(42, 42, 42, 0.8)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
   },
   continueButton: {
     backgroundColor: 'rgba(76, 175, 80, 0.9)',
