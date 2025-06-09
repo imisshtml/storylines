@@ -44,15 +44,38 @@ export const fetchCampaignsAtom = atom(
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
-      const { data: userCampaigns, error: userError } = await supabase
+      // First, get campaigns where user is the owner
+      const { data: ownedCampaigns, error: ownedError } = await supabase
         .from('campaigns')
         .select('*')
-        .eq('owner', user.id)
-        .order('created_at', { ascending: false });
+        .eq('owner', user.id);
 
-      if (userError) throw userError;
+      if (ownedError) throw ownedError;
 
-      set(campaignsAtom, userCampaigns || []);
+      // Then, get all campaigns and filter client-side for ones where user is a player
+      const { data: allCampaigns, error: allError } = await supabase
+        .from('campaigns')
+        .select('*');
+
+      if (allError) throw allError;
+
+      // Filter campaigns where user is a player (but not owner to avoid duplicates)
+      const playerCampaigns = allCampaigns?.filter(campaign => {
+        // Skip if user is already the owner (already included in ownedCampaigns)
+        if (campaign.owner === user.id) return false;
+
+        // Check if user is in the players array
+        const players = campaign.players || [];
+        return players.some((player: Player) => player.id === user.id);
+      }) || [];
+
+      // Combine owned and player campaigns
+      const userCampaigns = [...(ownedCampaigns || []), ...playerCampaigns];
+
+      // Sort by created_at descending
+      userCampaigns.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+
+      set(campaignsAtom, userCampaigns);
     } catch (error) {
       set(campaignsErrorAtom, (error as Error).message);
       console.error('Campaign fetch error:', error);
@@ -70,9 +93,30 @@ export const upsertCampaignAtom = atom(
       set(campaignsLoadingAtom, true);
       set(campaignsErrorAtom, null);
 
+      // Clean the campaign data to only include fields that exist in the database
+      const cleanCampaignData = {
+        id: campaign.id,
+        name: campaign.name,
+        adventure: campaign.adventure,
+        level: campaign.level,
+        tone: campaign.tone,
+        exclude: campaign.exclude,
+        status: campaign.status,
+        players: campaign.players,
+        invite_code: campaign.invite_code,
+        owner: campaign.owner,
+        content_level: campaign.content_level,
+        rp_focus: campaign.rp_focus,
+      };
+
+      // Remove undefined values
+      const filteredData = Object.fromEntries(
+        Object.entries(cleanCampaignData).filter(([_, value]) => value !== undefined)
+      );
+
       const { data, error } = await supabase
         .from('campaigns')
-        .upsert(campaign)
+        .upsert(filteredData)
         .select()
         .single();
 
@@ -105,6 +149,9 @@ export const currentCampaignAtom = atom<Campaign | null>(null);
 export const initializeRealtimeAtom = atom(
   null,
   async (get, set) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
     const subscription = supabase
       .channel('campaigns')
       .on(
