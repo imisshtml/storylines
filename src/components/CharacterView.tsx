@@ -42,14 +42,15 @@ type Equipment = {
 };
 
 type Spell = {
+  index: string;
   name: string;
   level: number;
-  school: string;
-  castingTime: string;
+  school: { name: string };
+  casting_time: string;
   range: string;
-  components: string;
+  components: string[];
   duration: string;
-  description: string;
+  description: string[];
 };
 
 export default function CharacterView() {
@@ -139,24 +140,26 @@ export default function CharacterView() {
 
   const spells: Spell[] = [
     {
+      index: 'fire-bolt',
       name: 'Fire Bolt',
       level: 0,
-      school: 'Evocation',
-      castingTime: '1 action',
+      school: { name: 'Evocation' },
+      casting_time: '1 action',
       range: '120 feet',
-      components: 'V, S',
+      components: ['V', 'S'],
       duration: 'Instantaneous',
-      description: 'Ranged spell attack deals 1d10 fire damage. Ignites flammable objects.',
+      description: ['Ranged spell attack deals 1d10 fire damage. Ignites flammable objects.'],
     },
     {
+      index: 'shield',
       name: 'Shield',
       level: 1,
-      school: 'Abjuration',
-      castingTime: '1 reaction',
+      school: { name: 'Abjuration' },
+      casting_time: '1 reaction',
       range: 'Self',
-      components: 'V, S',
+      components: ['V', 'S'],
       duration: '1 round',
-      description: '+5 to AC, including against triggering attack. Blocks Magic Missile.',
+      description: ['+5 to AC, including against triggering attack. Blocks Magic Missile.'],
     },
   ];
 
@@ -261,16 +264,18 @@ export default function CharacterView() {
           </View>
           {expandedSpell === spell.name ? (
             <View style={styles.spellDetails}>
-              <Text style={styles.spellSchool}>{spell.school}</Text>
-              <Text style={styles.spellProperty}>Casting Time: {spell.castingTime}</Text>
+              <Text style={styles.spellSchool}>{spell.school.name}</Text>
+              <Text style={styles.spellProperty}>Casting Time: {spell.casting_time}</Text>
               <Text style={styles.spellProperty}>Range: {spell.range}</Text>
-              <Text style={styles.spellProperty}>Components: {spell.components}</Text>
+              <Text style={styles.spellProperty}>Components: {spell.components.join(', ')}</Text>
               <Text style={styles.spellProperty}>Duration: {spell.duration}</Text>
-              <Text style={styles.spellDescription}>{spell.description}</Text>
+              {spell.description.map((desc, i) => (
+                <Text key={i} style={styles.spellDescription}>{desc}</Text>
+              ))}
             </View>
           ) : (
             <Text style={styles.spellPreview} numberOfLines={1}>
-              {spell.description}
+              {spell.description[0]}
             </Text>
           )}
         </TouchableOpacity>
