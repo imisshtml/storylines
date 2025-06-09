@@ -1,15 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { User, Crown, Info } from 'lucide-react-native';
-import { StoryEvent } from '../hooks/useStoryAI';
+import { CampaignMessage } from '../atoms/campaignHistoryAtoms';
 
 interface StoryEventItemProps {
-  event: StoryEvent;
+  message: CampaignMessage;
 }
 
-export default function StoryEventItem({ event }: StoryEventItemProps) {
+export default function StoryEventItem({ message }: StoryEventItemProps) {
   const getEventIcon = () => {
-    switch (event.type) {
+    switch (message.message_type) {
       case 'dm':
         return <Crown size={16} color="#FFD700" />;
       case 'player':
@@ -22,7 +22,7 @@ export default function StoryEventItem({ event }: StoryEventItemProps) {
   };
 
   const getEventStyles = () => {
-    switch (event.type) {
+    switch (message.message_type) {
       case 'dm':
         return {
           container: styles.dmContainer,
@@ -57,19 +57,19 @@ export default function StoryEventItem({ event }: StoryEventItemProps) {
       <View style={[styles.header, eventStyles.header]}>
         {getEventIcon()}
         <Text style={styles.headerText}>
-          {event.type === 'dm' ? 'Dungeon Master' : 
-           event.type === 'player' ? (event.playerName || 'Player') : 
+          {message.message_type === 'dm' ? 'Dungeon Master' : 
+           message.message_type === 'player' ? message.author : 
            'System'}
         </Text>
         <Text style={styles.timestamp}>
-          {new Date(event.timestamp).toLocaleTimeString([], { 
+          {new Date(message.timestamp).toLocaleTimeString([], { 
             hour: '2-digit', 
             minute: '2-digit' 
           })}
         </Text>
       </View>
       <Text style={[styles.content, eventStyles.text]}>
-        {event.content}
+        {message.message}
       </Text>
     </View>
   );
