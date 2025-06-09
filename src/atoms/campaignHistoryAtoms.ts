@@ -28,7 +28,8 @@ export const fetchCampaignHistoryAtom = atom(
         .from('campaign_history')
         .select('*')
         .eq('campaign_id', campaignId)
-        .order('timestamp', { ascending: true });
+        .order('timestamp', { ascending: true })
+        .order('id', { ascending: true }); // Secondary sort by ID for consistent ordering
 
       if (error) throw error;
 
@@ -60,10 +61,8 @@ export const addCampaignMessageAtom = atom(
 
       if (error) throw error;
 
-      // Update local state
-      const currentHistory = get(campaignHistoryAtom);
-      set(campaignHistoryAtom, [...currentHistory, data]);
-
+      // Don't update local state here - let real-time subscription handle it
+      // This prevents duplicate messages when real-time is working
       return data;
     } catch (error) {
       set(campaignHistoryErrorAtom, (error as Error).message);
@@ -93,7 +92,12 @@ export const initializeCampaignHistoryRealtimeAtom = atom(
           // Check if message already exists to avoid duplicates
           const messageExists = currentHistory.some(msg => msg.id === newMessage.id);
           if (!messageExists) {
-            set(campaignHistoryAtom, [...currentHistory, newMessage]);
+            // Insert in correct chronological order
+            const updatedHistory = [...currentHistory, newMessage].sort((a, b) => {
+              const timeCompare = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+              return timeCompare !== 0 ? timeCompare : a.id - b.id;
+            });
+            set(campaignHistoryAtom, updatedHistory);
           }
         }
       )
@@ -102,5 +106,14 @@ export const initializeCampaignHistoryRealtimeAtom = atom(
     return () => {
       subscription.unsubscribe();
     };
+  }
+);
+
+// Clear campaign history (useful when switching campaigns)
+export const clearCampaignHistoryAtom = atom(
+  null,
+  (get, set) => {
+    set(campaignHistoryAtom, []);
+    set(campaignHistoryErrorAtom, null);
   }
 );

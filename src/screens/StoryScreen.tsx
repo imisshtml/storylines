@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Send, Chrome as Home, User as User2, X, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Send, Home, User as User2, X, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
@@ -22,7 +22,8 @@ import { userAtom } from '../atoms/authAtoms';
 import { 
   campaignHistoryAtom, 
   fetchCampaignHistoryAtom, 
-  initializeCampaignHistoryRealtimeAtom 
+  initializeCampaignHistoryRealtimeAtom,
+  clearCampaignHistoryAtom
 } from '../atoms/campaignHistoryAtoms';
 import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
@@ -40,12 +41,14 @@ export default function StoryScreen() {
   const [campaignHistory] = useAtom(campaignHistoryAtom);
   const [, fetchCampaignHistory] = useAtom(fetchCampaignHistoryAtom);
   const [, initializeRealtimeSubscription] = useAtom(initializeCampaignHistoryRealtimeAtom);
+  const [, clearCampaignHistory] = useAtom(clearCampaignHistoryAtom);
 
   const scrollViewRef = useRef<ScrollView>(null);
   const { storyState, sendPlayerAction, sendChoice, clearError } = useStoryAI();
 
   // Polling interval ref
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const realtimeUnsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!currentCampaign) {
@@ -53,11 +56,16 @@ export default function StoryScreen() {
       return;
     }
 
+    // Clear previous campaign history when switching campaigns
+    clearCampaignHistory();
+
     // Initial fetch of campaign history
     fetchCampaignHistory(currentCampaign.id);
 
     // Initialize real-time subscription
-    const unsubscribe = initializeRealtimeSubscription(currentCampaign.id);
+    initializeRealtimeSubscription(currentCampaign.id).then(unsubscribe => {
+      realtimeUnsubscribeRef.current = unsubscribe;
+    });
 
     // Set up polling as backup (every 5 seconds)
     pollingIntervalRef.current = setInterval(() => {
@@ -69,14 +77,18 @@ export default function StoryScreen() {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
       }
-      unsubscribe?.then(unsub => unsub?.());
+      if (realtimeUnsubscribeRef.current) {
+        realtimeUnsubscribeRef.current();
+      }
     };
-  }, [currentCampaign, fetchCampaignHistory, initializeRealtimeSubscription]);
+  }, [currentCampaign, fetchCampaignHistory, initializeRealtimeSubscription, clearCampaignHistory]);
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages are added
     if (scrollViewRef.current && campaignHistory.length > 0) {
-      scrollViewRef.current.scrollToEnd({ animated: true });
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     }
   }, [campaignHistory]);
 
@@ -246,7 +258,7 @@ export default function StoryScreen() {
               disabled={!userInput.trim() || storyState.isLoading}
             >
               {storyState.isLoading ? (
-                <ActivityIndicator size="small\" color="#666" />
+                <ActivityIndicator size="small" color="#666" />
               ) : (
                 <Send size={24} color={userInput.trim() ? '#fff' : '#666'} />
               )}
