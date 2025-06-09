@@ -111,6 +111,11 @@ export const signInAtom = atom(
 
         // Save to AsyncStorage for persistence
         await saveUserSession(data.session, userData);
+
+        // Import and trigger campaign fetch after successful login
+        const { fetchCampaignsAtom } = await import('./campaignAtoms');
+        const fetchCampaigns = get(fetchCampaignsAtom);
+        await fetchCampaigns();
       }
 
       return data;
@@ -183,6 +188,10 @@ export const signOutAtom = atom(
 
       set(userAtom, null);
       set(sessionAtom, null);
+
+      // Clear campaigns when signing out
+      const { campaignsAtom } = await import('./campaignAtoms');
+      set(campaignsAtom, []);
     } catch (error) {
       set(authErrorAtom, (error as Error).message);
       throw error;
@@ -214,6 +223,11 @@ export const initializeAuthAtom = atom(
           // Session is still valid, use it
           set(sessionAtom, currentSession);
           set(userAtom, savedUser);
+
+          // Fetch campaigns for authenticated user
+          const { fetchCampaignsAtom } = await import('./campaignAtoms');
+          const fetchCampaigns = get(fetchCampaignsAtom);
+          await fetchCampaigns();
         } else {
           // Session expired, clear AsyncStorage and get fresh session
           await clearUserSession();
@@ -239,6 +253,11 @@ export const initializeAuthAtom = atom(
 
             set(userAtom, userData);
             await saveUserSession(freshSession, userData);
+
+            // Fetch campaigns for authenticated user
+            const { fetchCampaignsAtom } = await import('./campaignAtoms');
+            const fetchCampaigns = get(fetchCampaignsAtom);
+            await fetchCampaigns();
           }
         }
       } else {
@@ -264,6 +283,11 @@ export const initializeAuthAtom = atom(
 
           set(userAtom, userData);
           await saveUserSession(session, userData);
+
+          // Fetch campaigns for authenticated user
+          const { fetchCampaignsAtom } = await import('./campaignAtoms');
+          const fetchCampaigns = get(fetchCampaignsAtom);
+          await fetchCampaigns();
         }
       }
 
@@ -288,11 +312,20 @@ export const initializeAuthAtom = atom(
 
           set(userAtom, userData);
           await saveUserSession(session, userData);
+
+          // Fetch campaigns for authenticated user
+          const { fetchCampaignsAtom } = await import('./campaignAtoms');
+          const fetchCampaigns = get(fetchCampaignsAtom);
+          await fetchCampaigns();
         } else {
           // User signed out
           await clearUserSession();
           set(userAtom, null);
           set(sessionAtom, null);
+
+          // Clear campaigns when signing out
+          const { campaignsAtom } = await import('./campaignAtoms');
+          set(campaignsAtom, []);
         }
       });
     } catch (error) {
