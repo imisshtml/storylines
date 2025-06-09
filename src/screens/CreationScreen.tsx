@@ -698,6 +698,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
     borderBottomWidth: 1,
     borderBottomColor: '#2a2a2a',
+    height: 50,
   },
   stepIndicatorContent: {
     paddingHorizontal: 16,
