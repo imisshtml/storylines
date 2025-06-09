@@ -14,11 +14,17 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Send, Chrome as Home, User as User2, X, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Send, Home, User as User2, X, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
+import {
+  campaignHistoryAtom,
+  fetchCampaignHistoryAtom,
+  initializeCampaignHistoryRealtimeAtom,
+  clearCampaignHistoryAtom
+} from '../atoms/campaignHistoryAtoms';
 import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
 import StoryChoices from '../components/StoryChoices';
@@ -31,21 +37,60 @@ export default function StoryScreen() {
   const [isCharacterSheetVisible, setIsCharacterSheetVisible] = useState(false);
   const [showChoices, setShowChoices] = useState(true);
 
+  // Campaign history atoms
+  const [campaignHistory] = useAtom(campaignHistoryAtom);
+  const [, fetchCampaignHistory] = useAtom(fetchCampaignHistoryAtom);
+  const [, initializeRealtimeSubscription] = useAtom(initializeCampaignHistoryRealtimeAtom);
+  const [, clearCampaignHistory] = useAtom(clearCampaignHistoryAtom);
+
   const scrollViewRef = useRef<ScrollView>(null);
   const { storyState, sendPlayerAction, sendChoice, clearError } = useStoryAI();
+
+  // Polling interval ref
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const realtimeUnsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!currentCampaign) {
       router.replace('/home');
+      return;
     }
-  }, [currentCampaign]);
+
+    // Clear previous campaign history when switching campaigns
+    clearCampaignHistory();
+
+    // Initial fetch of campaign history
+    fetchCampaignHistory(currentCampaign.uid);
+
+    // Initialize real-time subscription
+    initializeRealtimeSubscription(currentCampaign.uid).then(unsubscribe => {
+      realtimeUnsubscribeRef.current = unsubscribe;
+    });
+
+    // Set up polling as backup (every 5 seconds)
+    pollingIntervalRef.current = setInterval(() => {
+      fetchCampaignHistory(currentCampaign.uid);
+    }, 5000);
+
+    // Cleanup function
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+      if (realtimeUnsubscribeRef.current) {
+        realtimeUnsubscribeRef.current();
+      }
+    };
+  }, [currentCampaign, fetchCampaignHistory, initializeRealtimeSubscription, clearCampaignHistory]);
 
   useEffect(() => {
-    // Auto-scroll to bottom when new events are added
-    if (scrollViewRef.current) {
-      scrollViewRef.current.scrollToEnd({ animated: true });
+    // Auto-scroll to bottom when new messages are added
+    if (scrollViewRef.current && campaignHistory.length > 0) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     }
-  }, [storyState.events]);
+  }, [campaignHistory]);
 
   useEffect(() => {
     // Show error alert if there's an error
@@ -132,7 +177,7 @@ export default function StoryScreen() {
           <View style={styles.headerTitle}>
             <Text style={styles.title}>{currentCampaign.name}</Text>
             <Text style={styles.subtitle}>
-              {storyState.events.length > 0 ? 'Adventure in Progress' : 'Chapter 1: The Beginning'}
+              {campaignHistory.length > 0 ? 'Adventure in Progress' : 'Chapter 1: The Beginning'}
             </Text>
           </View>
 
@@ -151,7 +196,7 @@ export default function StoryScreen() {
             style={styles.storyContainer}
             showsVerticalScrollIndicator={false}
           >
-            {storyState.events.length === 0 ? (
+            {campaignHistory.length === 0 ? (
               <View style={styles.welcomeContainer}>
                 <Text style={styles.welcomeText}>
                   Welcome to {currentCampaign.name}! Your adventure is about to begin...
@@ -161,8 +206,8 @@ export default function StoryScreen() {
                 </Text>
               </View>
             ) : (
-              storyState.events.map((event) => (
-                <StoryEventItem key={event.id} event={event} />
+              campaignHistory.map((message) => (
+                <StoryEventItem key={message.id} message={message} />
               ))
             )}
 

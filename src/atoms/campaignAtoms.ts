@@ -15,6 +15,7 @@ export type Campaign = {
   content_level: 'kids' | 'teens' | 'adults';
   rp_focus: 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heavy_combat';
   created_at?: string;
+  uid: string;
 };
 
 export type Player = {
@@ -62,7 +63,7 @@ export const fetchCampaignsAtom = atom(
       const playerCampaigns = allCampaigns?.filter(campaign => {
         // Skip if user is already the owner (already included in ownedCampaigns)
         if (campaign.owner === user.id) return false;
-        
+
         // Check if user is in the players array
         const players = campaign.players || [];
         return players.some((player: Player) => player.id === user.id);
@@ -123,7 +124,7 @@ export const upsertCampaignAtom = atom(
 
       // Update local state
       const currentCampaigns = get(campaignsAtom);
-      const updatedCampaigns = currentCampaigns.map(c => 
+      const updatedCampaigns = currentCampaigns.map(c =>
         c.id === data.id ? data : c
       );
 
@@ -161,10 +162,23 @@ export const initializeRealtimeAtom = atom(
           table: 'campaigns'
         },
         async (payload) => {
-          // Refresh campaigns when any change occurs
-          const fetchCampaigns = get(fetchCampaignsAtom);
-          if (fetchCampaigns) {
-            await fetchCampaigns();
+          // Fetch fresh data to ensure we have the complete state
+          const { data: campaigns } = await supabase
+            .from('campaigns')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (campaigns) {
+            set(campaignsAtom, campaigns);
+
+            // Update current campaign if it was modified
+            const currentCampaign = get(currentCampaignAtom);
+            if (currentCampaign) {
+              const updatedCampaign = campaigns.find(c => c.id === currentCampaign.id);
+              if (updatedCampaign) {
+                set(currentCampaignAtom, updatedCampaign);
+              }
+            }
           }
         }
       )
