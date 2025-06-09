@@ -386,7 +386,7 @@ export default function CreationScreen() {
       setLoading(false);
     }
   };
-
+console.log('::: CURR STEP', currentStep)
   const renderStepContent = () => {
     switch (currentStep) {
       case 0: // Name & Race
