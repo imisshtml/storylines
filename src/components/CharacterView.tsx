@@ -257,9 +257,8 @@ export default function CharacterView() {
           onPress={() => setExpandedSpell(expandedSpell === spell.name ? null : spell.name)}
         >
           <View style={styles.spellHeader}>
-            <Text style={styles.spellName}>{spell.name}</Text>
-            <Text style={styles.spellLevel}>
-              {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
+            <Text style={styles.spellName}>
+              {spell.name}({spell.level === 0 ? 'c' : spell.level})
             </Text>
           </View>
           {expandedSpell === spell.name ? (
@@ -598,20 +597,12 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   spellHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 4,
   },
   spellName: {
     fontSize: 16,
     color: '#1a1a1a',
     fontFamily: 'Inter-Bold',
-  },
-  spellLevel: {
-    fontSize: 14,
-    color: '#4CAF50',
-    fontFamily: 'Inter-Regular',
   },
   spellPreview: {
     fontSize: 14,
