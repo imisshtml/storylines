@@ -79,7 +79,7 @@ export default function LoginScreen() {
 
   return (
     <ImageBackground
-      source={require('../../assets/images/storylines_splash.png')}
+      source={require('../../assets/images/storylines_splash.jpg')}
       style={styles.container}
       imageStyle={styles.backgroundImage}
     >
@@ -210,7 +210,7 @@ export default function LoginScreen() {
               disabled={!isValid() || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small\" color="#fff" />
               ) : (
                 <>
                   {isSignUp ? (

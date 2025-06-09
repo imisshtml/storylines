@@ -62,7 +62,7 @@ export default function HomeScreen() {
 
   return (
     <ImageBackground
-      source={require('../../assets/images/storylines_splash.png')}
+      source={require('../../assets/images/storylines_splash.jpg')}
       style={styles.container}
       imageStyle={styles.backgroundImage}
     >

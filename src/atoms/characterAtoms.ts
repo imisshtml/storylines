@@ -20,7 +20,7 @@ export type DnDSpell = {
   index: string;
   name: string;
   level: number;
-  school: string;
+  school: { name: string };
   casting_time: string;
   range: string;
   components: string[];
@@ -56,58 +56,47 @@ export type Character = {
 export type Race = {
   index: string;
   name: string;
-  ability_score_increases: Array<{
+  ability_bonuses: {
     ability_score: { index: string; name: string };
     bonus: number;
-  }>;
+  }[];
   size: string;
   speed: number;
-  languages: Array<{ index: string; name: string }>;
-  traits: Array<{ index: string; name: string }>;
-  subraces?: Array<{ index: string; name: string }>;
+  languages: { index: string; name: string }[];
+  traits: { index: string; name: string }[];
+  subraces?: { index: string; name: string }[];
 };
 
 export type Class = {
   index: string;
   name: string;
   hit_die: number;
-  proficiencies: Array<{ index: string; name: string }>;
-  proficiency_choices: Array<{
+  proficiencies: { index: string; name: string }[];
+  proficiency_choices: {
     choose: number;
     type: string;
-    from: Array<{ index: string; name: string }>;
-  }>;
-  saving_throws: Array<{ index: string; name: string }>;
-  starting_equipment: Array<{
+    from: {
+      options: {
+        item: { index: string; name: string };
+      }[];
+    };
+  }[];
+  saving_throws: { index: string; name: string }[];
+  starting_equipment: {
     equipment: { index: string; name: string };
     quantity: number;
-  }>;
-  starting_equipment_options: Array<{
+  }[];
+  starting_equipment_options: {
     choose: number;
     type: string;
-    from: Array<{
+    from: {
       equipment: { index: string; name: string };
       quantity: number;
-    }>;
-  }>;
+    }[];
+  }[];
   spellcasting?: {
     level: number;
     spellcasting_ability: { index: string; name: string };
-  };
-};
-
-export type Background = {
-  index: string;
-  name: string;
-  skill_proficiencies: Array<{ index: string; name: string }>;
-  languages: Array<{ index: string; name: string }>;
-  equipment: Array<{
-    equipment: { index: string; name: string };
-    quantity: number;
-  }>;
-  feature: {
-    name: string;
-    desc: string[];
   };
 };
 
@@ -116,7 +105,6 @@ export const characterCreationStepAtom = atom(0);
 export const characterNameAtom = atom('');
 export const selectedRaceAtom = atom<Race | null>(null);
 export const selectedClassAtom = atom<Class | null>(null);
-export const selectedBackgroundAtom = atom<Background | null>(null);
 export const characterAbilitiesAtom = atom<DnDAbilities>({
   strength: 10,
   dexterity: 10,
@@ -137,7 +125,6 @@ export const characterEquipmentAtom = atom<DnDEquipment>({
 // API data atoms
 export const racesAtom = atom<Race[]>([]);
 export const classesAtom = atom<Class[]>([]);
-export const backgroundsAtom = atom<Background[]>([]);
 export const spellsAtom = atom<DnDSpell[]>([]);
 
 // Characters storage
@@ -145,24 +132,53 @@ export const charactersAtom = atom<Character[]>([]);
 export const charactersLoadingAtom = atom(false);
 export const charactersErrorAtom = atom<string | null>(null);
 
+// Helper function for retrying failed requests
+const fetchWithRetry = async (url: string, retries = 3, delay = 1000) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+};
+
+// Helper function to delay execution
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Fetch races from D&D API
 export const fetchRacesAtom = atom(
   null,
   async (get, set) => {
     try {
-      const response = await fetch('https://www.dnd5eapi.co/api/races');
-      const data = await response.json();
+      const data = await fetchWithRetry('https://www.dnd5eapi.co/api/races');
       
       const detailedRaces = await Promise.all(
         data.results.map(async (race: any) => {
-          const raceResponse = await fetch(`https://www.dnd5eapi.co${race.url}`);
-          return await raceResponse.json();
+          try {
+            return await fetchWithRetry(`https://www.dnd5eapi.co${race.url}`);
+          } catch (error) {
+            console.error(`Error fetching race ${race.index}:`, error);
+            return null;
+          }
         })
       );
       
-      set(racesAtom, detailedRaces);
+      // Filter out failed fetches
+      const validRaces = detailedRaces.filter((race): race is NonNullable<typeof race> => 
+        race !== null && typeof race === 'object'
+      );
+      
+      set(racesAtom, validRaces);
     } catch (error) {
       console.error('Error fetching races:', error);
+      set(racesAtom, []); // Set empty array on error
     }
   }
 );
@@ -172,66 +188,52 @@ export const fetchClassesAtom = atom(
   null,
   async (get, set) => {
     try {
-      const response = await fetch('https://www.dnd5eapi.co/api/classes');
-      const data = await response.json();
+      const data = await fetchWithRetry('https://www.dnd5eapi.co/api/classes');
       
       const detailedClasses = await Promise.all(
         data.results.map(async (cls: any) => {
-          const classResponse = await fetch(`https://www.dnd5eapi.co${cls.url}`);
-          return await classResponse.json();
+          try {
+            return await fetchWithRetry(`https://www.dnd5eapi.co${cls.url}`);
+          } catch (error) {
+            console.error(`Error fetching class ${cls.index}:`, error);
+            return null;
+          }
         })
       );
       
-      set(classesAtom, detailedClasses);
+      // Filter out failed fetches
+      const validClasses = detailedClasses.filter((cls): cls is NonNullable<typeof cls> => 
+        cls !== null && typeof cls === 'object'
+      );
+      
+      set(classesAtom, validClasses);
     } catch (error) {
       console.error('Error fetching classes:', error);
+      set(classesAtom, []); // Set empty array on error
     }
   }
 );
 
-// Fetch backgrounds from D&D API
-export const fetchBackgroundsAtom = atom(
-  null,
-  async (get, set) => {
-    try {
-      const response = await fetch('https://www.dnd5eapi.co/api/backgrounds');
-      const data = await response.json();
-      const detailedBackgrounds = await Promise.all(
-        data.results.map(async (bg: any) => {
-          const bgResponse = await fetch(`https://www.dnd5eapi.co${bg.url}`);
-          return await bgResponse.json();
-        })
-      );
-      
-      set(backgroundsAtom, detailedBackgrounds);
-    } catch (error) {
-      console.error('Error fetching backgrounds:', error);
-    }
-  }
-);
-
-// Fetch spells from D&D API (level 0-1 for character creation)
+// Fetch spells from Supabase
 export const fetchSpellsAtom = atom(
   null,
   async (get, set) => {
     try {
-      const response = await fetch('https://www.dnd5eapi.co/api/spells');
-      const data = await response.json();
-      console.log('::: spells', data)
-      const level0or1Spells = data.results.filter(spell =>
-        spell.level === 0 || spell.level === 1
-      );
-      const detailedSpells = await Promise.all(
-        level0or1Spells.slice(0, 10).map(async (spell: any) => { // Limit to first 50 spells
-          console.log('::: spell... ', spell.index)
-          const spellResponse = await fetch(`https://www.dnd5eapi.co${spell.url}`);
-          return await spellResponse.json();
-        })
-      );
-      
-      set(spellsAtom, detailedSpells);
+      const { data: spells, error } = await supabase
+        .from('spells')
+        .select('*')
+        .lte('level', 1)
+        .order('level')
+        .order('name');
+
+      if (error) {
+        throw error;
+      }
+
+      set(spellsAtom, spells);
     } catch (error) {
       console.error('Error fetching spells:', error);
+      set(spellsAtom, []); // Set empty array on error
     }
   }
 );
@@ -298,7 +300,6 @@ export const resetCharacterCreationAtom = atom(
     set(characterNameAtom, '');
     set(selectedRaceAtom, null);
     set(selectedClassAtom, null);
-    set(selectedBackgroundAtom, null);
     set(characterAbilitiesAtom, {
       strength: 10,
       dexterity: 10,
