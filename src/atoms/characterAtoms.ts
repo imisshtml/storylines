@@ -56,7 +56,7 @@ export type Character = {
 export type Race = {
   index: string;
   name: string;
-  ability_score_increases: Array<{
+  ability_bonuses: Array<{
     ability_score: { index: string; name: string };
     bonus: number;
   }>;
@@ -75,7 +75,11 @@ export type Class = {
   proficiency_choices: Array<{
     choose: number;
     type: string;
-    from: Array<{ index: string; name: string }>;
+    from: {
+      options: Array<{
+        item: { index: string; name: string };
+      }>;
+    };
   }>;
   saving_throws: Array<{ index: string; name: string }>;
   starting_equipment: Array<{
@@ -96,27 +100,11 @@ export type Class = {
   };
 };
 
-export type Background = {
-  index: string;
-  name: string;
-  skill_proficiencies: Array<{ index: string; name: string }>;
-  languages: Array<{ index: string; name: string }>;
-  equipment: Array<{
-    equipment: { index: string; name: string };
-    quantity: number;
-  }>;
-  feature: {
-    name: string;
-    desc: string[];
-  };
-};
-
 // Character creation state atoms
 export const characterCreationStepAtom = atom(0);
 export const characterNameAtom = atom('');
 export const selectedRaceAtom = atom<Race | null>(null);
 export const selectedClassAtom = atom<Class | null>(null);
-export const selectedBackgroundAtom = atom<Background | null>(null);
 export const characterAbilitiesAtom = atom<DnDAbilities>({
   strength: 10,
   dexterity: 10,
@@ -137,7 +125,6 @@ export const characterEquipmentAtom = atom<DnDEquipment>({
 // API data atoms
 export const racesAtom = atom<Race[]>([]);
 export const classesAtom = atom<Class[]>([]);
-export const backgroundsAtom = atom<Background[]>([]);
 export const spellsAtom = atom<DnDSpell[]>([]);
 
 // Characters storage
@@ -185,27 +172,6 @@ export const fetchClassesAtom = atom(
       set(classesAtom, detailedClasses);
     } catch (error) {
       console.error('Error fetching classes:', error);
-    }
-  }
-);
-
-// Fetch backgrounds from D&D API
-export const fetchBackgroundsAtom = atom(
-  null,
-  async (get, set) => {
-    try {
-      const response = await fetch('https://www.dnd5eapi.co/api/backgrounds');
-      const data = await response.json();
-      const detailedBackgrounds = await Promise.all(
-        data.results.map(async (bg: any) => {
-          const bgResponse = await fetch(`https://www.dnd5eapi.co${bg.url}`);
-          return await bgResponse.json();
-        })
-      );
-      
-      set(backgroundsAtom, detailedBackgrounds);
-    } catch (error) {
-      console.error('Error fetching backgrounds:', error);
     }
   }
 );
@@ -298,7 +264,6 @@ export const resetCharacterCreationAtom = atom(
     set(characterNameAtom, '');
     set(selectedRaceAtom, null);
     set(selectedClassAtom, null);
-    set(selectedBackgroundAtom, null);
     set(characterAbilitiesAtom, {
       strength: 10,
       dexterity: 10,
@@ -308,7 +273,7 @@ export const resetCharacterCreationAtom = atom(
       charisma: 10,
     });
     set(selectedSkillsAtom, []);
-    set(selectedSpellsAtom, []);
+    set(selectedSpells, []);
     set(characterEquipmentAtom, {
       weapons: [],
       armor: [],
