@@ -1187,7 +1187,7 @@ const styles = StyleSheet.create({
   },
   skillCounterText: {
     color: '#4CAF50',
-    fontSize: 14,
+    fontSize: 18,
     fontFamily: 'Inter-Bold',
   },
   noSkillsContainer: {
