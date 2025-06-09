@@ -3,7 +3,7 @@ import { supabase } from '../config/supabase';
 
 export type CampaignMessage = {
   id: number;
-  campaign_id: string;
+  campaign_uid: string;
   message: string;
   author: string;
   message_type: 'player' | 'dm' | 'system';
@@ -19,7 +19,7 @@ export const campaignHistoryErrorAtom = atom<string | null>(null);
 // Fetch campaign history
 export const fetchCampaignHistoryAtom = atom(
   null,
-  async (get, set, campaignId: string) => {
+  async (get, set, campaignUid: string) => {
     try {
       set(campaignHistoryLoadingAtom, true);
       set(campaignHistoryErrorAtom, null);
@@ -27,7 +27,7 @@ export const fetchCampaignHistoryAtom = atom(
       const { data, error } = await supabase
         .from('campaign_history')
         .select('*')
-        .eq('campaign_id', campaignId)
+        .eq('campaign_uid', campaignUid)
         .order('timestamp', { ascending: true })
         .order('id', { ascending: true }); // Secondary sort by ID for consistent ordering
 
@@ -47,7 +47,7 @@ export const fetchCampaignHistoryAtom = atom(
 export const addCampaignMessageAtom = atom(
   null,
   async (get, set, messageData: {
-    campaign_id: string;
+    campaign_uid: string;
     message: string;
     author: string;
     message_type: 'player' | 'dm' | 'system';
@@ -74,21 +74,21 @@ export const addCampaignMessageAtom = atom(
 // Initialize real-time subscription for campaign history
 export const initializeCampaignHistoryRealtimeAtom = atom(
   null,
-  async (get, set, campaignId: string) => {
+  async (get, set, campaignUid: string) => {
     const subscription = supabase
-      .channel(`campaign_history:${campaignId}`)
+      .channel(`campaign_history:${campaignUid}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'campaign_history',
-          filter: `campaign_id=eq.${campaignId}`
+          filter: `campaign_uid=eq.${campaignUid}`
         },
         (payload) => {
           const newMessage = payload.new as CampaignMessage;
           const currentHistory = get(campaignHistoryAtom);
-          
+
           // Check if message already exists to avoid duplicates
           const messageExists = currentHistory.some(msg => msg.id === newMessage.id);
           if (!messageExists) {

@@ -15,6 +15,7 @@ export type Campaign = {
   content_level: 'kids' | 'teens' | 'adults';
   rp_focus: 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heavy_combat';
   created_at?: string;
+  uid: string;
 };
 
 export type Player = {
@@ -79,7 +80,7 @@ export const upsertCampaignAtom = atom(
 
       // Update local state
       const currentCampaigns = get(campaignsAtom);
-      const updatedCampaigns = currentCampaigns.map(c => 
+      const updatedCampaigns = currentCampaigns.map(c =>
         c.id === data.id ? data : c
       );
 
@@ -122,7 +123,7 @@ export const initializeRealtimeAtom = atom(
 
           if (campaigns) {
             set(campaignsAtom, campaigns);
-            
+
             // Update current campaign if it was modified
             const currentCampaign = get(currentCampaignAtom);
             if (currentCampaign) {

@@ -45,7 +45,7 @@ export function useStoryAI() {
     try {
       // Add player message to campaign history
       await addCampaignMessage({
-        campaign_id: currentCampaign.id,
+        campaign_uid: currentCampaign.uid,
         message: action,
         author: playerName,
         message_type: 'player',
@@ -79,7 +79,7 @@ export function useStoryAI() {
 
       // Add DM response to campaign history
       await addCampaignMessage({
-        campaign_id: currentCampaign.id,
+        campaign_uid: currentCampaign.uid,
         message: data.response,
         author: 'DM',
         message_type: 'dm',
