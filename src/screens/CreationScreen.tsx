@@ -11,8 +11,9 @@ import {
   Alert,
   Image,
   Platform,
+  Modal,
 } from 'react-native';
-import { ArrowLeft, ArrowRight, Save, User, Dices, Scroll, Package, Camera, Upload, ShieldUser, Dna, Brain } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Save, User, Dices, Scroll, Package, Camera, Upload, ShieldUser, Dna, Brain, BookOpen, X } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import * as ImagePicker from 'expo-image-picker';
@@ -52,6 +53,13 @@ const CREATION_STEPS = [
   { id: 7, title: 'Review', icon: Save },
 ];
 
+// Point buy cost chart for D&D 5e
+const POINT_BUY_COSTS: { [key: number]: number } = {
+  8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9
+};
+
+const POINT_BUY_TOTAL = 27;
+
 export default function CreationScreen() {
   const [user] = useAtom(userAtom);
   const [currentStep, setCurrentStep] = useAtom(characterCreationStepAtom);
@@ -76,6 +84,8 @@ export default function CreationScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [showClassDetails, setShowClassDetails] = useState<Class | null>(null);
+  const [showRaceDetails, setShowRaceDetails] = useState<Race | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -154,6 +164,49 @@ export default function CreationScreen() {
         setAvatarUri(result.assets[0].uri);
       }
     }
+  };
+
+  const calculatePointsUsed = () => {
+    return Object.values(abilities).reduce((total, score) => {
+      return total + (POINT_BUY_COSTS[score] || 0);
+    }, 0);
+  };
+
+  const getRemainingPoints = () => {
+    return POINT_BUY_TOTAL - calculatePointsUsed();
+  };
+
+  const canIncreaseAbility = (ability: keyof DnDAbilities) => {
+    const currentScore = abilities[ability];
+    const nextScore = currentScore + 1;
+    
+    if (nextScore > 15) return false;
+    
+    const currentCost = POINT_BUY_COSTS[currentScore] || 0;
+    const nextCost = POINT_BUY_COSTS[nextScore] || 0;
+    const costDifference = nextCost - currentCost;
+    
+    return getRemainingPoints() >= costDifference;
+  };
+
+  const getAbilityModifier = (score: number) => {
+    return Math.floor((score - 10) / 2);
+  };
+
+  const getFinalAbilityScore = (ability: keyof DnDAbilities) => {
+    let baseScore = abilities[ability];
+    
+    // Add racial bonuses
+    if (selectedRace?.ability_bonuses) {
+      const bonus = selectedRace.ability_bonuses.find(
+        (bonus) => bonus.ability_score.index === ability.substring(0, 3)
+      );
+      if (bonus) {
+        baseScore += bonus.bonus;
+      }
+    }
+    
+    return baseScore;
   };
 
   const handleSaveCharacter = async () => {
@@ -312,6 +365,12 @@ export default function CreationScreen() {
                 Hit Die: d{cls.hit_die} • {cls.spellcasting ? 'Spellcaster' : 'Non-spellcaster'}
               </Text>
             </View>
+            <TouchableOpacity
+              style={styles.detailsButton}
+              onPress={() => setShowClassDetails(cls)}
+            >
+              <BookOpen size={20} color={selectedClass?.index === cls.index ? '#fff' : '#4CAF50'} />
+            </TouchableOpacity>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -345,7 +404,23 @@ export default function CreationScreen() {
               ]}>
                 Size: {race.size} • Speed: {race.speed} ft
               </Text>
+              {race.ability_bonuses && race.ability_bonuses.length > 0 && (
+                <Text style={[
+                  styles.raceAbilityBonuses,
+                  selectedRace?.index === race.index && styles.raceAbilityBonusesSelected,
+                ]}>
+                  Bonuses: {race.ability_bonuses.map(bonus => 
+                    `+${bonus.bonus} ${bonus.ability_score.name}`
+                  ).join(', ')}
+                </Text>
+              )}
             </View>
+            <TouchableOpacity
+              style={styles.detailsButton}
+              onPress={() => setShowRaceDetails(race)}
+            >
+              <BookOpen size={20} color={selectedRace?.index === race.index ? '#fff' : '#4CAF50'} />
+            </TouchableOpacity>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -354,41 +429,99 @@ export default function CreationScreen() {
 
   const renderAbilities = () => {
     const abilityNames = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'];
+    const remainingPoints = getRemainingPoints();
     
     return (
       <View style={styles.stepContent}>
-        <Text style={styles.stepTitle}>Ability Scores</Text>
-        <Text style={styles.subtitle}>Distribute points between 8-15 for each ability</Text>
-        {abilityNames.map((ability) => (
-          <View key={ability} style={styles.abilityRow}>
-            <Text style={styles.abilityLabel}>
-              {ability.charAt(0).toUpperCase() + ability.slice(1)}
-            </Text>
-            <View style={styles.abilityControls}>
-              <TouchableOpacity
-                style={styles.abilityButton}
-                onPress={() => setAbilities(prev => ({
-                  ...prev,
-                  [ability]: Math.max(8, prev[ability as keyof DnDAbilities] - 1)
-                }))}
-              >
-                <Text style={styles.abilityButtonText}>-</Text>
-              </TouchableOpacity>
-              <Text style={styles.abilityValue}>
-                {abilities[ability as keyof DnDAbilities]}
-              </Text>
-              <TouchableOpacity
-                style={styles.abilityButton}
-                onPress={() => setAbilities(prev => ({
-                  ...prev,
-                  [ability]: Math.min(15, prev[ability as keyof DnDAbilities] + 1)
-                }))}
-              >
-                <Text style={styles.abilityButtonText}>+</Text>
-              </TouchableOpacity>
+        <Text style={styles.stepTitle}>Ability Scores (Point Buy)</Text>
+        <Text style={styles.subtitle}>
+          You have {POINT_BUY_TOTAL} points to spend. Remaining: {remainingPoints}
+        </Text>
+        
+        <View style={styles.pointBuyRules}>
+          <Text style={styles.rulesTitle}>Point Buy Rules:</Text>
+          <Text style={styles.rulesText}>• Scores range from 8-15 (before racial bonuses)</Text>
+          <Text style={styles.rulesText}>• Cost increases as scores get higher</Text>
+          <Text style={styles.rulesText}>• You can freely mix and match as long as total cost ≤ 27</Text>
+          
+          <View style={styles.costChart}>
+            <Text style={styles.costChartTitle}>Cost Chart:</Text>
+            <View style={styles.costChartGrid}>
+              {Object.entries(POINT_BUY_COSTS).map(([score, cost]) => (
+                <View key={score} style={styles.costChartItem}>
+                  <Text style={styles.costChartScore}>{score}</Text>
+                  <Text style={styles.costChartCost}>{cost}</Text>
+                </View>
+              ))}
             </View>
           </View>
-        ))}
+        </View>
+
+        {abilityNames.map((ability) => {
+          const baseScore = abilities[ability as keyof DnDAbilities];
+          const finalScore = getFinalAbilityScore(ability as keyof DnDAbilities);
+          const modifier = getAbilityModifier(finalScore);
+          const racialBonus = finalScore - baseScore;
+          
+          return (
+            <View key={ability} style={styles.abilityRow}>
+              <View style={styles.abilityInfo}>
+                <Text style={styles.abilityLabel}>
+                  {ability.charAt(0).toUpperCase() + ability.slice(1)}
+                </Text>
+                <View style={styles.abilityScores}>
+                  <Text style={styles.abilityBaseScore}>{baseScore}</Text>
+                  {racialBonus > 0 && (
+                    <Text style={styles.abilityRacialBonus}>+{racialBonus}</Text>
+                  )}
+                  <Text style={styles.abilityFinalScore}>= {finalScore}</Text>
+                  <Text style={styles.abilityModifier}>
+                    ({modifier >= 0 ? '+' : ''}{modifier})
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.abilityControls}>
+                <TouchableOpacity
+                  style={[
+                    styles.abilityButton,
+                    baseScore <= 8 && styles.abilityButtonDisabled,
+                  ]}
+                  onPress={() => setAbilities(prev => ({
+                    ...prev,
+                    [ability]: Math.max(8, prev[ability as keyof DnDAbilities] - 1)
+                  }))}
+                  disabled={baseScore <= 8}
+                >
+                  <Text style={styles.abilityButtonText}>-</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.abilityButton,
+                    !canIncreaseAbility(ability as keyof DnDAbilities) && styles.abilityButtonDisabled,
+                  ]}
+                  onPress={() => setAbilities(prev => ({
+                    ...prev,
+                    [ability]: Math.min(15, prev[ability as keyof DnDAbilities] + 1)
+                  }))}
+                  disabled={!canIncreaseAbility(ability as keyof DnDAbilities)}
+                >
+                  <Text style={styles.abilityButtonText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
+        
+        <View style={styles.pointSummary}>
+          <Text style={styles.pointSummaryText}>
+            Points Used: {calculatePointsUsed()} / {POINT_BUY_TOTAL}
+          </Text>
+          {remainingPoints < 0 && (
+            <Text style={styles.pointsOverLimit}>
+              Over limit by {Math.abs(remainingPoints)} points!
+            </Text>
+          )}
+        </View>
       </View>
     );
   };
@@ -542,7 +675,7 @@ export default function CreationScreen() {
       <View style={styles.reviewSection}>
         <Text style={styles.reviewLabel}>Abilities:</Text>
         <Text style={styles.reviewValue}>
-          STR {abilities.strength}, DEX {abilities.dexterity}, CON {abilities.constitution}, INT {abilities.intelligence}, WIS {abilities.wisdom}, CHA {abilities.charisma}
+          STR {getFinalAbilityScore('strength')}, DEX {getFinalAbilityScore('dexterity')}, CON {getFinalAbilityScore('constitution')}, INT {getFinalAbilityScore('intelligence')}, WIS {getFinalAbilityScore('wisdom')}, CHA {getFinalAbilityScore('charisma')}
         </Text>
       </View>
 
@@ -578,7 +711,7 @@ export default function CreationScreen() {
         disabled={isSaving}
       >
         {isSaving ? (
-          <ActivityIndicator size="small\" color="#fff" />
+          <ActivityIndicator size="small" color="#fff" />
         ) : (
           <>
             <Save size={20} color="#fff" />
@@ -608,7 +741,7 @@ export default function CreationScreen() {
       case 0: return characterName.length > 0;
       case 1: return selectedClass !== null;
       case 2: return selectedRace !== null;
-      case 3: return true; // Abilities always have default values
+      case 3: return getRemainingPoints() >= 0; // Must not exceed point limit
       case 4: return true; // Skills are optional
       case 5: return true; // Spells are optional
       case 6: return true; // Equipment is automatic
@@ -653,6 +786,101 @@ export default function CreationScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Class Details Modal */}
+      <Modal
+        visible={showClassDetails !== null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowClassDetails(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{showClassDetails?.name}</Text>
+              <TouchableOpacity onPress={() => setShowClassDetails(null)}>
+                <X size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              <Text style={styles.modalSectionTitle}>Hit Die</Text>
+              <Text style={styles.modalText}>d{showClassDetails?.hit_die}</Text>
+              
+              <Text style={styles.modalSectionTitle}>Proficiencies</Text>
+              {showClassDetails?.proficiencies.map((prof, index) => (
+                <Text key={index} style={styles.modalText}>• {prof.name}</Text>
+              ))}
+              
+              <Text style={styles.modalSectionTitle}>Saving Throws</Text>
+              {showClassDetails?.saving_throws.map((save, index) => (
+                <Text key={index} style={styles.modalText}>• {save.name}</Text>
+              ))}
+              
+              {showClassDetails?.spellcasting && (
+                <>
+                  <Text style={styles.modalSectionTitle}>Spellcasting</Text>
+                  <Text style={styles.modalText}>
+                    Spellcasting ability: {showClassDetails.spellcasting.spellcasting_ability.name}
+                  </Text>
+                  <Text style={styles.modalText}>
+                    Spellcasting starts at level {showClassDetails.spellcasting.level}
+                  </Text>
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Race Details Modal */}
+      <Modal
+        visible={showRaceDetails !== null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowRaceDetails(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{showRaceDetails?.name}</Text>
+              <TouchableOpacity onPress={() => setShowRaceDetails(null)}>
+                <X size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              <Text style={styles.modalSectionTitle}>Size & Speed</Text>
+              <Text style={styles.modalText}>Size: {showRaceDetails?.size}</Text>
+              <Text style={styles.modalText}>Speed: {showRaceDetails?.speed} feet</Text>
+              
+              <Text style={styles.modalSectionTitle}>Ability Score Increases</Text>
+              {showRaceDetails?.ability_bonuses.map((bonus, index) => (
+                <Text key={index} style={styles.modalText}>
+                  • {bonus.ability_score.name} +{bonus.bonus}
+                </Text>
+              ))}
+              
+              <Text style={styles.modalSectionTitle}>Languages</Text>
+              {showRaceDetails?.languages.map((lang, index) => (
+                <Text key={index} style={styles.modalText}>• {lang.name}</Text>
+              ))}
+              
+              <Text style={styles.modalSectionTitle}>Traits</Text>
+              {showRaceDetails?.traits.map((trait, index) => (
+                <Text key={index} style={styles.modalText}>• {trait.name}</Text>
+              ))}
+              
+              {showRaceDetails?.subraces && showRaceDetails.subraces.length > 0 && (
+                <>
+                  <Text style={styles.modalSectionTitle}>Subraces</Text>
+                  {showRaceDetails.subraces.map((subrace, index) => (
+                    <Text key={index} style={styles.modalText}>• {subrace.name}</Text>
+                  ))}
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -857,6 +1085,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 2,
     borderColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   classOptionContent: {
     flex: 1,
@@ -882,6 +1112,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 2,
     borderColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   raceOptionContent: {
     flex: 1,
@@ -896,9 +1128,22 @@ const styles = StyleSheet.create({
     color: '#888',
     fontSize: 14,
     fontFamily: 'Inter-Regular',
+    marginBottom: 4,
   },
   raceOptionDescriptionSelected: {
     color: '#fff',
+  },
+  raceAbilityBonuses: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  raceAbilityBonusesSelected: {
+    color: '#fff',
+  },
+  detailsButton: {
+    padding: 8,
+    marginLeft: 12,
   },
   spellOptionItem: {
     backgroundColor: '#2a2a2a',
@@ -938,6 +1183,55 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
+  pointBuyRules: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  rulesTitle: {
+    color: '#4CAF50',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
+  rulesText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 4,
+  },
+  costChart: {
+    marginTop: 12,
+  },
+  costChartTitle: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
+  costChartGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  costChartItem: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 6,
+    padding: 8,
+    minWidth: 40,
+    alignItems: 'center',
+  },
+  costChartScore: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+  },
+  costChartCost: {
+    color: '#888',
+    fontSize: 10,
+    fontFamily: 'Inter-Regular',
+  },
   abilityRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -947,15 +1241,44 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 8,
   },
+  abilityInfo: {
+    flex: 1,
+  },
   abilityLabel: {
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
-    flex: 1,
+    marginBottom: 4,
+  },
+  abilityScores: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  abilityBaseScore: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  abilityRacialBonus: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  abilityFinalScore: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  abilityModifier: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
   },
   abilityControls: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
   abilityButton: {
     width: 32,
@@ -965,18 +1288,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  abilityButtonDisabled: {
+    backgroundColor: '#666',
+  },
   abilityButtonText: {
     color: '#fff',
     fontSize: 18,
     fontFamily: 'Inter-Bold',
   },
-  abilityValue: {
+  pointSummary: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  pointSummaryText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: 'Inter-Bold',
-    marginHorizontal: 16,
-    minWidth: 24,
-    textAlign: 'center',
+  },
+  pointsOverLimit: {
+    color: '#f44336',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    marginTop: 4,
   },
   equipmentPreview: {
     backgroundColor: '#2a2a2a',
@@ -1054,5 +1390,48 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    width: '90%',
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+  modalTitle: {
+    fontSize: 20,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  modalBody: {
+    padding: 20,
+  },
+  modalSectionTitle: {
+    fontSize: 16,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  modalText: {
+    fontSize: 14,
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 4,
+    lineHeight: 20,
   },
 });
