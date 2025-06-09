@@ -3,7 +3,7 @@
 
   1. Drop and recreate campaign_history table with correct data types
     - `id` as auto-incrementing bigint (for message ordering)
-    - `campaign_id` as uuid (matching campaigns.id)
+    - `campaign_uid` as uuid (matching campaigns.uid)
     - All other columns remain the same
 
   2. Security
@@ -14,13 +14,10 @@
     - Add indexes for efficient querying
 */
 
--- Drop the existing table if it exists (since it has the wrong schema)
-DROP TABLE IF EXISTS campaign_history;
-
 -- Create campaign_history table with correct data types
 CREATE TABLE campaign_history (
   id bigserial PRIMARY KEY,
-  campaign_id uuid REFERENCES campaigns(id) ON DELETE CASCADE NOT NULL,
+  campaign_uid uuid REFERENCES campaigns(uid) ON DELETE CASCADE NOT NULL,
   message text NOT NULL,
   author text NOT NULL,
   message_type text NOT NULL CHECK (message_type IN ('player', 'dm', 'system')) DEFAULT 'player',
@@ -39,11 +36,11 @@ CREATE POLICY "Campaign participants can view campaign history"
   USING (
     EXISTS (
       SELECT 1 FROM campaigns c
-      WHERE c.id = campaign_id
+      WHERE c.uid = campaign_uid
       AND (
-        c.owner = auth.uid()
+        (c.owner)::text = (auth.uid())::text
         OR EXISTS (
-          SELECT 1 FROM jsonb_array_elements(c.players) player
+          SELECT 1 FROM jsonb_array_elements(c.players::jsonb) player
           WHERE (auth.uid())::text = (player->>'id')::text
         )
       )
@@ -58,11 +55,11 @@ CREATE POLICY "Campaign participants can insert messages"
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM campaigns c
-      WHERE c.id = campaign_id
+      WHERE c.uid = campaign_uid
       AND (
-        c.owner = auth.uid()
+        (c.owner)::text = (auth.uid())::text
         OR EXISTS (
-          SELECT 1 FROM jsonb_array_elements(c.players) player
+          SELECT 1 FROM jsonb_array_elements(c.players::jsonb) player
           WHERE (auth.uid())::text = (player->>'id')::text
         )
       )
@@ -70,9 +67,9 @@ CREATE POLICY "Campaign participants can insert messages"
   );
 
 -- Create indexes for better performance
-CREATE INDEX idx_campaign_history_campaign_id ON campaign_history(campaign_id);
+CREATE INDEX idx_campaign_history_campaign_uid ON campaign_history(campaign_uid);
 CREATE INDEX idx_campaign_history_timestamp ON campaign_history(timestamp);
-CREATE INDEX idx_campaign_history_campaign_timestamp ON campaign_history(campaign_id, timestamp);
+CREATE INDEX idx_campaign_history_campaign_timestamp ON campaign_history(campaign_uid, timestamp);
 
 -- Enable real-time for the table
 ALTER PUBLICATION supabase_realtime ADD TABLE campaign_history;

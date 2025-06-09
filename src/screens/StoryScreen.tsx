@@ -14,14 +14,14 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Send, Chrome as Home, User as User2, X, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Send, Home, User as User2, X, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
-import { 
-  campaignHistoryAtom, 
-  fetchCampaignHistoryAtom, 
+import {
+  campaignHistoryAtom,
+  fetchCampaignHistoryAtom,
   initializeCampaignHistoryRealtimeAtom,
   clearCampaignHistoryAtom
 } from '../atoms/campaignHistoryAtoms';
@@ -60,16 +60,16 @@ export default function StoryScreen() {
     clearCampaignHistory();
 
     // Initial fetch of campaign history
-    fetchCampaignHistory(currentCampaign.id);
+    fetchCampaignHistory(currentCampaign.uid);
 
     // Initialize real-time subscription
-    initializeRealtimeSubscription(currentCampaign.id).then(unsubscribe => {
+    initializeRealtimeSubscription(currentCampaign.uid).then(unsubscribe => {
       realtimeUnsubscribeRef.current = unsubscribe;
     });
 
     // Set up polling as backup (every 5 seconds)
     pollingIntervalRef.current = setInterval(() => {
-      fetchCampaignHistory(currentCampaign.id);
+      fetchCampaignHistory(currentCampaign.uid);
     }, 5000);
 
     // Cleanup function
@@ -258,7 +258,7 @@ export default function StoryScreen() {
               disabled={!userInput.trim() || storyState.isLoading}
             >
               {storyState.isLoading ? (
-                <ActivityIndicator size="small\" color="#666" />
+                <ActivityIndicator size="small" color="#666" />
               ) : (
                 <Send size={24} color={userInput.trim() ? '#fff' : '#666'} />
               )}
