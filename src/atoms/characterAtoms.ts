@@ -273,7 +273,7 @@ export const resetCharacterCreationAtom = atom(
       charisma: 10,
     });
     set(selectedSkillsAtom, []);
-    set(selectedSpells, []);
+    set(selectedSpellsAtom, []);
     set(characterEquipmentAtom, {
       weapons: [],
       armor: [],
