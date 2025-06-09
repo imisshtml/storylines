@@ -554,7 +554,7 @@ export default function CreationScreen() {
             <Text style={styles.stepTitle}>Choose Skills</Text>
             <View style={styles.skillsHeader}>
               <Text style={styles.stepDescription}>
-                Select {maxChoices} skill{maxChoices !== 1 ? 's' : ''} from your class proficiencies
+                Select {maxChoices} skill{maxChoices !== 1 ? 's' : ''} for your proficiencies
               </Text>
               <View style={styles.skillCounter}>
                 <Text style={styles.skillCounterText}>
