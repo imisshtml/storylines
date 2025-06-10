@@ -1,47 +1,52 @@
-import { NextRequest } from 'next/server';
+import OpenAI from 'openai';
 
-// Simple in-memory store for development (replace with proper database in production)
-const conversations = new Map();
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    console.log('Story API: Received request');
-    
-    const body = await request.json();
-    console.log('Story API: Request body:', JSON.stringify(body, null, 2));
-    
-    const { campaignId, message, context, playerAction } = body;
+    const { campaignId, message, context, playerAction } = await request.json();
 
     if (!campaignId || !message) {
-      console.log('Story API: Missing required fields');
       return new Response('Missing required fields', {
         status: 400,
         headers: { 'Content-Type': 'text/plain' },
       });
     }
 
-    console.log('Story API: Building system prompt');
-    
     // Build the system prompt based on campaign context
     const systemPrompt = buildSystemPrompt(context);
-    console.log('Story API: System prompt built, length:', systemPrompt.length);
 
-    // For now, we'll return a mock response since OpenAI integration requires API keys
-    // In production, you would use OpenAI here
-    console.log('Story API: Generating mock response');
-    
-    const mockResponse = generateMockDMResponse(playerAction || message, context);
-    console.log('Story API: Mock response generated:', mockResponse);
+    // Create the conversation with OpenAI
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: message }
+      ],
+      max_tokens: 600,
+      temperature: 0.8,
+    });
+
+    const response = completion.choices[0]?.message?.content;
+
+    if (!response) {
+      throw new Error('No response from OpenAI');
+    }
+
+    // Parse the response to extract story and choices
+    const parsedResponse = parseStoryResponse(response);
 
     return Response.json({
-      response: mockResponse.story,
-      choices: mockResponse.choices,
+      response: parsedResponse.story,
+      choices: parsedResponse.choices,
       campaignId,
       timestamp: new Date().toISOString(),
     });
 
   } catch (error) {
-    console.error('Story API: Error occurred:', error);
+    console.error('OpenAI API error:', error);
     return new Response('Internal server error', {
       status: 500,
       headers: { 'Content-Type': 'text/plain' },
@@ -49,63 +54,30 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function generateMockDMResponse(playerAction: string, context: any) {
-  console.log('Generating mock response for action:', playerAction);
+function parseStoryResponse(response: string) {
+  // Look for choices section in the response
+  const choicesMatch = response.match(/\[CHOICES\](.*?)\[\/CHOICES\]/s);
   
-  const campaign = context?.campaign;
-  const storyHistory = context?.storyHistory || [];
-  
-  // Generate contextual story response based on player action
-  let story = '';
-  let choices = [];
-  
-  if (playerAction.toLowerCase().includes('forest') || playerAction.toLowerCase().includes('explore')) {
-    story = `As you venture deeper into the ancient forest, the canopy above grows thicker, filtering the sunlight into dancing patterns on the forest floor. The air is filled with the scent of moss and old wood. Suddenly, you hear the snap of a twig behind you. You turn to see a pair of glowing eyes watching you from the shadows between the trees.`;
-    choices = [
-      'Approach the glowing eyes cautiously',
-      'Call out to whatever is watching you',
-      'Ready your weapon and prepare for combat',
-      'Slowly back away while keeping eye contact'
-    ];
-  } else if (playerAction.toLowerCase().includes('camp') || playerAction.toLowerCase().includes('rest')) {
-    story = `You find a small clearing surrounded by tall oak trees, their branches forming a natural shelter overhead. As you set up camp, you notice strange markings carved into the bark of the nearest tree - symbols that seem to pulse with a faint, otherworldly light. The fire crackles to life, casting long shadows that seem to move independently of the flames.`;
-    choices = [
-      'Investigate the strange markings on the tree',
-      'Keep watch through the night',
-      'Try to decipher the meaning of the symbols',
-      'Move to a different camping spot'
-    ];
-  } else if (playerAction.toLowerCase().includes('listen') || playerAction.toLowerCase().includes('sound')) {
-    story = `You stand perfectly still, straining your ears to catch any sound in the wilderness. At first, there's only the gentle rustle of leaves and distant bird calls. But then you hear it - a low, melodic humming that seems to come from everywhere and nowhere at once. The melody is hauntingly beautiful, yet fills you with an inexplicable sense of unease.`;
-    choices = [
-      'Follow the source of the humming',
-      'Cover your ears and move away quickly',
-      'Try to hum along with the melody',
-      'Search for the origin of the sound'
-    ];
-  } else if (playerAction.toLowerCase().includes('civilization') || playerAction.toLowerCase().includes('search')) {
-    story = `Your search leads you to what appears to be an old, overgrown path winding through the forest. Moss-covered stones mark what might have once been a road, and you can make out the remnants of ancient waymarkers. In the distance, you spot the crumbling remains of what looks like a watchtower, its stones blackened as if by some great fire long ago.`;
-    choices = [
-      'Follow the old path toward the watchtower',
-      'Examine the waymarkers more closely',
-      'Search the area for other signs of civilization',
-      'Mark this location and continue exploring elsewhere'
-    ];
-  } else {
-    // Generic response for other actions
-    story = `Your action has consequences that ripple through the fabric of this mystical realm. The very air around you seems to shimmer with possibility as new paths reveal themselves. The ${campaign?.name || 'adventure'} continues to unfold in unexpected ways, and you sense that your choices here will shape the destiny of all who follow.`;
-    choices = [
-      'Press forward with determination',
-      'Take a moment to assess the situation',
-      'Look for alternative approaches',
-      'Seek guidance from your companions'
-    ];
+  if (choicesMatch) {
+    // Extract story (everything before [CHOICES])
+    const story = response.split('[CHOICES]')[0].trim();
+    
+    // Extract and parse choices
+    const choicesText = choicesMatch[1].trim();
+    const choices = choicesText
+      .split('\n')
+      .map(line => line.replace(/^\d+\.\s*/, '').trim())
+      .filter(choice => choice.length > 0)
+      .slice(0, 4); // Limit to 4 choices max
+    
+    return { story, choices };
   }
   
-  console.log('Generated story length:', story.length);
-  console.log('Generated choices count:', choices.length);
-  
-  return { story, choices };
+  // If no choices section found, return the full response as story with empty choices
+  return { 
+    story: response.trim(), 
+    choices: [] 
+  };
 }
 
 function buildSystemPrompt(context: any) {
@@ -114,7 +86,7 @@ function buildSystemPrompt(context: any) {
   let prompt = `You are an expert Dungeon Master for a D&D 5e fantasy tabletop RPG campaign called "${campaign?.name || 'Adventure'}".
 
 CAMPAIGN DETAILS:
-- Theme: ${campaign?.adventure || 'fantasy'}
+- Theme: ${campaign?.theme || 'fantasy'}
 - Tone: ${campaign?.tone || 'serious'}
 - Starting Level: ${campaign?.level || 1}
 - Content Restrictions: Avoid ${campaign?.exclude?.join(', ') || 'none specified'}
@@ -152,7 +124,7 @@ STORY CONTEXT:`;
   if (storyHistory.length > 0) {
     prompt += '\nPREVIOUS EVENTS:\n';
     storyHistory.slice(-5).forEach((event: any, index: number) => {
-      prompt += `${index + 1}. ${event.message || event.content}\n`;
+      prompt += `${index + 1}. ${event.content}\n`;
     });
   }
 
