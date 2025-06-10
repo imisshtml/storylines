@@ -69,22 +69,25 @@ export default function HomeScreen() {
   };
 
   const getCharacterAvatar = (character: Character) => {
-    // Try to get avatar from character_data, fallback to a default fantasy portrait
-    const avatar = character.character_data?.avatar;
-    if (avatar) {
-      return avatar;
+    // Try to get avatar from character_data
+    const avatarUrl = character.character_data?.avatar || character?.avatar;
+    
+    if (avatarUrl && typeof avatarUrl === 'string') {
+      // Check if it's a default avatar reference
+      if (avatarUrl.startsWith('default:')) {
+        const { getAvatarById } = require('../data/defaultAvatars');
+        const avatarId = avatarUrl.replace('default:', '');
+        const defaultAvatar = getAvatarById(avatarId);
+        return defaultAvatar ? defaultAvatar.imagePath : require('../data/defaultAvatars').DEFAULT_AVATARS[0].imagePath;
+      }
+      
+      // Return URL as-is for uploaded images
+      return { uri: avatarUrl };
     }
     
-    // Use different default avatars based on class
-    const classAvatars: { [key: string]: string } = {
-      'Fighter': 'https://images.pexels.com/photos/1040881/pexels-photo-1040881.jpeg?auto=compress&cs=tinysrgb&w=400',
-      'Wizard': 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400',
-      'Rogue': 'https://images.pexels.com/photos/1212984/pexels-photo-1212984.jpeg?auto=compress&cs=tinysrgb&w=400',
-      'Cleric': 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-      'Ranger': 'https://images.pexels.com/photos/1300402/pexels-photo-1300402.jpeg?auto=compress&cs=tinysrgb&w=400',
-    };
-    
-    return classAvatars[character.class] || classAvatars['Fighter'];
+    // Fallback to first default avatar
+    const { DEFAULT_AVATARS } = require('../data/defaultAvatars');
+    return DEFAULT_AVATARS[0].imagePath;
   };
 
   const getCharacterCampaignName = (character: Character) => {
@@ -246,7 +249,7 @@ export default function HomeScreen() {
                   >
                     <View style={styles.characterAvatarContainer}>
                       <Image
-                        source={{ uri: getCharacterAvatar(character) }}
+                        source={getCharacterAvatar(character)}
                         style={styles.characterAvatar}
                       />
                       <View style={styles.characterLevelBadge}>
