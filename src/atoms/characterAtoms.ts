@@ -141,6 +141,22 @@ export type Class = {
   };
 };
 
+// D&D 5e Starting Wealth by Class (in gold pieces)
+export const STARTING_WEALTH_BY_CLASS: { [key: string]: { dice: string; multiplier: number; average: number } } = {
+  'Barbarian': { dice: '2d4', multiplier: 10, average: 50 },
+  'Bard': { dice: '5d4', multiplier: 10, average: 125 },
+  'Cleric': { dice: '5d4', multiplier: 10, average: 125 },
+  'Druid': { dice: '2d4', multiplier: 10, average: 50 },
+  'Fighter': { dice: '5d4', multiplier: 10, average: 125 },
+  'Monk': { dice: '5d4', multiplier: 1, average: 12.5 },
+  'Paladin': { dice: '5d4', multiplier: 10, average: 125 },
+  'Ranger': { dice: '5d4', multiplier: 10, average: 125 },
+  'Rogue': { dice: '4d4', multiplier: 10, average: 100 },
+  'Sorcerer': { dice: '3d4', multiplier: 10, average: 75 },
+  'Warlock': { dice: '4d4', multiplier: 10, average: 100 },
+  'Wizard': { dice: '4d4', multiplier: 10, average: 100 },
+};
+
 // Character creation state atoms
 export const characterCreationStepAtom = atom(0);
 export const characterNameAtom = atom('');
@@ -164,9 +180,12 @@ export const characterEquipmentAtom = atom<DnDEquipment>({
 });
 
 // Currency atoms for character creation
-export const characterGoldAtom = atom(50); // Starting gold
+export const characterGoldAtom = atom(0); // Will be set based on class
 export const characterSilverAtom = atom(0);
 export const characterCopperAtom = atom(0);
+
+// Starting wealth method atom
+export const startingWealthMethodAtom = atom<'equipment' | 'gold'>('equipment');
 
 // Purchased equipment atom
 export const purchasedEquipmentAtom = atom<Equipment[]>([]);
@@ -201,6 +220,54 @@ const fetchWithRetry = async (url: string, retries = 3, delay = 1000) => {
 
 // Helper function to delay execution
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Function to roll dice (simple implementation)
+const rollDice = (diceString: string): number => {
+  const [count, sides] = diceString.split('d').map(Number);
+  let total = 0;
+  for (let i = 0; i < count; i++) {
+    total += Math.floor(Math.random() * sides) + 1;
+  }
+  return total;
+};
+
+// Function to calculate starting gold for a class
+export const calculateStartingGold = (className: string, method: 'average' | 'roll' = 'average'): number => {
+  const wealthData = STARTING_WEALTH_BY_CLASS[className];
+  if (!wealthData) {
+    return 50; // Default fallback
+  }
+
+  if (method === 'roll') {
+    const roll = rollDice(wealthData.dice);
+    return roll * wealthData.multiplier;
+  } else {
+    return wealthData.average;
+  }
+};
+
+// Atom to set starting wealth based on selected class
+export const setStartingWealthAtom = atom(
+  null,
+  (get, set, method: 'average' | 'roll' = 'average') => {
+    const selectedClass = get(selectedClassAtom);
+    const startingWealthMethod = get(startingWealthMethodAtom);
+    
+    if (selectedClass && startingWealthMethod === 'gold') {
+      const startingGold = calculateStartingGold(selectedClass.name, method);
+      const currency = convertFromCopper(startingGold * 100); // Convert gold to copper then back for proper distribution
+      
+      set(characterGoldAtom, currency.gold);
+      set(characterSilverAtom, currency.silver);
+      set(characterCopperAtom, currency.copper);
+    } else {
+      // Equipment method - give modest starting gold for additional purchases
+      set(characterGoldAtom, 15);
+      set(characterSilverAtom, 0);
+      set(characterCopperAtom, 0);
+    }
+  }
+);
 
 // Fetch races from D&D API
 export const fetchRacesAtom = atom(
@@ -395,10 +462,11 @@ export const resetCharacterCreationAtom = atom(
       tools: [],
       other: [],
     });
-    set(characterGoldAtom, 50);
+    set(characterGoldAtom, 0);
     set(characterSilverAtom, 0);
     set(characterCopperAtom, 0);
     set(purchasedEquipmentAtom, []);
+    set(startingWealthMethodAtom, 'equipment');
   }
 );
 
