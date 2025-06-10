@@ -21,6 +21,7 @@ import {
   type Character,
   type DnDSpell,
 } from '../atoms/characterAtoms';
+import { campaignsAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import { supabase } from '../config/supabase';
 
@@ -31,6 +32,7 @@ interface CharacterViewScreenProps {
 export default function CharacterViewScreen() {
   const [user] = useAtom(userAtom);
   const [characters] = useAtom(charactersAtom);
+  const [campaigns] = useAtom(campaignsAtom);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
   const [character, setCharacter] = useState<Character | null>(null);
   const [isEditingAvatar, setIsEditingAvatar] = useState(false);
@@ -230,8 +232,12 @@ export default function CharacterViewScreen() {
   };
 
   const getCampaignName = () => {
-    // For now, return a placeholder since we don't have campaign assignment implemented
-    return character?.campaign_id ? 'Adventure Campaign' : 'No Campaign Set';
+    if (character?.campaign_id) {
+      // Find the campaign by campaign_id (which should match campaign.uid)
+      const campaign = campaigns.find(c => c.uid === character.campaign_id);
+      return campaign ? campaign.name : 'Unknown Campaign';
+    }
+    return 'No Campaign Set';
   };
 
   const hasSpellcasting = () => {

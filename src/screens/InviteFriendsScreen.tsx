@@ -386,7 +386,11 @@ export default function InviteFriendsScreen() {
                   
                   <View style={styles.characterInfo}>
                     {playerCharacter ? (
-                      <View style={styles.selectedCharacterContainer}>
+                      <TouchableOpacity
+                        style={styles.selectedCharacterContainer}
+                        onPress={() => canSelectCharacter ? setShowCharacterSelector(player.id) : undefined}
+                        disabled={!canSelectCharacter}
+                      >
                         <Image 
                           source={{ uri: getCharacterAvatar(playerCharacter) }} 
                           style={styles.characterAvatar}
@@ -399,7 +403,10 @@ export default function InviteFriendsScreen() {
                             Lv{playerCharacter.level} {playerCharacter.race} {playerCharacter.class}
                           </Text>
                         </View>
-                      </View>
+                        {canSelectCharacter && (
+                          <ChevronDown size={16} color="#4CAF50" style={styles.chevronIcon} />
+                        )}
+                      </TouchableOpacity>
                     ) : canSelectCharacter ? (
                       <TouchableOpacity
                         style={styles.selectCharacterButton}
@@ -704,6 +711,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter-Regular',
     marginTop: 2,
+  },
+  chevronIcon: {
+    marginLeft: 8,
   },
   selectCharacterButton: {
     flexDirection: 'row',
