@@ -35,6 +35,39 @@ export type DnDEquipment = {
   other: any[];
 };
 
+export type Equipment = {
+  id: string;
+  index: string;
+  name: string;
+  equipment_category: string;
+  weight: number;
+  cost_quantity: number;
+  cost_unit: string;
+  description: string[];
+  special: string[];
+  contents: any[];
+  properties: any[];
+  armor_category?: string;
+  armor_class_base?: number;
+  armor_class_dex_bonus?: boolean;
+  str_minimum?: number;
+  stealth_disadvantage?: boolean;
+  weapon_category?: string;
+  weapon_range?: string;
+  category_range?: string;
+  damage_dice?: string;
+  damage_type?: string;
+  range_normal?: number;
+  range_long?: number;
+  throw_range_normal?: number;
+  throw_range_long?: number;
+  gear_category?: string;
+  quantity?: number;
+  enabled: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type Character = {
   id: string;
   user_id: string;
@@ -49,6 +82,14 @@ export type Character = {
   spells: DnDSpell[];
   equipment: DnDEquipment;
   character_data: any;
+  current_hitpoints: number;
+  max_hitpoints: number;
+  temp_hitpoints: number;
+  armor_class: number;
+  conditions: any[];
+  gold: number;
+  silver: number;
+  copper: number;
   created_at?: string;
   updated_at?: string;
 };
@@ -100,6 +141,22 @@ export type Class = {
   };
 };
 
+// D&D 5e Starting Wealth by Class (max roll in gold pieces)
+export const STARTING_WEALTH_BY_CLASS: { [key: string]: { dice: string; multiplier: number; maxRoll: number } } = {
+  'Barbarian': { dice: '2d4', multiplier: 10, maxRoll: 80 },
+  'Bard': { dice: '5d4', multiplier: 10, maxRoll: 200 },
+  'Cleric': { dice: '5d4', multiplier: 10, maxRoll: 200 },
+  'Druid': { dice: '2d4', multiplier: 10, maxRoll: 80 },
+  'Fighter': { dice: '5d4', multiplier: 10, maxRoll: 200 },
+  'Monk': { dice: '5d4', multiplier: 1, maxRoll: 20 },
+  'Paladin': { dice: '5d4', multiplier: 10, maxRoll: 200 },
+  'Ranger': { dice: '5d4', multiplier: 10, maxRoll: 200 },
+  'Rogue': { dice: '4d4', multiplier: 10, maxRoll: 160 },
+  'Sorcerer': { dice: '3d4', multiplier: 10, maxRoll: 120 },
+  'Warlock': { dice: '4d4', multiplier: 10, maxRoll: 160 },
+  'Wizard': { dice: '4d4', multiplier: 10, maxRoll: 160 },
+};
+
 // Character creation state atoms
 export const characterCreationStepAtom = atom(0);
 export const characterNameAtom = atom('');
@@ -122,10 +179,19 @@ export const characterEquipmentAtom = atom<DnDEquipment>({
   other: [],
 });
 
+// Currency atoms for character creation
+export const characterGoldAtom = atom(0);
+export const characterSilverAtom = atom(0);
+export const characterCopperAtom = atom(0);
+
+// Purchased equipment atom
+export const purchasedEquipmentAtom = atom<Equipment[]>([]);
+
 // API data atoms
 export const racesAtom = atom<Race[]>([]);
 export const classesAtom = atom<Class[]>([]);
 export const spellsAtom = atom<DnDSpell[]>([]);
+export const equipmentAtom = atom<Equipment[]>([]);
 
 // Characters storage
 export const charactersAtom = atom<Character[]>([]);
@@ -151,6 +217,30 @@ const fetchWithRetry = async (url: string, retries = 3, delay = 1000) => {
 
 // Helper function to delay execution
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Function to get starting gold for a class (max roll)
+export const getStartingGold = (className: string): number => {
+  const wealthData = STARTING_WEALTH_BY_CLASS[className];
+  if (!wealthData) {
+    return 50; // Default fallback
+  }
+  return wealthData.maxRoll;
+};
+
+// Atom to set starting wealth based on selected class
+export const setStartingWealthAtom = atom(
+  null,
+  (get, set) => {
+    const selectedClass = get(selectedClassAtom);
+    
+    if (selectedClass) {
+      const startingGold = getStartingGold(selectedClass.name);
+      set(characterGoldAtom, startingGold);
+      set(characterSilverAtom, 0);
+      set(characterCopperAtom, 0);
+    }
+  }
+);
 
 // Fetch races from D&D API
 export const fetchRacesAtom = atom(
@@ -238,6 +328,30 @@ export const fetchSpellsAtom = atom(
   }
 );
 
+// Fetch equipment from Supabase
+export const fetchEquipmentAtom = atom(
+  null,
+  async (get, set) => {
+    try {
+      const { data: equipment, error } = await supabase
+        .from('equipment')
+        .select('*')
+        .eq('enabled', true)
+        .order('equipment_category')
+        .order('name');
+
+      if (error) {
+        throw error;
+      }
+
+      set(equipmentAtom, equipment || []);
+    } catch (error) {
+      console.error('Error fetching equipment:', error);
+      set(equipmentAtom, []); // Set empty array on error
+    }
+  }
+);
+
 // Save character to Supabase
 export const saveCharacterAtom = atom(
   null,
@@ -276,9 +390,13 @@ export const fetchCharactersAtom = atom(
       set(charactersLoadingAtom, true);
       set(charactersErrorAtom, null);
 
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
       const { data, error } = await supabase
         .from('characters')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -286,6 +404,7 @@ export const fetchCharactersAtom = atom(
       set(charactersAtom, data || []);
     } catch (error) {
       set(charactersErrorAtom, (error as Error).message);
+      console.error('Error fetching characters:', error);
     } finally {
       set(charactersLoadingAtom, false);
     }
@@ -316,5 +435,102 @@ export const resetCharacterCreationAtom = atom(
       tools: [],
       other: [],
     });
+    set(characterGoldAtom, 0);
+    set(characterSilverAtom, 0);
+    set(characterCopperAtom, 0);
+    set(purchasedEquipmentAtom, []);
+  }
+);
+
+// Helper functions for currency conversion
+export const convertToCopper = (gold: number, silver: number, copper: number): number => {
+  return (gold * 100) + (silver * 10) + copper;
+};
+
+export const convertFromCopper = (totalCopper: number): { gold: number; silver: number; copper: number } => {
+  const gold = Math.floor(totalCopper / 100);
+  const remaining = totalCopper % 100;
+  const silver = Math.floor(remaining / 10);
+  const copper = remaining % 10;
+  
+  return { gold, silver, copper };
+};
+
+// Calculate equipment cost in copper based on cost_quantity and cost_unit
+export const getEquipmentCostInCopper = (equipment: Equipment): number => {
+  const { cost_quantity, cost_unit } = equipment;
+  
+  switch (cost_unit) {
+    case 'cp':
+      return cost_quantity;
+    case 'sp':
+      return cost_quantity * 10;
+    case 'gp':
+      return cost_quantity * 100;
+    case 'pp':
+      return cost_quantity * 1000;
+    default:
+      return cost_quantity * 100; // Default to gold
+  }
+};
+
+// Check if player can afford equipment
+export const canAffordEquipment = (equipment: Equipment, gold: number, silver: number, copper: number): boolean => {
+  const totalPlayerCopper = convertToCopper(gold, silver, copper);
+  const equipmentCost = getEquipmentCostInCopper(equipment);
+  return totalPlayerCopper >= equipmentCost;
+};
+
+// Purchase equipment atom
+export const purchaseEquipmentAtom = atom(
+  null,
+  (get, set, equipment: Equipment) => {
+    const currentGold = get(characterGoldAtom);
+    const currentSilver = get(characterSilverAtom);
+    const currentCopper = get(characterCopperAtom);
+    const purchasedEquipment = get(purchasedEquipmentAtom);
+
+    if (!canAffordEquipment(equipment, currentGold, currentSilver, currentCopper)) {
+      throw new Error('Cannot afford this equipment');
+    }
+
+    // Calculate new currency amounts
+    const totalPlayerCopper = convertToCopper(currentGold, currentSilver, currentCopper);
+    const equipmentCost = getEquipmentCostInCopper(equipment);
+    const remainingCopper = totalPlayerCopper - equipmentCost;
+    const newCurrency = convertFromCopper(remainingCopper);
+
+    // Update currency
+    set(characterGoldAtom, newCurrency.gold);
+    set(characterSilverAtom, newCurrency.silver);
+    set(characterCopperAtom, newCurrency.copper);
+
+    // Add equipment to purchased list
+    set(purchasedEquipmentAtom, [...purchasedEquipment, equipment]);
+  }
+);
+
+// Remove equipment atom
+export const removeEquipmentAtom = atom(
+  null,
+  (get, set, equipment: Equipment) => {
+    const currentGold = get(characterGoldAtom);
+    const currentSilver = get(characterSilverAtom);
+    const currentCopper = get(characterCopperAtom);
+    const purchasedEquipment = get(purchasedEquipmentAtom);
+
+    // Calculate refund (full price back)
+    const totalPlayerCopper = convertToCopper(currentGold, currentSilver, currentCopper);
+    const equipmentCost = getEquipmentCostInCopper(equipment);
+    const newTotalCopper = totalPlayerCopper + equipmentCost;
+    const newCurrency = convertFromCopper(newTotalCopper);
+
+    // Update currency
+    set(characterGoldAtom, newCurrency.gold);
+    set(characterSilverAtom, newCurrency.silver);
+    set(characterCopperAtom, newCurrency.copper);
+
+    // Remove equipment from purchased list
+    set(purchasedEquipmentAtom, purchasedEquipment.filter(item => item.id !== equipment.id));
   }
 );
