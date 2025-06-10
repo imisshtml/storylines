@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator, TextInput, SafeAreaView, Modal, Image } from 'react-native';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
@@ -18,6 +18,7 @@ export default function InviteFriendsScreen() {
   const [, upsertCampaign] = useAtom(upsertCampaignAtom);
   const [user] = useAtom(userAtom);
   const [characters] = useAtom(charactersAtom);
+  const [campaignCharacters, setCampaignCharacters] = useState<Character[]>([]);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
   const [copied, setCopied] = useState(false);
   const [phoneNumbers, setPhoneNumbers] = useState('');
@@ -31,12 +32,80 @@ export default function InviteFriendsScreen() {
     checkSmsAvailability();
     if (user) {
       fetchCharacters();
+      fetchCampaignCharacters();
     }
   }, [currentCampaign, user, fetchCharacters]);
+
+  // Set up real-time subscription for campaign and character updates
+  useEffect(() => {
+    if (!currentCampaign || !user) return;
+
+    const subscription = supabase
+      .channel(`campaign-${currentCampaign.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'campaigns',
+          filter: `id=eq.${currentCampaign.id}`,
+        },
+        (payload) => {
+          if (payload.new) {
+            setCurrentCampaign(payload.new as any);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'characters',
+        },
+        (payload) => {
+          const newCharacter = payload.new as any;
+          const oldCharacter = payload.old as any;
+
+          if (
+            (newCharacter && newCharacter.campaign_id === currentCampaign.uid) ||
+            (oldCharacter && oldCharacter.campaign_id === currentCampaign.uid)
+          ) {
+            fetchCharacters();
+            fetchCampaignCharacters();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [currentCampaign?.id, currentCampaign?.uid, user?.id, fetchCharacters, setCurrentCampaign]);
 
   const checkSmsAvailability = async () => {
     const isAvailable = await SMS.isAvailableAsync();
     setSmsAvailable(isAvailable);
+  };
+
+  const fetchCampaignCharacters = async () => {
+    if (!currentCampaign) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('characters')
+        .select('*')
+        .eq('campaign_id', currentCampaign.uid);
+
+      if (error) {
+        console.error('Error fetching campaign characters:', error);
+        return;
+      }
+
+      setCampaignCharacters(data || []);
+    } catch (error) {
+      console.error('Error fetching campaign characters:', error);
+    }
   };
 
   const handleBack = () => {
@@ -85,7 +154,7 @@ export default function InviteFriendsScreen() {
         numbers,
         `Join me on Storylines! Use my invite code ${currentCampaign.invite_code} and download the app here: https://linkTBD`
       );
-      
+
       if (result === 'sent') {
         setPhoneNumbers('');
       }
@@ -94,22 +163,20 @@ export default function InviteFriendsScreen() {
     }
   };
 
-  const getPlayerCharacter = (playerId: string): Character | null => {
-    // Find character assigned to this campaign for this player
-    return characters.find(char => 
-      char.campaign_id === currentCampaign?.uid && 
+  const getPlayerCharacter = useCallback((playerId: string): Character | null => {
+    return campaignCharacters.find(char =>
       char.user_id === playerId
     ) || null;
-  };
+  }, [campaignCharacters]);
 
   const getAvailableCharacters = (playerId: string): Character[] => {
     if (!user) return [];
-    
+
     // Only show user's own characters if they are the player
     if (playerId !== user.id) return [];
-    
+
     // Filter characters that are not assigned to any campaign or assigned to this campaign
-    return characters.filter(char => 
+    return characters.filter(char =>
       char.user_id === user.id && (!char.campaign_id || char.campaign_id === currentCampaign?.uid)
     );
   };
@@ -126,26 +193,12 @@ export default function InviteFriendsScreen() {
     }
 
     try {
-      // Use the authenticated user's ID instead of the player ID from campaign data
       const userId = user.id;
-      console.log('Debug - IDs:', {
-        playerId,
-        userId,
-        characterId,
-        campaignId: currentCampaign.uid
-      });
 
       // First, remove any existing character assignment for this player in this campaign
       const existingCharacter = getPlayerCharacter(userId);
-      console.log('Debug - Existing character:', existingCharacter);
 
       if (existingCharacter) {
-        console.log('Debug - Removing character:', {
-          characterId: existingCharacter.id,
-          userId,
-          campaignId: currentCampaign.uid
-        });
-
         const { error: removeError } = await supabase
           .from('characters')
           .update({ campaign_id: null })
@@ -161,30 +214,15 @@ export default function InviteFriendsScreen() {
       let selectedCharacter: Character | null = null;
 
       if (characterId) {
-        // Log available characters for debugging
-        console.log('Debug - Available characters:', characters.map(c => ({
-          id: c.id,
-          userId: c.user_id,
-          name: c.name
-        })));
-
         // Validate that the character exists and belongs to the user
-        const characterToAssign = characters.find(char => 
+        const characterToAssign = characters.find(char =>
           char.id === characterId && char.user_id === userId
         );
-
-        console.log('Debug - Character to assign:', characterToAssign);
 
         if (!characterToAssign) {
           console.error('Character not found or does not belong to user');
           throw new Error('Character not found or access denied');
         }
-
-        console.log('Debug - Assigning character:', {
-          characterId: characterToAssign.id,
-          userId,
-          campaignId: currentCampaign.uid
-        });
 
         // Assign new character to campaign
         const { error: assignError } = await supabase
@@ -201,22 +239,9 @@ export default function InviteFriendsScreen() {
         selectedCharacter = characterToAssign;
       }
 
-      // Log current campaign players before update
-      console.log('Debug - Current campaign players:', currentCampaign.players);
-
       // Update the campaign's players array with character information
       const updatedPlayers = currentCampaign.players.map(player => {
         if (player.id === playerId) {
-          console.log('Debug - Updating player:', {
-            playerId: player.id,
-            characterInfo: selectedCharacter ? {
-              id: selectedCharacter.id,
-              name: selectedCharacter.name,
-              class: selectedCharacter.class,
-              race: selectedCharacter.race,
-              level: selectedCharacter.level,
-            } : null
-          });
           return {
             ...player,
             character: selectedCharacter ? {
@@ -230,8 +255,6 @@ export default function InviteFriendsScreen() {
         }
         return player;
       });
-
-      console.log('Debug - Updated players:', updatedPlayers);
 
       // Update the campaign in the database
       const { error: campaignError } = await supabase
@@ -252,24 +275,22 @@ export default function InviteFriendsScreen() {
 
       // Refresh characters
       await fetchCharacters();
+      await fetchCampaignCharacters();
       setShowCharacterSelector(null);
-
-      console.log('Character assignment completed successfully');
     } catch (error) {
       console.error('Error updating character assignment:', error);
-      // You might want to show an alert to the user here
     }
   };
 
   // Check if all players have characters assigned
-  const allPlayersHaveCharacters = () => {
+  const allPlayersHaveCharacters = useMemo(() => {
     if (!currentCampaign || currentCampaign.players.length === 0) return false;
-    
+
     return currentCampaign.players.every(player => {
       const playerCharacter = getPlayerCharacter(player.id);
       return playerCharacter !== null;
     });
-  };
+  }, [currentCampaign, getPlayerCharacter]);
 
   if (isLoading) {
     return (
@@ -296,7 +317,7 @@ export default function InviteFriendsScreen() {
         </View>
         <Text style={styles.title}>{currentCampaign.name}</Text>
       </View>
-      
+
       {error && (
         <View style={styles.errorContainer}>
           <AlertCircle color="#f44336" size={20} />
@@ -357,7 +378,7 @@ export default function InviteFriendsScreen() {
             const playerCharacter = getPlayerCharacter(player.id);
             const availableCharacters = getAvailableCharacters(player.id);
             const canSelectCharacter = player.id === user?.id && availableCharacters.length > 0;
-            
+
             return (
               <View key={player.id} style={styles.playerItem}>
                 <View style={styles.playerRow}>
@@ -368,7 +389,7 @@ export default function InviteFriendsScreen() {
                       <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
                     )}
                   </View>
-                  
+
                   <View style={styles.characterInfo}>
                     {playerCharacter ? (
                       <TouchableOpacity
@@ -376,8 +397,8 @@ export default function InviteFriendsScreen() {
                         onPress={() => canSelectCharacter ? setShowCharacterSelector(player.id) : undefined}
                         disabled={!canSelectCharacter}
                       >
-                        <Image 
-                          source={getCharacterAvatarUrl(playerCharacter)} 
+                        <Image
+                          source={getCharacterAvatarUrl(playerCharacter)}
                           style={styles.characterAvatar}
                         />
                         <View style={styles.characterDetails}>
@@ -414,13 +435,13 @@ export default function InviteFriendsScreen() {
       <TouchableOpacity
         style={[
           styles.startButton,
-          !allPlayersHaveCharacters() && styles.startButtonDisabled
+          !allPlayersHaveCharacters && styles.startButtonDisabled
         ]}
         onPress={handleStartCampaign}
-        disabled={!allPlayersHaveCharacters()}
+        disabled={!allPlayersHaveCharacters}
       >
         <Text style={styles.startButtonText}>
-          {!allPlayersHaveCharacters()
+          {!allPlayersHaveCharacters
             ? 'Waiting for Characters...'
             : 'Start Campaign'}
         </Text>
@@ -448,8 +469,8 @@ export default function InviteFriendsScreen() {
                   style={styles.characterOption}
                   onPress={() => handleCharacterSelect(showCharacterSelector, character.id)}
                 >
-                  <Image 
-                    source={getCharacterAvatarUrl(character)} 
+                  <Image
+                    source={getCharacterAvatarUrl(character)}
                     style={styles.modalCharacterAvatar}
                   />
                   <View style={styles.characterOptionInfo}>
