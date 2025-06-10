@@ -3,6 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { DEFAULT_AVATARS, getRandomAvatarSelection, type DefaultAvatar, getAvatarById } from '../data/defaultAvatars';
+import { Character } from '../atoms/characterAtoms';
 
 export type AvatarUploadResult = {
   success: boolean;
@@ -248,26 +249,28 @@ export const pickAndUploadAvatar = async (
 /**
  * Get character avatar URL with fallback
  */
-export const getCharacterAvatarUrl = (character: any): any => {
+export const getCharacterAvatarUrl = (character: Character | null) => {
+  if (!character) return null;
+
   // Try to get avatar from character_data
-  const avatarUrl = character?.character_data?.avatar || character?.avatar;
+  const avatarUrl = character.character_data?.avatar || character?.avatar;
   
   if (avatarUrl && typeof avatarUrl === 'string') {
     // Check if it's a default avatar reference
     if (avatarUrl.startsWith('default:')) {
+      const { getAvatarById } = require('../data/defaultAvatars');
       const avatarId = avatarUrl.replace('default:', '');
       const defaultAvatar = getAvatarById(avatarId);
-      return defaultAvatar ? defaultAvatar.imagePath : getDefaultAvatar();
+      return defaultAvatar ? defaultAvatar.imagePath : require('../data/defaultAvatars').DEFAULT_AVATARS[0].imagePath;
     }
     
     // Return URL as-is for uploaded images
     return { uri: avatarUrl };
   }
   
-  // Fallback to random default
-  const fallbackId = getDefaultAvatar().replace('default:', '');
-  const fallbackAvatar = getAvatarById(fallbackId);
-  return fallbackAvatar ? fallbackAvatar.imagePath : DEFAULT_AVATARS[0].imagePath;
+  // Fallback to first default avatar
+  const { DEFAULT_AVATARS } = require('../data/defaultAvatars');
+  return DEFAULT_AVATARS[0].imagePath;
 };
 
 /**
