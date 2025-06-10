@@ -39,8 +39,9 @@ export default function AvatarSelector({
   const [uploadProgress, setUploadProgress] = useState<string>('');
 
   const handleDefaultAvatarSelect = (avatar: DefaultAvatar) => {
-    // For local images, we need to pass the require() result
-    onAvatarSelect(avatar.imagePath);
+    // Pass the avatar ID instead of the require() result
+    // We'll store the ID and resolve it when displaying
+    onAvatarSelect(`default:${avatar.id}`);
     onClose();
   };
 
@@ -68,14 +69,9 @@ export default function AvatarSelector({
     }
   };
 
-  const isCurrentAvatar = (avatarPath: any) => {
-    // For local images (require() results), we need to compare differently
-    // Since currentAvatar might be a require() result or a URL string
-    if (typeof currentAvatar === 'string' && typeof avatarPath === 'string') {
-      return currentAvatar === avatarPath;
-    }
-    // For require() results, they should be the same object reference
-    return currentAvatar === avatarPath;
+  const isCurrentAvatar = (avatar: DefaultAvatar) => {
+    // Check if current avatar matches this default avatar
+    return currentAvatar === `default:${avatar.id}`;
   };
 
   return (
@@ -104,7 +100,7 @@ export default function AvatarSelector({
             >
               {isUploading ? (
                 <>
-                  <ActivityIndicator size="small\" color="#fff" />
+                  <ActivityIndicator size="small" color="#fff" />
                   <Text style={styles.uploadButtonText}>
                     {uploadProgress || 'Uploading...'}
                   </Text>
@@ -136,13 +132,13 @@ export default function AvatarSelector({
                   key={avatar.id}
                   style={[
                     styles.avatarItem,
-                    isCurrentAvatar(avatar.imagePath) && styles.selectedAvatarItem
+                    isCurrentAvatar(avatar) && styles.selectedAvatarItem
                   ]}
                   onPress={() => handleDefaultAvatarSelect(avatar)}
                 >
                   <View style={styles.avatarImageContainer}>
                     <Image source={avatar.imagePath} style={styles.avatarImage} />
-                    {isCurrentAvatar(avatar.imagePath) && (
+                    {isCurrentAvatar(avatar) && (
                       <View style={styles.selectedOverlay}>
                         <Sparkles size={20} color="#fff" />
                       </View>
