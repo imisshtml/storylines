@@ -97,6 +97,16 @@ export default function HomeScreen() {
     return 'Player';
   };
 
+  // Check if user is currently in any active campaigns
+  const isInActiveCampaign = () => {
+    return campaigns.some(campaign => 
+      campaign.status !== 'creation' && (
+        isOwner(campaign) || 
+        campaign.players.some((player: any) => player.id === user?.id)
+      )
+    );
+  };
+
   return (
     <ImageBackground
       source={require('../../assets/images/storylines_splash.jpg')}
@@ -185,7 +195,32 @@ export default function HomeScreen() {
             ))}
 
             {campaigns.length === 0 && (
-              <Text style={styles.noCampaigns}>No active campaigns</Text>
+              <View style={styles.noCampaignsContainer}>
+                <Text style={styles.noCampaigns}>No active campaigns</Text>
+                <Text style={styles.noCampaignsSubtext}>
+                  Create a new campaign or join an existing one to start your adventure!
+                </Text>
+              </View>
+            )}
+
+            {/* Show campaign action buttons only if user is not in an active campaign */}
+            {!isInActiveCampaign() && (
+              <View style={styles.campaignActionButtons}>
+                <TouchableOpacity
+                  style={styles.createButton}
+                  onPress={() => router.push('/create')}
+                >
+                  <Text style={styles.buttonText}>Create Campaign</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.joinButton}
+                  onPress={handleJoinCampaign}
+                >
+                  <Users size={20} color="#fff" />
+                  <Text style={styles.buttonText}>Join via Code</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
 
@@ -226,6 +261,9 @@ export default function HomeScreen() {
               <View style={styles.noCharactersContainer}>
                 <User size={48} color="#666" />
                 <Text style={styles.noCharacters}>No characters created yet</Text>
+                <Text style={styles.noCharactersSubtext}>
+                  Create your first D&D character to begin your adventures!
+                </Text>
                 <TouchableOpacity
                   style={styles.createCharacterButton}
                   onPress={() => router.push('/creation')}
@@ -236,23 +274,6 @@ export default function HomeScreen() {
             )}
           </View>
         </ScrollView>
-
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={() => router.push('/create')}
-          >
-            <Text style={styles.buttonText}>Create Campaign</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.joinButton}
-            onPress={handleJoinCampaign}
-          >
-            <Users size={20} color="#fff" />
-            <Text style={styles.buttonText}>Join via Code</Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
       <SidebarMenu
@@ -337,14 +358,26 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
+  noCampaignsContainer: {
+    backgroundColor: 'rgba(42, 42, 42, 0.8)',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   noCampaigns: {
     color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
     textAlign: 'center',
-    marginTop: 20,
+    marginBottom: 8,
+  },
+  noCampaignsSubtext: {
+    color: '#888',
+    fontSize: 14,
     fontFamily: 'Inter-Regular',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   campaignCard: {
     backgroundColor: 'rgba(42, 42, 42, 0.8)',
@@ -424,6 +457,9 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
   },
+  campaignActionButtons: {
+    gap: 12,
+  },
   charactersGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -502,11 +538,19 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   noCharacters: {
-    color: '#888',
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
     textAlign: 'center',
     marginTop: 16,
+    marginBottom: 8,
+  },
+  noCharactersSubtext: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+    lineHeight: 20,
     marginBottom: 20,
   },
   createCharacterButton: {
@@ -519,11 +563,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontFamily: 'Inter-Bold',
-  },
-  actionButtons: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    gap: 10,
   },
   createButton: {
     backgroundColor: 'rgba(76, 175, 80, 0.9)',
