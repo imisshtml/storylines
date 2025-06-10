@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 
 export type AvatarUploadResult = {
   success: boolean;
@@ -59,14 +60,12 @@ export const getRandomFantasyPortrait = (): string => {
  */
 const imageToBase64 = async (uri: string): Promise<string> => {
   if (Platform.OS === 'web') {
-    // For web, we need to fetch the image and convert to base64
     const response = await fetch(uri);
     const blob = await response.blob();
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
         const base64 = reader.result as string;
-        // Remove the data:image/jpeg;base64, prefix
         const base64Data = base64.split(',')[1];
         resolve(base64Data);
       };
@@ -74,12 +73,15 @@ const imageToBase64 = async (uri: string): Promise<string> => {
       reader.readAsDataURL(blob);
     });
   } else {
-    // For mobile, use expo-file-system
-    const { FileSystem } = require('expo-file-system');
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    return base64;
+    try {
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      return base64;
+    } catch (error) {
+      console.error('Error reading file:', error);
+      throw error;
+    }
   }
 };
 
@@ -92,11 +94,11 @@ export const uploadAvatar = async (
   characterId?: string
 ): Promise<AvatarUploadResult> => {
   try {
-    // Generate unique filename
+    // Generate unique filename with user ID as folder
     const timestamp = Date.now();
     const fileName = characterId 
-      ? `character_${characterId}_${timestamp}.jpg`
-      : `user_${userId}_${timestamp}.jpg`;
+      ? `${userId}/character_${characterId}_${timestamp}.jpg`
+      : `${userId}/avatar_${timestamp}.jpg`;
     
     // Convert image to base64
     const base64Data = await imageToBase64(imageUri);
@@ -200,22 +202,63 @@ export const pickAndUploadAvatar = async (
 
     onProgress?.('Opening image picker...');
 
-    // Launch image picker
+    // Launch image picker with modified options
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
-      base64: false,
+      base64: true,
     });
 
     if (result.canceled || !result.assets[0]) {
       return { success: false, error: 'Image selection cancelled' };
     }
 
-    onProgress?.('Uploading image...');
+    onProgress?.('Processing image...');
 
-    // Upload the selected image
+    // Use base64 data directly if available
+    if (result.assets[0].base64) {
+      // Create file path with user ID as folder
+      const timestamp = Date.now();
+      const fileName = characterId 
+        ? `${userId}/character_${characterId}_${timestamp}.jpg`
+        : `${userId}/avatar_${timestamp}.jpg`;
+      
+      // Convert base64 to Uint8Array
+      const binaryString = atob(result.assets[0].base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      onProgress?.('Uploading to storage...');
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, bytes, {
+          contentType: 'image/jpeg',
+          upsert: false
+        });
+
+      if (error) {
+        console.error('Upload error:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      return { 
+        success: true, 
+        url: urlData.publicUrl 
+      };
+    }
+
+    // Fallback to URI if base64 is not available
     return await uploadAvatar(result.assets[0].uri, userId, characterId);
 
   } catch (error) {

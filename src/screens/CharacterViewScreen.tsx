@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { ArrowLeft, Camera, Upload, LocationEdit as Edit3, Scroll, X } from 'lucide-react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useAtom } from 'jotai';
 import {
   charactersAtom,
@@ -31,11 +31,8 @@ import {
   deleteAvatar 
 } from '../utils/avatarStorage';
 
-interface CharacterViewScreenProps {
-  characterId: string;
-}
-
 export default function CharacterViewScreen() {
+  const { characterId } = useLocalSearchParams<{ characterId: string }>();
   const [user] = useAtom(userAtom);
   const [characters] = useAtom(charactersAtom);
   const [campaigns] = useAtom(campaignsAtom);
@@ -49,13 +46,15 @@ export default function CharacterViewScreen() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
 
-  // Get character ID from route params (for now, we'll use the first character)
   useEffect(() => {
-    if (characters.length > 0) {
-      setCharacter(characters[0]);
-      setSelectedSpells(characters[0].spells || []);
+    if (characters.length > 0 && characterId) {
+      const selectedCharacter = characters.find(c => c.id === characterId);
+      if (selectedCharacter) {
+        setCharacter(selectedCharacter);
+        setSelectedSpells(selectedCharacter.spells || []);
+      }
     }
-  }, [characters]);
+  }, [characters, characterId]);
 
   useEffect(() => {
     fetchCharacters();
