@@ -141,20 +141,20 @@ export type Class = {
   };
 };
 
-// D&D 5e Starting Wealth by Class (in gold pieces)
-export const STARTING_WEALTH_BY_CLASS: { [key: string]: { dice: string; multiplier: number; average: number } } = {
-  'Barbarian': { dice: '2d4', multiplier: 10, average: 50 },
-  'Bard': { dice: '5d4', multiplier: 10, average: 125 },
-  'Cleric': { dice: '5d4', multiplier: 10, average: 125 },
-  'Druid': { dice: '2d4', multiplier: 10, average: 50 },
-  'Fighter': { dice: '5d4', multiplier: 10, average: 125 },
-  'Monk': { dice: '5d4', multiplier: 1, average: 12.5 },
-  'Paladin': { dice: '5d4', multiplier: 10, average: 125 },
-  'Ranger': { dice: '5d4', multiplier: 10, average: 125 },
-  'Rogue': { dice: '4d4', multiplier: 10, average: 100 },
-  'Sorcerer': { dice: '3d4', multiplier: 10, average: 75 },
-  'Warlock': { dice: '4d4', multiplier: 10, average: 100 },
-  'Wizard': { dice: '4d4', multiplier: 10, average: 100 },
+// D&D 5e Starting Wealth by Class (max roll in gold pieces)
+export const STARTING_WEALTH_BY_CLASS: { [key: string]: { dice: string; multiplier: number; maxRoll: number } } = {
+  'Barbarian': { dice: '2d4', multiplier: 10, maxRoll: 80 },
+  'Bard': { dice: '5d4', multiplier: 10, maxRoll: 200 },
+  'Cleric': { dice: '5d4', multiplier: 10, maxRoll: 200 },
+  'Druid': { dice: '2d4', multiplier: 10, maxRoll: 80 },
+  'Fighter': { dice: '5d4', multiplier: 10, maxRoll: 200 },
+  'Monk': { dice: '5d4', multiplier: 1, maxRoll: 20 },
+  'Paladin': { dice: '5d4', multiplier: 10, maxRoll: 200 },
+  'Ranger': { dice: '5d4', multiplier: 10, maxRoll: 200 },
+  'Rogue': { dice: '4d4', multiplier: 10, maxRoll: 160 },
+  'Sorcerer': { dice: '3d4', multiplier: 10, maxRoll: 120 },
+  'Warlock': { dice: '4d4', multiplier: 10, maxRoll: 160 },
+  'Wizard': { dice: '4d4', multiplier: 10, maxRoll: 160 },
 };
 
 // Character creation state atoms
@@ -180,12 +180,9 @@ export const characterEquipmentAtom = atom<DnDEquipment>({
 });
 
 // Currency atoms for character creation
-export const characterGoldAtom = atom(0); // Will be set based on class
+export const characterGoldAtom = atom(0);
 export const characterSilverAtom = atom(0);
 export const characterCopperAtom = atom(0);
-
-// Starting wealth method atom
-export const startingWealthMethodAtom = atom<'equipment' | 'gold'>('equipment');
 
 // Purchased equipment atom
 export const purchasedEquipmentAtom = atom<Equipment[]>([]);
@@ -221,48 +218,24 @@ const fetchWithRetry = async (url: string, retries = 3, delay = 1000) => {
 // Helper function to delay execution
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Function to roll dice (simple implementation)
-const rollDice = (diceString: string): number => {
-  const [count, sides] = diceString.split('d').map(Number);
-  let total = 0;
-  for (let i = 0; i < count; i++) {
-    total += Math.floor(Math.random() * sides) + 1;
-  }
-  return total;
-};
-
-// Function to calculate starting gold for a class
-export const calculateStartingGold = (className: string, method: 'average' | 'roll' = 'average'): number => {
+// Function to get starting gold for a class (max roll)
+export const getStartingGold = (className: string): number => {
   const wealthData = STARTING_WEALTH_BY_CLASS[className];
   if (!wealthData) {
     return 50; // Default fallback
   }
-
-  if (method === 'roll') {
-    const roll = rollDice(wealthData.dice);
-    return roll * wealthData.multiplier;
-  } else {
-    return wealthData.average;
-  }
+  return wealthData.maxRoll;
 };
 
 // Atom to set starting wealth based on selected class
 export const setStartingWealthAtom = atom(
   null,
-  (get, set, method: 'average' | 'roll' = 'average') => {
+  (get, set) => {
     const selectedClass = get(selectedClassAtom);
-    const startingWealthMethod = get(startingWealthMethodAtom);
     
-    if (selectedClass && startingWealthMethod === 'gold') {
-      const startingGold = calculateStartingGold(selectedClass.name, method);
-      const currency = convertFromCopper(startingGold * 100); // Convert gold to copper then back for proper distribution
-      
-      set(characterGoldAtom, currency.gold);
-      set(characterSilverAtom, currency.silver);
-      set(characterCopperAtom, currency.copper);
-    } else {
-      // Equipment method - give modest starting gold for additional purchases
-      set(characterGoldAtom, 15);
+    if (selectedClass) {
+      const startingGold = getStartingGold(selectedClass.name);
+      set(characterGoldAtom, startingGold);
       set(characterSilverAtom, 0);
       set(characterCopperAtom, 0);
     }
@@ -466,7 +439,6 @@ export const resetCharacterCreationAtom = atom(
     set(characterSilverAtom, 0);
     set(characterCopperAtom, 0);
     set(purchasedEquipmentAtom, []);
-    set(startingWealthMethodAtom, 'equipment');
   }
 );
 
