@@ -47,8 +47,10 @@ export default function HomeScreen() {
   };
 
   const handleCharacterPress = (character: Character) => {
-    // Navigate to character view screen
-    router.push('/character-view');
+    router.push({
+      pathname: '/character-view',
+      params: { characterId: character.id }
+    });
   };
 
   const toggleSidebar = () => {
