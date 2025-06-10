@@ -10,11 +10,11 @@ import {
   Modal,
   Alert,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { ArrowLeft, Camera, Upload, LocationEdit as Edit3, Scroll, X } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
-import * as ImagePicker from 'expo-image-picker';
 import {
   charactersAtom,
   fetchCharactersAtom,
@@ -24,6 +24,12 @@ import {
 import { campaignsAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import { supabase } from '../config/supabase';
+import { 
+  pickAndUploadAvatar, 
+  getCharacterAvatarUrl, 
+  updateCharacterAvatar,
+  deleteAvatar 
+} from '../utils/avatarStorage';
 
 interface CharacterViewScreenProps {
   characterId: string;
@@ -40,6 +46,8 @@ export default function CharacterViewScreen() {
   const [selectedSpells, setSelectedSpells] = useState<DnDSpell[]>([]);
   const [availableSpells, setAvailableSpells] = useState<DnDSpell[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
 
   // Get character ID from route params (for now, we'll use the first character)
   useEffect(() => {
@@ -80,56 +88,45 @@ export default function CharacterViewScreen() {
   };
 
   const pickImage = async () => {
-    if (Platform.OS === 'web') {
-      Alert.alert(
-        'Avatar Selection',
-        'Choose an avatar option:',
-        [
-          {
-            text: 'Random Fantasy Portrait',
-            onPress: () => {
-              const portraits = [
-                'https://images.pexels.com/photos/1040881/pexels-photo-1040881.jpeg?auto=compress&cs=tinysrgb&w=400',
-                'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400',
-                'https://images.pexels.com/photos/1212984/pexels-photo-1212984.jpeg?auto=compress&cs=tinysrgb&w=400',
-                'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-                'https://images.pexels.com/photos/1300402/pexels-photo-1300402.jpeg?auto=compress&cs=tinysrgb&w=400',
-              ];
-              const randomPortrait = portraits[Math.floor(Math.random() * portraits.length)];
-              updateCharacterAvatar(randomPortrait);
-            },
-          },
-          { text: 'Cancel', style: 'cancel' },
-        ]
+    if (!user || !character) return;
+
+    setIsUploadingAvatar(true);
+    try {
+      const result = await pickAndUploadAvatar(
+        user.id,
+        character.id,
+        setUploadProgress
       );
-    } else {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Sorry, we need camera roll permissions to select an avatar.');
-        return;
-      }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        updateCharacterAvatar(result.assets[0].uri);
+      if (result.success && result.url) {
+        await updateCharacterAvatarInDB(result.url);
+      } else {
+        Alert.alert('Upload Failed', result.error || 'Failed to upload avatar');
       }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to select avatar');
+    } finally {
+      setIsUploadingAvatar(false);
+      setUploadProgress('');
+      setIsEditingAvatar(false);
     }
   };
 
-  const updateCharacterAvatar = async (avatarUri: string) => {
+  const updateCharacterAvatarInDB = async (avatarUrl: string) => {
     if (!character) return;
 
     setIsLoading(true);
     try {
+      // Delete old avatar if it exists and is a Supabase storage URL
+      const oldAvatar = getCharacterAvatarUrl(character);
+      if (oldAvatar && oldAvatar.includes('supabase')) {
+        await deleteAvatar(oldAvatar);
+      }
+
       const updatedCharacterData = {
         ...character.character_data,
-        avatar: avatarUri,
+        avatar: avatarUrl,
       };
 
       const { error } = await supabase
@@ -147,7 +144,6 @@ export default function CharacterViewScreen() {
 
       // Refresh characters list
       await fetchCharacters();
-      setIsEditingAvatar(false);
     } catch (error) {
       console.error('Error updating avatar:', error);
       Alert.alert('Error', 'Failed to update avatar. Please try again.');
@@ -192,22 +188,6 @@ export default function CharacterViewScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const getCharacterAvatar = () => {
-    const avatar = character?.character_data?.avatar;
-    if (avatar) return avatar;
-    
-    // Default avatars based on class
-    const classAvatars: { [key: string]: string } = {
-      'Fighter': 'https://images.pexels.com/photos/1040881/pexels-photo-1040881.jpeg?auto=compress&cs=tinysrgb&w=400',
-      'Wizard': 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400',
-      'Rogue': 'https://images.pexels.com/photos/1212984/pexels-photo-1212984.jpeg?auto=compress&cs=tinysrgb&w=400',
-      'Cleric': 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-      'Ranger': 'https://images.pexels.com/photos/1300402/pexels-photo-1300402.jpeg?auto=compress&cs=tinysrgb&w=400',
-    };
-    
-    return classAvatars[character?.class || 'Fighter'] || classAvatars['Fighter'];
   };
 
   const getAbilityModifier = (score: number) => {
@@ -275,13 +255,18 @@ export default function CharacterViewScreen() {
         {/* Character Portrait Section */}
         <View style={styles.portraitSection}>
           <View style={styles.avatarContainer}>
-            <Image source={{ uri: getCharacterAvatar() }} style={styles.avatar} />
+            <Image source={{ uri: getCharacterAvatarUrl(character) }} style={styles.avatar} />
             <TouchableOpacity
               style={styles.editAvatarButton}
               onPress={() => setIsEditingAvatar(true)}
             >
               <Camera size={16} color="#fff" />
             </TouchableOpacity>
+            {isUploadingAvatar && (
+              <View style={styles.uploadingOverlay}>
+                <ActivityIndicator size="small" color="#4CAF50" />
+              </View>
+            )}
           </View>
           <Text style={styles.characterName}>{character.name}</Text>
           <Text style={styles.characterClass}>
@@ -398,12 +383,27 @@ export default function CharacterViewScreen() {
             </View>
             <View style={styles.modalBody}>
               <View style={styles.currentAvatarContainer}>
-                <Image source={{ uri: getCharacterAvatar() }} style={styles.currentAvatar} />
+                <Image source={{ uri: getCharacterAvatarUrl(character) }} style={styles.currentAvatar} />
               </View>
-              <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
+              <TouchableOpacity 
+                style={[styles.uploadButton, isUploadingAvatar && styles.uploadButtonDisabled]} 
+                onPress={pickImage}
+                disabled={isUploadingAvatar}
+              >
                 <Upload size={20} color="#4CAF50" />
-                <Text style={styles.uploadButtonText}>Choose New Portrait</Text>
+                <Text style={styles.uploadButtonText}>
+                  {isUploadingAvatar 
+                    ? (uploadProgress || 'Uploading...') 
+                    : 'Choose New Portrait'
+                  }
+                </Text>
               </TouchableOpacity>
+              {isUploadingAvatar && (
+                <View style={styles.uploadingIndicator}>
+                  <ActivityIndicator size="small" color="#4CAF50" />
+                  <Text style={styles.uploadingText}>{uploadProgress}</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -547,6 +547,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#121212',
+  },
+  uploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   characterName: {
     fontSize: 24,
@@ -755,10 +766,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#4CAF50',
   },
+  uploadButtonDisabled: {
+    opacity: 0.5,
+  },
   uploadButtonText: {
     color: '#4CAF50',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
+  },
+  uploadingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+  },
+  uploadingText: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
   },
   spellOptionItem: {
     backgroundColor: '#2a2a2a',
