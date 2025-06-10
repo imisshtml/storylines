@@ -96,7 +96,7 @@ export default function InviteFriendsScreen() {
   const getPlayerCharacter = (playerId: string): Character | null => {
     // Find character assigned to this campaign for this player
     return characters.find(char => 
-      char.campaign_id === currentCampaign?.id && 
+      char.campaign_id === currentCampaign?.uid && 
       char.user_id === playerId
     ) || null;
   };
@@ -109,28 +109,52 @@ export default function InviteFriendsScreen() {
     
     // Filter characters that are not assigned to any campaign or assigned to this campaign
     return characters.filter(char => 
-      char.user_id === user.id && (!char.campaign_id || char.campaign_id === currentCampaign?.id)
+      char.user_id === user.id && (!char.campaign_id || char.campaign_id === currentCampaign?.uid)
     );
+  };
+
+  const isValidUUID = (uuid: string) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
   };
 
   const handleCharacterSelect = async (playerId: string, characterId: string | null) => {
     if (!user || !currentCampaign || playerId !== user.id) {
-      console.error('Invalid user or campaign state');
+      console.error('Invalid user or campaign state:', {
+        hasUser: !!user,
+        hasCampaign: !!currentCampaign,
+        playerId,
+        userId: user?.id
+      });
       return;
     }
 
     try {
-      console.log('Handling character selection:', { playerId, characterId, campaignId: currentCampaign.id });
+      // Use the authenticated user's ID instead of the player ID from campaign data
+      const userId = user.id;
+      console.log('Debug - IDs:', {
+        playerId,
+        userId,
+        characterId,
+        campaignId: currentCampaign.uid
+      });
 
       // First, remove any existing character assignment for this player in this campaign
-      const existingCharacter = getPlayerCharacter(playerId);
+      const existingCharacter = getPlayerCharacter(userId);
+      console.log('Debug - Existing character:', existingCharacter);
+
       if (existingCharacter) {
-        console.log('Removing existing character assignment:', existingCharacter.id);
+        console.log('Debug - Removing character:', {
+          characterId: existingCharacter.id,
+          userId,
+          campaignId: currentCampaign.uid
+        });
+
         const { error: removeError } = await supabase
           .from('characters')
           .update({ campaign_id: null })
           .eq('id', existingCharacter.id)
-          .eq('user_id', user.id); // Extra security check
+          .eq('user_id', userId);
 
         if (removeError) {
           console.error('Error removing existing character:', removeError);
@@ -141,24 +165,37 @@ export default function InviteFriendsScreen() {
       let selectedCharacter: Character | null = null;
 
       if (characterId) {
+        // Log available characters for debugging
+        console.log('Debug - Available characters:', characters.map(c => ({
+          id: c.id,
+          userId: c.user_id,
+          name: c.name
+        })));
+
         // Validate that the character exists and belongs to the user
         const characterToAssign = characters.find(char => 
-          char.id === characterId && char.user_id === user.id
+          char.id === characterId && char.user_id === userId
         );
+
+        console.log('Debug - Character to assign:', characterToAssign);
 
         if (!characterToAssign) {
           console.error('Character not found or does not belong to user');
           throw new Error('Character not found or access denied');
         }
 
-        console.log('Assigning character to campaign:', characterToAssign.id);
+        console.log('Debug - Assigning character:', {
+          characterId: characterToAssign.id,
+          userId,
+          campaignId: currentCampaign.uid
+        });
 
         // Assign new character to campaign
         const { error: assignError } = await supabase
           .from('characters')
-          .update({ campaign_id: currentCampaign.id })
+          .update({ campaign_id: currentCampaign.uid })
           .eq('id', characterToAssign.id)
-          .eq('user_id', user.id); // Extra security check
+          .eq('user_id', userId);
 
         if (assignError) {
           console.error('Error assigning character:', assignError);
@@ -168,9 +205,22 @@ export default function InviteFriendsScreen() {
         selectedCharacter = characterToAssign;
       }
 
+      // Log current campaign players before update
+      console.log('Debug - Current campaign players:', currentCampaign.players);
+
       // Update the campaign's players array with character information
       const updatedPlayers = currentCampaign.players.map(player => {
         if (player.id === playerId) {
+          console.log('Debug - Updating player:', {
+            playerId: player.id,
+            characterInfo: selectedCharacter ? {
+              id: selectedCharacter.id,
+              name: selectedCharacter.name,
+              class: selectedCharacter.class,
+              race: selectedCharacter.race,
+              level: selectedCharacter.level,
+            } : null
+          });
           return {
             ...player,
             character: selectedCharacter ? {
@@ -185,7 +235,7 @@ export default function InviteFriendsScreen() {
         return player;
       });
 
-      console.log('Updating campaign players:', updatedPlayers);
+      console.log('Debug - Updated players:', updatedPlayers);
 
       // Update the campaign in the database
       const { error: campaignError } = await supabase
@@ -307,31 +357,31 @@ export default function InviteFriendsScreen() {
                   {player.ready && (
                     <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
                   )}
+                  {canSelectCharacter && (
+                    <TouchableOpacity
+                      onPress={() => setShowCharacterSelector(player.id)}
+                      style={styles.chevronButton}
+                    >
+                      <ChevronDown size={16} color="#888" />
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <View style={styles.characterSelection}>
                   {playerCharacter ? (
-                    <TouchableOpacity
-                      style={styles.selectedCharacterButton}
-                      onPress={() => canSelectCharacter ? setShowCharacterSelector(player.id) : undefined}
-                      disabled={!canSelectCharacter}
-                    >
+                    <View style={styles.selectedCharacterInfo}>
                       <Text style={styles.selectedCharacterText}>
                         {playerCharacter.name}
                       </Text>
                       <Text style={styles.selectedCharacterDetails}>
                         Lv{playerCharacter.level} {playerCharacter.race} {playerCharacter.class}
                       </Text>
-                      {canSelectCharacter && (
-                        <ChevronDown size={16} color="#4CAF50" />
-                      )}
-                    </TouchableOpacity>
+                    </View>
                   ) : canSelectCharacter ? (
                     <TouchableOpacity
                       style={styles.selectCharacterButton}
                       onPress={() => setShowCharacterSelector(player.id)}
                     >
                       <Text style={styles.selectCharacterText}>Select Character</Text>
-                      <ChevronDown size={16} color="#888" />
                     </TouchableOpacity>
                   ) : (
                     <Text style={styles.noCharacterText}>No Character</Text>
@@ -574,7 +624,7 @@ const styles = StyleSheet.create({
   playerInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   playerName: {
     flex: 1,
@@ -586,13 +636,17 @@ const styles = StyleSheet.create({
   readyIcon: {
     marginLeft: 8,
   },
+  chevronButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
   characterSelection: {
     marginLeft: 32,
   },
-  selectedCharacterButton: {
+  selectedCharacterInfo: {
     backgroundColor: 'rgba(76, 175, 80, 0.1)',
     borderRadius: 6,
-    padding: 12,
+    padding: 8,
     borderWidth: 1,
     borderColor: '#4CAF50',
   },
@@ -600,17 +654,16 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontSize: 14,
     fontFamily: 'Inter-Bold',
-    marginBottom: 2,
   },
   selectedCharacterDetails: {
     color: '#4CAF50',
     fontSize: 12,
     fontFamily: 'Inter-Regular',
+    marginTop: 2,
   },
   selectCharacterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: '#1a1a1a',
     borderRadius: 6,
     padding: 8,
