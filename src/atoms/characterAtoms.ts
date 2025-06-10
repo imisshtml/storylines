@@ -276,9 +276,13 @@ export const fetchCharactersAtom = atom(
       set(charactersLoadingAtom, true);
       set(charactersErrorAtom, null);
 
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
       const { data, error } = await supabase
         .from('characters')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -286,6 +290,7 @@ export const fetchCharactersAtom = atom(
       set(charactersAtom, data || []);
     } catch (error) {
       set(charactersErrorAtom, (error as Error).message);
+      console.error('Error fetching characters:', error);
     } finally {
       set(charactersLoadingAtom, false);
     }
