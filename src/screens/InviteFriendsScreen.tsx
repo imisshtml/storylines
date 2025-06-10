@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator, TextInput, SafeAreaView, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator, TextInput, SafeAreaView, Modal, Image } from 'react-native';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
@@ -113,9 +113,23 @@ export default function InviteFriendsScreen() {
     );
   };
 
-  const isValidUUID = (uuid: string) => {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(uuid);
+  const getCharacterAvatar = (character: Character) => {
+    // Try to get avatar from character_data, fallback to a default fantasy portrait
+    const avatar = character.character_data?.avatar;
+    if (avatar) {
+      return avatar;
+    }
+    
+    // Use different default avatars based on class
+    const classAvatars: { [key: string]: string } = {
+      'Fighter': 'https://images.pexels.com/photos/1040881/pexels-photo-1040881.jpeg?auto=compress&cs=tinysrgb&w=400',
+      'Wizard': 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400',
+      'Rogue': 'https://images.pexels.com/photos/1212984/pexels-photo-1212984.jpeg?auto=compress&cs=tinysrgb&w=400',
+      'Cleric': 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
+      'Ranger': 'https://images.pexels.com/photos/1300402/pexels-photo-1300402.jpeg?auto=compress&cs=tinysrgb&w=400',
+    };
+    
+    return classAvatars[character.class] || classAvatars['Fighter'];
   };
 
   const handleCharacterSelect = async (playerId: string, characterId: string | null) => {
@@ -265,6 +279,16 @@ export default function InviteFriendsScreen() {
     }
   };
 
+  // Check if all players have characters assigned
+  const allPlayersHaveCharacters = () => {
+    if (!currentCampaign || currentCampaign.players.length === 0) return false;
+    
+    return currentCampaign.players.every(player => {
+      const playerCharacter = getPlayerCharacter(player.id);
+      return playerCharacter !== null;
+    });
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -351,41 +375,43 @@ export default function InviteFriendsScreen() {
             
             return (
               <View key={player.id} style={styles.playerItem}>
-                <View style={styles.playerInfo}>
-                  <Users size={20} color="#4CAF50" />
-                  <Text style={styles.playerName}>{player.name || `Player ${index + 1}`}</Text>
-                  {player.ready && (
-                    <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
-                  )}
-                  {canSelectCharacter && (
-                    <TouchableOpacity
-                      onPress={() => setShowCharacterSelector(player.id)}
-                      style={styles.chevronButton}
-                    >
-                      <ChevronDown size={16} color="#888" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <View style={styles.characterSelection}>
-                  {playerCharacter ? (
-                    <View style={styles.selectedCharacterInfo}>
-                      <Text style={styles.selectedCharacterText}>
-                        {playerCharacter.name}
-                      </Text>
-                      <Text style={styles.selectedCharacterDetails}>
-                        Lv{playerCharacter.level} {playerCharacter.race} {playerCharacter.class}
-                      </Text>
-                    </View>
-                  ) : canSelectCharacter ? (
-                    <TouchableOpacity
-                      style={styles.selectCharacterButton}
-                      onPress={() => setShowCharacterSelector(player.id)}
-                    >
-                      <Text style={styles.selectCharacterText}>Select Character</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <Text style={styles.noCharacterText}>No Character</Text>
-                  )}
+                <View style={styles.playerRow}>
+                  <View style={styles.playerInfo}>
+                    <Users size={20} color="#4CAF50" />
+                    <Text style={styles.playerName}>{player.name || `Player ${index + 1}`}</Text>
+                    {player.ready && (
+                      <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
+                    )}
+                  </View>
+                  
+                  <View style={styles.characterInfo}>
+                    {playerCharacter ? (
+                      <View style={styles.selectedCharacterContainer}>
+                        <Image 
+                          source={{ uri: getCharacterAvatar(playerCharacter) }} 
+                          style={styles.characterAvatar}
+                        />
+                        <View style={styles.characterDetails}>
+                          <Text style={styles.selectedCharacterText}>
+                            {playerCharacter.name}
+                          </Text>
+                          <Text style={styles.selectedCharacterSubtext}>
+                            Lv{playerCharacter.level} {playerCharacter.race} {playerCharacter.class}
+                          </Text>
+                        </View>
+                      </View>
+                    ) : canSelectCharacter ? (
+                      <TouchableOpacity
+                        style={styles.selectCharacterButton}
+                        onPress={() => setShowCharacterSelector(player.id)}
+                      >
+                        <Text style={styles.selectCharacterText}>Select Character</Text>
+                        <ChevronDown size={16} color="#888" />
+                      </TouchableOpacity>
+                    ) : (
+                      <Text style={styles.noCharacterText}>No Character</Text>
+                    )}
+                  </View>
                 </View>
               </View>
             );
@@ -396,14 +422,14 @@ export default function InviteFriendsScreen() {
       <TouchableOpacity
         style={[
           styles.startButton,
-          currentCampaign.players.length < 2 && styles.startButtonDisabled
+          !allPlayersHaveCharacters() && styles.startButtonDisabled
         ]}
         onPress={handleStartCampaign}
-        disabled={currentCampaign.players.length < 2}
+        disabled={!allPlayersHaveCharacters()}
       >
         <Text style={styles.startButtonText}>
-          {currentCampaign.players.length < 2
-            ? 'Waiting for Players...'
+          {!allPlayersHaveCharacters()
+            ? 'Waiting for Characters...'
             : 'Start Campaign'}
         </Text>
       </TouchableOpacity>
@@ -430,10 +456,16 @@ export default function InviteFriendsScreen() {
                   style={styles.characterOption}
                   onPress={() => handleCharacterSelect(showCharacterSelector, character.id)}
                 >
-                  <Text style={styles.characterOptionName}>{character.name}</Text>
-                  <Text style={styles.characterOptionDetails}>
-                    Level {character.level} {character.race} {character.class}
-                  </Text>
+                  <Image 
+                    source={{ uri: getCharacterAvatar(character) }} 
+                    style={styles.modalCharacterAvatar}
+                  />
+                  <View style={styles.characterOptionInfo}>
+                    <Text style={styles.characterOptionName}>{character.name}</Text>
+                    <Text style={styles.characterOptionDetails}>
+                      Level {character.level} {character.race} {character.class}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               ))}
               {showCharacterSelector && getPlayerCharacter(showCharacterSelector) && (
@@ -621,41 +653,53 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
   },
+  playerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   playerInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    flex: 1,
   },
   playerName: {
-    flex: 1,
     color: '#fff',
     fontSize: 16,
     marginLeft: 12,
     fontFamily: 'Inter-Regular',
+    flex: 1,
   },
   readyIcon: {
     marginLeft: 8,
   },
-  chevronButton: {
-    padding: 4,
-    marginLeft: 8,
+  characterInfo: {
+    alignItems: 'flex-end',
   },
-  characterSelection: {
-    marginLeft: 32,
-  },
-  selectedCharacterInfo: {
+  selectedCharacterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    borderRadius: 6,
+    borderRadius: 8,
     padding: 8,
     borderWidth: 1,
     borderColor: '#4CAF50',
+  },
+  characterAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  characterDetails: {
+    alignItems: 'flex-end',
   },
   selectedCharacterText: {
     color: '#4CAF50',
     fontSize: 14,
     fontFamily: 'Inter-Bold',
   },
-  selectedCharacterDetails: {
+  selectedCharacterSubtext: {
     color: '#4CAF50',
     fontSize: 12,
     fontFamily: 'Inter-Regular',
@@ -665,10 +709,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1a1a1a',
-    borderRadius: 6,
+    borderRadius: 8,
     padding: 8,
     borderWidth: 1,
     borderColor: '#666',
+    gap: 4,
   },
   selectCharacterText: {
     color: '#888',
@@ -726,10 +771,21 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   characterOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
     padding: 16,
     marginBottom: 8,
+  },
+  modalCharacterAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  characterOptionInfo: {
+    flex: 1,
   },
   characterOptionName: {
     color: '#fff',
