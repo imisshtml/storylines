@@ -24,12 +24,8 @@ import {
 import { campaignsAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import { supabase } from '../config/supabase';
-import { 
-  pickAndUploadAvatar, 
-  getCharacterAvatarUrl, 
-  updateCharacterAvatar,
-  deleteAvatar 
-} from '../utils/avatarStorage';
+import { getCharacterAvatarUrl } from '../utils/avatarStorage';
+import AvatarSelector from '../components/AvatarSelector';
 
 export default function CharacterViewScreen() {
   const { characterId } = useLocalSearchParams<{ characterId: string }>();
@@ -43,8 +39,6 @@ export default function CharacterViewScreen() {
   const [selectedSpells, setSelectedSpells] = useState<DnDSpell[]>([]);
   const [availableSpells, setAvailableSpells] = useState<DnDSpell[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<string>('');
 
   useEffect(() => {
     if (characters.length > 0 && characterId) {
@@ -86,43 +80,11 @@ export default function CharacterViewScreen() {
     router.back();
   };
 
-  const pickImage = async () => {
-    if (!user || !character) return;
-
-    setIsUploadingAvatar(true);
-    try {
-      const result = await pickAndUploadAvatar(
-        user.id,
-        character.id,
-        setUploadProgress
-      );
-
-      if (result.success && result.url) {
-        await updateCharacterAvatarInDB(result.url);
-      } else {
-        Alert.alert('Upload Failed', result.error || 'Failed to upload avatar');
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to select avatar');
-    } finally {
-      setIsUploadingAvatar(false);
-      setUploadProgress('');
-      setIsEditingAvatar(false);
-    }
-  };
-
-  const updateCharacterAvatarInDB = async (avatarUrl: string) => {
+  const handleAvatarSelect = async (avatarUrl: string) => {
     if (!character) return;
 
     setIsLoading(true);
     try {
-      // Delete old avatar if it exists and is a Supabase storage URL
-      const oldAvatar = getCharacterAvatarUrl(character);
-      if (oldAvatar && oldAvatar.includes('supabase')) {
-        await deleteAvatar(oldAvatar);
-      }
-
       const updatedCharacterData = {
         ...character.character_data,
         avatar: avatarUrl,
@@ -261,7 +223,7 @@ export default function CharacterViewScreen() {
             >
               <Camera size={16} color="#fff" />
             </TouchableOpacity>
-            {isUploadingAvatar && (
+            {isLoading && (
               <View style={styles.uploadingOverlay}>
                 <ActivityIndicator size="small" color="#4CAF50" />
               </View>
@@ -365,48 +327,15 @@ export default function CharacterViewScreen() {
         </View>
       </ScrollView>
 
-      {/* Avatar Edit Modal */}
-      <Modal
-        visible={isEditingAvatar}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setIsEditingAvatar(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Change Avatar</Text>
-              <TouchableOpacity onPress={() => setIsEditingAvatar(false)}>
-                <X size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.modalBody}>
-              <View style={styles.currentAvatarContainer}>
-                <Image source={{ uri: getCharacterAvatarUrl(character) }} style={styles.currentAvatar} />
-              </View>
-              <TouchableOpacity 
-                style={[styles.uploadButton, isUploadingAvatar && styles.uploadButtonDisabled]} 
-                onPress={pickImage}
-                disabled={isUploadingAvatar}
-              >
-                <Upload size={20} color="#4CAF50" />
-                <Text style={styles.uploadButtonText}>
-                  {isUploadingAvatar 
-                    ? (uploadProgress || 'Uploading...') 
-                    : 'Choose New Portrait'
-                  }
-                </Text>
-              </TouchableOpacity>
-              {isUploadingAvatar && (
-                <View style={styles.uploadingIndicator}>
-                  <ActivityIndicator size="small" color="#4CAF50" />
-                  <Text style={styles.uploadingText}>{uploadProgress}</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Avatar Selector Modal */}
+      <AvatarSelector
+        isVisible={isEditingAvatar}
+        onClose={() => setIsEditingAvatar(false)}
+        onAvatarSelect={handleAvatarSelect}
+        currentAvatar={getCharacterAvatarUrl(character)}
+        userId={user?.id || ''}
+        characterId={character.id}
+      />
 
       {/* Spells Edit Modal - Only show if class supports spellcasting */}
       {hasSpellcasting() && (
@@ -744,46 +673,6 @@ const styles = StyleSheet.create({
     color: '#888',
     fontFamily: 'Inter-Regular',
     marginBottom: 16,
-  },
-  currentAvatarContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  currentAvatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
-  uploadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    borderRadius: 8,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-  },
-  uploadButtonDisabled: {
-    opacity: 0.5,
-  },
-  uploadButtonText: {
-    color: '#4CAF50',
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-  },
-  uploadingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 16,
-  },
-  uploadingText: {
-    color: '#888',
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
   },
   spellOptionItem: {
     backgroundColor: '#2a2a2a',
