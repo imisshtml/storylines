@@ -23,12 +23,12 @@ import {
   campaignHistoryAtom,
   fetchCampaignHistoryAtom,
   initializeCampaignHistoryRealtimeAtom,
-  clearCampaignHistoryAtom
+  clearCampaignHistoryAtom,
+  addCampaignMessageAtom
 } from '../atoms/campaignHistoryAtoms';
 import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
 import StoryChoices from '../components/StoryChoices';
-import { useStoryAI } from '../hooks/useStoryAI';
 
 export default function StoryScreen() {
   const [userInput, setUserInput] = useState('');
@@ -36,18 +36,23 @@ export default function StoryScreen() {
   const [user] = useAtom(userAtom);
   const [isCharacterSheetVisible, setIsCharacterSheetVisible] = useState(false);
   const [showChoices, setShowChoices] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentChoices, setCurrentChoices] = useState<string[]>([
+    'Explore deeper into the forest',
+    'Search for signs of civilization',
+    'Set up camp for the night',
+    'Listen carefully for any sounds',
+  ]);
 
   // Campaign history atoms
   const [campaignHistory] = useAtom(campaignHistoryAtom);
   const [, fetchCampaignHistory] = useAtom(fetchCampaignHistoryAtom);
   const [, initializeRealtimeSubscription] = useAtom(initializeCampaignHistoryRealtimeAtom);
   const [, clearCampaignHistory] = useAtom(clearCampaignHistoryAtom);
+  const [, addCampaignMessage] = useAtom(addCampaignMessageAtom);
 
   const scrollViewRef = useRef<ScrollView>(null);
-  const { storyState, sendPlayerAction, sendChoice, clearError } = useStoryAI();
-
-  // Polling interval ref
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const realtimeUnsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -67,16 +72,8 @@ export default function StoryScreen() {
       realtimeUnsubscribeRef.current = unsubscribe;
     });
 
-    // Set up polling as backup (every 5 seconds)
-    pollingIntervalRef.current = setInterval(() => {
-      fetchCampaignHistory(currentCampaign.uid);
-    }, 5000);
-
     // Cleanup function
     return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
       if (realtimeUnsubscribeRef.current) {
         realtimeUnsubscribeRef.current();
       }
@@ -94,19 +91,80 @@ export default function StoryScreen() {
 
   useEffect(() => {
     // Show error alert if there's an error
-    if (storyState.error) {
+    if (error) {
       Alert.alert(
         'Connection Error',
         'Failed to get response from Dungeon Master. Please check your internet connection and try again.',
         [
-          { text: 'OK', onPress: clearError }
+          { text: 'OK', onPress: () => setError(null) }
         ]
       );
     }
-  }, [storyState.error, clearError]);
+  }, [error]);
+
+  const sendPlayerAction = async (action: string, playerId: string = 'player1', playerName: string = 'Player') => {
+    if (!currentCampaign || !action.trim()) return;
+
+    setIsLoading(true);
+    setError(null);
+    setCurrentChoices([]); // Clear choices while loading
+
+    try {
+      // Add player message to campaign history
+      await addCampaignMessage({
+        campaign_uid: currentCampaign.uid,
+        message: action,
+        author: playerName,
+        message_type: 'player',
+      });
+
+      // Prepare context for the AI
+      const context = {
+        campaign: currentCampaign,
+        storyHistory: campaignHistory.slice(-5), // Get last 5 messages for context
+      };
+
+      // Send request to our API route
+      const response = await fetch('/api/story', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          campaignId: currentCampaign.id,
+          message: `Player action: ${action}`,
+          context,
+          playerAction: action,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Add DM response to campaign history
+      await addCampaignMessage({
+        campaign_uid: currentCampaign.uid,
+        message: data.response,
+        author: 'DM',
+        message_type: 'dm',
+      });
+
+      setCurrentChoices(data.choices || []); // Use choices from AI response
+
+    } catch (error) {
+      console.error('Error sending player action:', error);
+      setError(error instanceof Error ? error.message : 'Failed to get DM response');
+      setCurrentChoices([]); // Clear choices on error
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSend = async () => {
-    if (!userInput.trim() || storyState.isLoading) return;
+    if (!userInput.trim() || isLoading) return;
 
     const action = userInput.trim();
     setUserInput('');
@@ -123,11 +181,11 @@ export default function StoryScreen() {
   };
 
   const handleChoiceSelect = async (choice: string) => {
-    if (storyState.isLoading) return;
+    if (isLoading) return;
 
     setShowChoices(false);
-    await sendChoice(
-      choice,
+    await sendPlayerAction(
+      `I choose to: ${choice}`,
       user?.id || 'player1',
       user?.username || user?.email || 'Player'
     );
@@ -154,8 +212,8 @@ export default function StoryScreen() {
   }
 
   // Use dynamic choices from AI or fallback to default choices
-  const choicesToShow = storyState.currentChoices.length > 0
-    ? storyState.currentChoices
+  const choicesToShow = currentChoices.length > 0
+    ? currentChoices
     : [
       'Explore deeper into the forest',
       'Search for signs of civilization',
@@ -211,7 +269,7 @@ export default function StoryScreen() {
               ))
             )}
 
-            {storyState.isLoading && (
+            {isLoading && (
               <View style={styles.loadingEvent}>
                 <ActivityIndicator size="small" color="#FFD700" />
                 <Text style={styles.loadingEventText}>
@@ -220,7 +278,7 @@ export default function StoryScreen() {
               </View>
             )}
 
-            {storyState.error && (
+            {error && (
               <View style={styles.errorContainer}>
                 <AlertCircle size={20} color="#f44336" />
                 <Text style={styles.errorText}>
@@ -229,11 +287,11 @@ export default function StoryScreen() {
               </View>
             )}
 
-            {showChoices && !storyState.isLoading && choicesToShow.length > 0 && (
+            {showChoices && !isLoading && choicesToShow.length > 0 && (
               <StoryChoices
                 choices={choicesToShow}
                 onChoiceSelect={handleChoiceSelect}
-                disabled={storyState.isLoading}
+                disabled={isLoading}
               />
             )}
           </ScrollView>
@@ -247,17 +305,17 @@ export default function StoryScreen() {
               placeholderTextColor="#666"
               multiline
               maxLength={500}
-              editable={!storyState.isLoading}
+              editable={!isLoading}
             />
             <TouchableOpacity
               style={[
                 styles.sendButton,
-                (!userInput.trim() || storyState.isLoading) && styles.sendButtonDisabled
+                (!userInput.trim() || isLoading) && styles.sendButtonDisabled
               ]}
               onPress={handleSend}
-              disabled={!userInput.trim() || storyState.isLoading}
+              disabled={!userInput.trim() || isLoading}
             >
-              {storyState.isLoading ? (
+              {isLoading ? (
                 <ActivityIndicator size="small" color="#666" />
               ) : (
                 <Send size={24} color={userInput.trim() ? '#fff' : '#666'} />
