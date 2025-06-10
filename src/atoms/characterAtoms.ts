@@ -37,17 +37,35 @@ export type DnDEquipment = {
 
 export type Equipment = {
   id: string;
+  index: string;
   name: string;
-  type: string;
-  category?: string;
-  cost_gold: number;
-  cost_silver: number;
-  cost_copper: number;
+  equipment_category: string;
   weight: number;
-  description?: string;
-  properties: any;
-  rarity: string;
+  cost_quantity: number;
+  cost_unit: string;
+  description: string[];
+  special: string[];
+  contents: any[];
+  properties: any[];
+  armor_category?: string;
+  armor_class_base?: number;
+  armor_class_dex_bonus?: boolean;
+  str_minimum?: number;
+  stealth_disadvantage?: boolean;
+  weapon_category?: string;
+  weapon_range?: string;
+  category_range?: string;
+  damage_dice?: string;
+  damage_type?: string;
+  range_normal?: number;
+  range_long?: number;
+  throw_range_normal?: number;
+  throw_range_long?: number;
+  gear_category?: string;
+  quantity?: number;
+  enabled: boolean;
   created_at?: string;
+  updated_at?: string;
 };
 
 export type Character = {
@@ -278,7 +296,8 @@ export const fetchEquipmentAtom = atom(
       const { data: equipment, error } = await supabase
         .from('equipment')
         .select('*')
-        .order('type')
+        .eq('enabled', true)
+        .order('equipment_category')
         .order('name');
 
       if (error) {
@@ -397,9 +416,22 @@ export const convertFromCopper = (totalCopper: number): { gold: number; silver: 
   return { gold, silver, copper };
 };
 
-// Calculate total cost in copper
+// Calculate equipment cost in copper based on cost_quantity and cost_unit
 export const getEquipmentCostInCopper = (equipment: Equipment): number => {
-  return convertToCopper(equipment.cost_gold, equipment.cost_silver, equipment.cost_copper);
+  const { cost_quantity, cost_unit } = equipment;
+  
+  switch (cost_unit) {
+    case 'cp':
+      return cost_quantity;
+    case 'sp':
+      return cost_quantity * 10;
+    case 'gp':
+      return cost_quantity * 100;
+    case 'pp':
+      return cost_quantity * 1000;
+    default:
+      return cost_quantity * 100; // Default to gold
+  }
 };
 
 // Check if player can afford equipment
