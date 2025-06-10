@@ -111,7 +111,7 @@ export default function AvatarSelector({
             >
               {isUploading ? (
                 <>
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small\" color="#fff" />
                   <Text style={styles.uploadButtonText}>
                     {uploadProgress || 'Uploading...'}
                   </Text>
