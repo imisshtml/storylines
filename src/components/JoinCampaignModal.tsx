@@ -38,7 +38,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
     // Convert to uppercase and limit to 6 characters
     const upperText = text.toUpperCase().slice(0, 6);
     setInviteCode(upperText);
-    
+
     // Clear error when user starts typing
     if (error) {
       setError(null);
@@ -120,7 +120,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
       // Close modal and navigate
       onClose();
       setInviteCode('');
-      
+
       // Navigate to character creation or campaign view
       router.push('/creation');
 
@@ -199,7 +199,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
               disabled={!validateCode(inviteCode) || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small\" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <Text style={styles.buttonText}>Join Campaign</Text>
               )}

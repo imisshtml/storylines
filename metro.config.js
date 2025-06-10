@@ -8,7 +8,7 @@ config.resolver.unstable_enablePackageExports = true;
 // Configure transformer to handle import.meta syntax
 config.transformer.getTransformOptions = async () => ({
   transform: {
-    experimentalImportSupport: false,
+    experimentalImportSupport: true, // Changed from false to true to support import.meta
     inlineRequires: true,
   },
 });
