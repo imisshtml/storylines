@@ -114,34 +114,58 @@ export default function InviteFriendsScreen() {
   };
 
   const handleCharacterSelect = async (playerId: string, characterId: string | null) => {
-    if (!user || !currentCampaign || playerId !== user.id) return;
+    if (!user || !currentCampaign || playerId !== user.id) {
+      console.error('Invalid user or campaign state');
+      return;
+    }
 
     try {
+      console.log('Handling character selection:', { playerId, characterId, campaignId: currentCampaign.id });
+
       // First, remove any existing character assignment for this player in this campaign
       const existingCharacter = getPlayerCharacter(playerId);
       if (existingCharacter) {
+        console.log('Removing existing character assignment:', existingCharacter.id);
         const { error: removeError } = await supabase
           .from('characters')
           .update({ campaign_id: null })
-          .eq('id', existingCharacter.id);
+          .eq('id', existingCharacter.id)
+          .eq('user_id', user.id); // Extra security check
 
-        if (removeError) throw removeError;
+        if (removeError) {
+          console.error('Error removing existing character:', removeError);
+          throw removeError;
+        }
       }
 
       let selectedCharacter: Character | null = null;
 
       if (characterId) {
+        // Validate that the character exists and belongs to the user
+        const characterToAssign = characters.find(char => 
+          char.id === characterId && char.user_id === user.id
+        );
+
+        if (!characterToAssign) {
+          console.error('Character not found or does not belong to user');
+          throw new Error('Character not found or access denied');
+        }
+
+        console.log('Assigning character to campaign:', characterToAssign.id);
+
         // Assign new character to campaign
         const { error: assignError } = await supabase
           .from('characters')
           .update({ campaign_id: currentCampaign.id })
-          .eq('id', characterId)
+          .eq('id', characterToAssign.id)
           .eq('user_id', user.id); // Extra security check
 
-        if (assignError) throw assignError;
+        if (assignError) {
+          console.error('Error assigning character:', assignError);
+          throw assignError;
+        }
 
-        // Get the character details
-        selectedCharacter = characters.find(char => char.id === characterId) || null;
+        selectedCharacter = characterToAssign;
       }
 
       // Update the campaign's players array with character information
@@ -161,13 +185,18 @@ export default function InviteFriendsScreen() {
         return player;
       });
 
+      console.log('Updating campaign players:', updatedPlayers);
+
       // Update the campaign in the database
       const { error: campaignError } = await supabase
         .from('campaigns')
         .update({ players: updatedPlayers })
         .eq('id', currentCampaign.id);
 
-      if (campaignError) throw campaignError;
+      if (campaignError) {
+        console.error('Error updating campaign:', campaignError);
+        throw campaignError;
+      }
 
       // Update local campaign state
       setCurrentCampaign({
@@ -178,8 +207,11 @@ export default function InviteFriendsScreen() {
       // Refresh characters
       await fetchCharacters();
       setShowCharacterSelector(null);
+
+      console.log('Character assignment completed successfully');
     } catch (error) {
       console.error('Error updating character assignment:', error);
+      // You might want to show an alert to the user here
     }
   };
 
