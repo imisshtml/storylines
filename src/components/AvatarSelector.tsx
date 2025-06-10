@@ -11,8 +11,8 @@ import {
   Alert,
   Dimensions,
 } from 'react-native';
-import { X, Upload, Camera, Sparkles } from 'lucide-react-native';
-import { DEFAULT_AVATARS, AVATAR_CATEGORIES, getSuggestedAvatars, type DefaultAvatar } from '../data/defaultAvatars';
+import { X, Upload, Sparkles } from 'lucide-react-native';
+import { DEFAULT_AVATARS, AVATAR_CATEGORIES, getRandomAvatarSelection, type DefaultAvatar } from '../data/defaultAvatars';
 import { pickAndUploadAvatar, type AvatarUploadResult } from '../utils/avatarStorage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -25,7 +25,6 @@ interface AvatarSelectorProps {
   currentAvatar?: string;
   userId: string;
   characterId?: string;
-  characterClass?: string;
 }
 
 export default function AvatarSelector({
@@ -35,21 +34,12 @@ export default function AvatarSelector({
   currentAvatar,
   userId,
   characterId,
-  characterClass,
 }: AvatarSelectorProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string>('suggested');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
 
-  const getSuggestedForClass = () => {
-    if (!characterClass) return DEFAULT_AVATARS.slice(0, 12);
-    return getSuggestedAvatars(characterClass);
-  };
-
   const getAvatarsToShow = () => {
-    if (selectedCategory === 'suggested') {
-      return getSuggestedForClass();
-    }
     if (selectedCategory === 'all') {
       return DEFAULT_AVATARS;
     }
@@ -85,7 +75,13 @@ export default function AvatarSelector({
     }
   };
 
-  const isCurrentAvatar = (avatarUrl: string) => {
+  const isCurrentAvatar = (avatarUrl: any) => {
+    // For local images (require() results), we need to compare differently
+    // Since currentAvatar might be a require() result or a URL string
+    if (typeof currentAvatar === 'string' && typeof avatarUrl === 'string') {
+      return currentAvatar === avatarUrl;
+    }
+    // For require() results, they should be the same object reference
     return currentAvatar === avatarUrl;
   };
 
@@ -136,25 +132,6 @@ export default function AvatarSelector({
             style={styles.categoryTabs}
             contentContainerStyle={styles.categoryTabsContent}
           >
-            {/* Suggested Tab */}
-            {characterClass && (
-              <TouchableOpacity
-                style={[
-                  styles.categoryTab,
-                  selectedCategory === 'suggested' && styles.activeCategoryTab
-                ]}
-                onPress={() => setSelectedCategory('suggested')}
-              >
-                <Text style={styles.categoryEmoji}>✨</Text>
-                <Text style={[
-                  styles.categoryTabText,
-                  selectedCategory === 'suggested' && styles.activeCategoryTabText
-                ]}>
-                  Suggested
-                </Text>
-              </TouchableOpacity>
-            )}
-
             {AVATAR_CATEGORIES.map((category) => (
               <TouchableOpacity
                 key={category.id}
@@ -187,7 +164,7 @@ export default function AvatarSelector({
                   ]}
                   onPress={() => handleDefaultAvatarSelect(avatar)}
                 >
-                  <Image source={{ uri: avatar.imagePath }} style={styles.avatarImage} />
+                  <Image source={avatar.imagePath} style={styles.avatarImage} />
                   {isCurrentAvatar(avatar.imagePath) && (
                     <View style={styles.selectedOverlay}>
                       <Sparkles size={24} color="#fff" />

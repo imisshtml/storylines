@@ -2,7 +2,7 @@ import { supabase } from '../config/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
-import { DEFAULT_AVATARS, getRandomAvatarFromCategory, type DefaultAvatar } from '../data/defaultAvatars';
+import { DEFAULT_AVATARS, getRandomAvatarSelection, type DefaultAvatar } from '../data/defaultAvatars';
 
 export type AvatarUploadResult = {
   success: boolean;
@@ -11,27 +11,11 @@ export type AvatarUploadResult = {
 };
 
 /**
- * Get default avatar URL for a character class
+ * Get default avatar for character creation
  */
-export const getDefaultAvatar = (characterClass?: string): string => {
-  const classToCategory: { [key: string]: DefaultAvatar['category'] } = {
-    'Fighter': 'warrior',
-    'Barbarian': 'warrior',
-    'Paladin': 'warrior',
-    'Wizard': 'mage',
-    'Sorcerer': 'mage',
-    'Warlock': 'mage',
-    'Rogue': 'rogue',
-    'Ranger': 'ranger',
-    'Druid': 'ranger',
-    'Cleric': 'cleric',
-    'Bard': 'general',
-    'Monk': 'general',
-  };
-
-  const category = characterClass ? classToCategory[characterClass] || 'general' : 'general';
-  const randomAvatar = getRandomAvatarFromCategory(category);
-  return randomAvatar.imagePath;
+export const getDefaultAvatar = (): string => {
+  const randomSelection = getRandomAvatarSelection(1);
+  return randomSelection[0].imagePath;
 };
 
 /**
@@ -135,7 +119,7 @@ export const uploadAvatar = async (
 export const deleteAvatar = async (avatarUrl: string): Promise<boolean> => {
   try {
     // Only delete if it's a Supabase storage URL (not a default avatar)
-    if (!avatarUrl.includes('supabase') || avatarUrl.includes('pexels.com')) {
+    if (!avatarUrl.includes('supabase') || isDefaultAvatar(avatarUrl)) {
       return true; // Don't try to delete external URLs or default avatars
     }
 
@@ -272,8 +256,8 @@ export const getCharacterAvatarUrl = (character: any): string => {
     return avatarUrl;
   }
   
-  // Fallback to class-based default
-  return getDefaultAvatar(character?.class);
+  // Fallback to random default
+  return getDefaultAvatar();
 };
 
 /**
@@ -311,7 +295,13 @@ export const updateCharacterAvatar = async (
  * Check if avatar URL is a default avatar
  */
 export const isDefaultAvatar = (avatarUrl: string): boolean => {
-  return DEFAULT_AVATARS.some(avatar => avatar.imagePath === avatarUrl);
+  // Check if it's one of our local default avatars
+  // Since we're using require(), we need to check differently
+  return DEFAULT_AVATARS.some(avatar => {
+    // For local images, we can't directly compare the require() result
+    // Instead, we check if it's not a Supabase URL or external URL
+    return !avatarUrl.includes('http') && !avatarUrl.includes('supabase');
+  }) || avatarUrl.includes('pexels.com'); // Keep pexels check for backward compatibility
 };
 
 /**
