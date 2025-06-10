@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Play, Users, Settings, Menu, Crown, UserCheck, User } from 'lucide-react-native';
+import { Play, Users, Settings, Menu, Crown, UserCheck, User, Star } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, ScrollView, Image } from 'react-native';
 import { useAtom } from 'jotai';
@@ -86,8 +86,12 @@ export default function HomeScreen() {
   };
 
   const getCharacterCampaignName = (character: Character) => {
-    // For now, return a placeholder since we don't have campaign assignment implemented
-    return character.campaign_id ? 'Adventure Campaign' : 'No Campaign Set';
+    if (character.campaign_id) {
+      // Find the campaign by ID
+      const campaign = campaigns.find(c => c.id === character.campaign_id);
+      return campaign ? campaign.name : 'Unknown Campaign';
+    }
+    return 'No Campaign Set';
   };
 
   // Helper function to check if user is the owner of a campaign
@@ -244,6 +248,7 @@ export default function HomeScreen() {
                         style={styles.characterAvatar}
                       />
                       <View style={styles.characterLevelBadge}>
+                        <Star size={12} color="#fff" />
                         <Text style={styles.characterLevel}>{character.level}</Text>
                       </View>
                     </View>
@@ -497,13 +502,16 @@ const styles = StyleSheet.create({
     bottom: -4,
     right: 8,
     backgroundColor: '#4CAF50',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 2,
     borderWidth: 2,
     borderColor: '#2a2a2a',
+    minWidth: 28,
+    justifyContent: 'center',
   },
   characterLevel: {
     color: '#fff',

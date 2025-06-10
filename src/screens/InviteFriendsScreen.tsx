@@ -1,27 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator, TextInput, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator, TextInput, SafeAreaView, Modal } from 'react-native';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
-import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send } from 'lucide-react-native';
+import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
+import { userAtom } from '../atoms/authAtoms';
+import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, X } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as SMS from 'expo-sms';
+import { supabase } from '../config/supabase';
 
 export default function InviteFriendsScreen() {
-  const [currentCampaign] = useAtom(currentCampaignAtom);
+  const [currentCampaign, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [isLoading] = useAtom(campaignsLoadingAtom);
   const [error] = useAtom(campaignsErrorAtom);
   const [, upsertCampaign] = useAtom(upsertCampaignAtom);
+  const [user] = useAtom(userAtom);
+  const [characters] = useAtom(charactersAtom);
+  const [, fetchCharacters] = useAtom(fetchCharactersAtom);
   const [copied, setCopied] = useState(false);
   const [phoneNumbers, setPhoneNumbers] = useState('');
   const [smsAvailable, setSmsAvailable] = useState(false);
+  const [showCharacterSelector, setShowCharacterSelector] = useState<string | null>(null);
+  const [playerCharacterAssignments, setPlayerCharacterAssignments] = useState<{ [playerId: string]: string }>({});
 
   useEffect(() => {
     if (!currentCampaign) {
       router.replace('/');
     }
     checkSmsAvailability();
-  }, [currentCampaign]);
+    if (user) {
+      fetchCharacters();
+    }
+  }, [currentCampaign, user, fetchCharacters]);
 
   const checkSmsAvailability = async () => {
     const isAvailable = await SMS.isAvailableAsync();
@@ -80,6 +91,70 @@ export default function InviteFriendsScreen() {
       }
     } catch (error) {
       console.error('Error sending SMS:', error);
+    }
+  };
+
+  const getPlayerCharacter = (playerId: string): Character | null => {
+    const characterId = playerCharacterAssignments[playerId];
+    if (!characterId) return null;
+    return characters.find(char => char.id === characterId) || null;
+  };
+
+  const getAvailableCharacters = (playerId: string): Character[] => {
+    if (!user) return [];
+    
+    // Only show user's own characters if they are the player
+    if (playerId !== user.id) return [];
+    
+    // Filter characters that are not assigned to any campaign or assigned to this campaign
+    return characters.filter(char => 
+      !char.campaign_id || char.campaign_id === currentCampaign?.id
+    );
+  };
+
+  const handleCharacterSelect = async (playerId: string, characterId: string | null) => {
+    if (!user || !currentCampaign || playerId !== user.id) return;
+
+    try {
+      if (characterId) {
+        // Assign character to campaign
+        const { error } = await supabase
+          .from('characters')
+          .update({ campaign_id: currentCampaign.id })
+          .eq('id', characterId);
+
+        if (error) throw error;
+
+        // Update local state
+        setPlayerCharacterAssignments(prev => ({
+          ...prev,
+          [playerId]: characterId
+        }));
+      } else {
+        // Remove character assignment
+        const currentCharacterId = playerCharacterAssignments[playerId];
+        if (currentCharacterId) {
+          const { error } = await supabase
+            .from('characters')
+            .update({ campaign_id: null })
+            .eq('id', currentCharacterId);
+
+          if (error) throw error;
+
+          // Update local state
+          setPlayerCharacterAssignments(prev => {
+            const newState = { ...prev };
+            delete newState[playerId];
+            return newState;
+          });
+        }
+      }
+
+      // Refresh characters
+      await fetchCharacters();
+      setShowCharacterSelector(null);
+    } catch (error) {
+      console.error('Error updating character assignment:', error);
     }
   };
 
@@ -162,15 +237,49 @@ export default function InviteFriendsScreen() {
           Players ({currentCampaign.players.length})
         </Text>
         <ScrollView style={styles.playersList}>
-          {currentCampaign.players.map((player, index) => (
-            <View key={player.id} style={styles.playerItem}>
-              <Users size={20} color="#4CAF50" />
-              <Text style={styles.playerName}>{player.name || `Player ${index + 1}`}</Text>
-              {player.ready && (
-                <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
-              )}
-            </View>
-          ))}
+          {currentCampaign.players.map((player, index) => {
+            const playerCharacter = getPlayerCharacter(player.id);
+            const availableCharacters = getAvailableCharacters(player.id);
+            const canSelectCharacter = player.id === user?.id && availableCharacters.length > 0;
+            
+            return (
+              <View key={player.id} style={styles.playerItem}>
+                <View style={styles.playerInfo}>
+                  <Users size={20} color="#4CAF50" />
+                  <Text style={styles.playerName}>{player.name || `Player ${index + 1}`}</Text>
+                  {player.ready && (
+                    <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
+                  )}
+                </View>
+                <View style={styles.characterSelection}>
+                  {playerCharacter ? (
+                    <TouchableOpacity
+                      style={styles.selectedCharacterButton}
+                      onPress={() => canSelectCharacter ? setShowCharacterSelector(player.id) : undefined}
+                      disabled={!canSelectCharacter}
+                    >
+                      <Text style={styles.selectedCharacterText}>
+                        {playerCharacter.name}
+                      </Text>
+                      {canSelectCharacter && (
+                        <ChevronDown size={16} color="#4CAF50" />
+                      )}
+                    </TouchableOpacity>
+                  ) : canSelectCharacter ? (
+                    <TouchableOpacity
+                      style={styles.selectCharacterButton}
+                      onPress={() => setShowCharacterSelector(player.id)}
+                    >
+                      <Text style={styles.selectCharacterText}>Select Character</Text>
+                      <ChevronDown size={16} color="#888" />
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.noCharacterText}>No Character</Text>
+                  )}
+                </View>
+              </View>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -188,6 +297,55 @@ export default function InviteFriendsScreen() {
             : 'Start Campaign'}
         </Text>
       </TouchableOpacity>
+
+      {/* Character Selection Modal */}
+      <Modal
+        visible={showCharacterSelector !== null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCharacterSelector(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Character</Text>
+              <TouchableOpacity onPress={() => setShowCharacterSelector(null)}>
+                <X size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              {showCharacterSelector && getAvailableCharacters(showCharacterSelector).map((character) => (
+                <TouchableOpacity
+                  key={character.id}
+                  style={styles.characterOption}
+                  onPress={() => handleCharacterSelect(showCharacterSelector, character.id)}
+                >
+                  <Text style={styles.characterOptionName}>{character.name}</Text>
+                  <Text style={styles.characterOptionDetails}>
+                    Level {character.level} {character.race} {character.class}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {showCharacterSelector && playerCharacterAssignments[showCharacterSelector] && (
+                <TouchableOpacity
+                  style={styles.removeCharacterOption}
+                  onPress={() => handleCharacterSelect(showCharacterSelector, null)}
+                >
+                  <Text style={styles.removeCharacterText}>Remove Character</Text>
+                </TouchableOpacity>
+              )}
+              {showCharacterSelector && getAvailableCharacters(showCharacterSelector).length === 0 && (
+                <View style={styles.noCharactersAvailable}>
+                  <Text style={styles.noCharactersText}>No characters available</Text>
+                  <Text style={styles.noCharactersSubtext}>
+                    Create a character first to assign to this campaign
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -348,11 +506,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   playerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#2a2a2a',
     padding: 16,
     borderRadius: 8,
+    marginBottom: 8,
+  },
+  playerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 8,
   },
   playerName: {
@@ -364,6 +525,45 @@ const styles = StyleSheet.create({
   },
   readyIcon: {
     marginLeft: 8,
+  },
+  characterSelection: {
+    marginLeft: 32,
+  },
+  selectedCharacterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 6,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  selectedCharacterText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  selectCharacterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 6,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#666',
+  },
+  selectCharacterText: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  noCharacterText: {
+    color: '#666',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    fontStyle: 'italic',
   },
   startButton: {
     backgroundColor: '#4CAF50',
@@ -379,5 +579,79 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    width: '90%',
+    maxHeight: '70%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+  modalTitle: {
+    fontSize: 18,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  modalBody: {
+    padding: 20,
+  },
+  characterOption: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 8,
+  },
+  characterOptionName: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  characterOptionDetails: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  removeCharacterOption: {
+    backgroundColor: '#dc3545',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  removeCharacterText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  noCharactersAvailable: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  noCharactersText: {
+    color: '#888',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
+  noCharactersSubtext: {
+    color: '#666',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
   },
 });
