@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator, TextInput, SafeAreaView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator, TextInput, SafeAreaView, AppState } from 'react-native';
 import { useAtom } from 'jotai';
-import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
+import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom, fetchCampaignsAtom } from '../atoms/campaignAtoms';
 import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -12,16 +12,61 @@ export default function InviteFriendsScreen() {
   const [isLoading] = useAtom(campaignsLoadingAtom);
   const [error] = useAtom(campaignsErrorAtom);
   const [, upsertCampaign] = useAtom(upsertCampaignAtom);
+  const [, fetchCampaigns] = useAtom(fetchCampaignsAtom);
   const [copied, setCopied] = useState(false);
   const [phoneNumbers, setPhoneNumbers] = useState('');
   const [smsAvailable, setSmsAvailable] = useState(false);
+  
+  // Polling state
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const appStateRef = useRef(AppState.currentState);
 
   useEffect(() => {
     if (!currentCampaign) {
       router.replace('/');
     }
     checkSmsAvailability();
+    
+    // Start polling when component mounts
+    startPolling();
+    
+    // Listen for app state changes
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
+    // Cleanup on unmount
+    return () => {
+      stopPolling();
+      subscription?.remove();
+    };
   }, [currentCampaign]);
+
+  const handleAppStateChange = (nextAppState: string) => {
+    if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
+      // App has come to the foreground, restart polling
+      startPolling();
+    } else if (nextAppState.match(/inactive|background/)) {
+      // App has gone to the background, stop polling
+      stopPolling();
+    }
+    appStateRef.current = nextAppState;
+  };
+
+  const startPolling = () => {
+    // Clear any existing interval
+    stopPolling();
+    
+    // Start new polling interval
+    pollingIntervalRef.current = setInterval(() => {
+      fetchCampaigns();
+    }, 15000); // Poll every 15 seconds
+  };
+
+  const stopPolling = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  };
 
   const checkSmsAvailability = async () => {
     const isAvailable = await SMS.isAvailableAsync();
@@ -29,6 +74,7 @@ export default function InviteFriendsScreen() {
   };
 
   const handleBack = () => {
+    stopPolling(); // Stop polling when leaving the screen
     router.push('/');
   };
 
@@ -53,6 +99,7 @@ export default function InviteFriendsScreen() {
   const handleStartCampaign = async () => {
     if (!currentCampaign) return;
     try {
+      stopPolling(); // Stop polling when starting campaign
       await upsertCampaign({
         ...currentCampaign,
         status: 'waiting',
@@ -128,6 +175,9 @@ export default function InviteFriendsScreen() {
             )}
           </TouchableOpacity>
         </View>
+        <Text style={styles.pollingIndicator}>
+          Checking for new players every 15 seconds...
+        </Text>
       </View>
 
       <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
@@ -281,6 +331,14 @@ const styles = StyleSheet.create({
   },
   copyButton: {
     padding: 8,
+  },
+  pollingIndicator: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Regular',
+    marginTop: 8,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   shareButton: {
     flexDirection: 'row',
