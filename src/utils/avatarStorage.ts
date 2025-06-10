@@ -2,6 +2,7 @@ import { supabase } from '../config/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
+import { DEFAULT_AVATARS, getRandomAvatarFromCategory, type DefaultAvatar } from '../data/defaultAvatars';
 
 export type AvatarUploadResult = {
   success: boolean;
@@ -9,50 +10,36 @@ export type AvatarUploadResult = {
   error?: string;
 };
 
-// Default avatar URLs from Pexels for different classes
-export const DEFAULT_AVATARS: { [key: string]: string } = {
-  'Fighter': 'https://images.pexels.com/photos/1040881/pexels-photo-1040881.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'Wizard': 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'Rogue': 'https://images.pexels.com/photos/1212984/pexels-photo-1212984.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'Cleric': 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'Ranger': 'https://images.pexels.com/photos/1300402/pexels-photo-1300402.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'Barbarian': 'https://images.pexels.com/photos/1040881/pexels-photo-1040881.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'Bard': 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'Druid': 'https://images.pexels.com/photos/1300402/pexels-photo-1300402.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'Monk': 'https://images.pexels.com/photos/1212984/pexels-photo-1212984.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'Paladin': 'https://images.pexels.com/photos/1040881/pexels-photo-1040881.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'Sorcerer': 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'Warlock': 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-};
-
-// Random fantasy portraits for variety
-export const RANDOM_FANTASY_PORTRAITS = [
-  'https://images.pexels.com/photos/1040881/pexels-photo-1040881.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'https://images.pexels.com/photos/1212984/pexels-photo-1212984.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'https://images.pexels.com/photos/1300402/pexels-photo-1300402.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'https://images.pexels.com/photos/1674752/pexels-photo-1674752.jpeg?auto=compress&cs=tinysrgb&w=400',
-  'https://images.pexels.com/photos/1559486/pexels-photo-1559486.jpeg?auto=compress&cs=tinysrgb&w=400',
-];
-
 /**
  * Get default avatar URL for a character class
  */
 export const getDefaultAvatar = (characterClass?: string): string => {
-  if (characterClass && DEFAULT_AVATARS[characterClass]) {
-    return DEFAULT_AVATARS[characterClass];
-  }
-  return DEFAULT_AVATARS['Fighter']; // Fallback
+  const classToCategory: { [key: string]: DefaultAvatar['category'] } = {
+    'Fighter': 'warrior',
+    'Barbarian': 'warrior',
+    'Paladin': 'warrior',
+    'Wizard': 'mage',
+    'Sorcerer': 'mage',
+    'Warlock': 'mage',
+    'Rogue': 'rogue',
+    'Ranger': 'ranger',
+    'Druid': 'ranger',
+    'Cleric': 'cleric',
+    'Bard': 'general',
+    'Monk': 'general',
+  };
+
+  const category = characterClass ? classToCategory[characterClass] || 'general' : 'general';
+  const randomAvatar = getRandomAvatarFromCategory(category);
+  return randomAvatar.imagePath;
 };
 
 /**
- * Get a random fantasy portrait
+ * Get a random fantasy portrait from defaults
  */
 export const getRandomFantasyPortrait = (): string => {
-  const randomIndex = Math.floor(Math.random() * RANDOM_FANTASY_PORTRAITS.length);
-  return RANDOM_FANTASY_PORTRAITS[randomIndex];
+  const randomIndex = Math.floor(Math.random() * DEFAULT_AVATARS.length);
+  return DEFAULT_AVATARS[randomIndex].imagePath;
 };
 
 /**
@@ -147,13 +134,17 @@ export const uploadAvatar = async (
  */
 export const deleteAvatar = async (avatarUrl: string): Promise<boolean> => {
   try {
+    // Only delete if it's a Supabase storage URL (not a default avatar)
+    if (!avatarUrl.includes('supabase') || avatarUrl.includes('pexels.com')) {
+      return true; // Don't try to delete external URLs or default avatars
+    }
+
     // Extract filename from URL
     const urlParts = avatarUrl.split('/');
     const fileName = urlParts[urlParts.length - 1];
     
-    // Only delete if it's a Supabase storage URL
-    if (!avatarUrl.includes('supabase') || !fileName) {
-      return true; // Don't try to delete external URLs
+    if (!fileName) {
+      return true;
     }
 
     const { error } = await supabase.storage
@@ -314,4 +305,18 @@ export const updateCharacterAvatar = async (
     console.error('Update character avatar error:', error);
     return false;
   }
+};
+
+/**
+ * Check if avatar URL is a default avatar
+ */
+export const isDefaultAvatar = (avatarUrl: string): boolean => {
+  return DEFAULT_AVATARS.some(avatar => avatar.imagePath === avatarUrl);
+};
+
+/**
+ * Check if avatar URL is a custom uploaded avatar
+ */
+export const isCustomAvatar = (avatarUrl: string): boolean => {
+  return avatarUrl.includes('supabase') && !isDefaultAvatar(avatarUrl);
 };
