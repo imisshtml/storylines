@@ -367,6 +367,9 @@ export default function InviteFriendsScreen() {
         <Text style={styles.playersLabel}>
           Players ({currentCampaign.players.length})
         </Text>
+        <Text style={styles.realtimeIndicator}>
+          Updates automatically when players join
+        </Text>
         <ScrollView style={styles.playersList}>
           {currentCampaign.players.map((player, index) => {
             const playerCharacter = getPlayerCharacter(player.id);
@@ -648,8 +651,15 @@ const styles = StyleSheet.create({
   playersLabel: {
     fontSize: 16,
     color: '#fff',
-    marginBottom: 8,
+    marginBottom: 4,
     fontFamily: 'Inter-Bold',
+  },
+  realtimeIndicator: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 12,
+    fontStyle: 'italic',
   },
   playersList: {
     flex: 1,
