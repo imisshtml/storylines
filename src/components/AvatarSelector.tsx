@@ -100,7 +100,7 @@ export default function AvatarSelector({
             >
               {isUploading ? (
                 <>
-                  <ActivityIndicator size="small\" color="#fff" />
+                  <ActivityIndicator size="small" color="#fff" />
                   <Text style={styles.uploadButtonText}>
                     {uploadProgress || 'Uploading...'}
                   </Text>
@@ -121,8 +121,8 @@ export default function AvatarSelector({
           </View>
 
           {/* Avatar Grid */}
-          <ScrollView 
-            style={styles.avatarGrid} 
+          <ScrollView
+            style={styles.avatarGrid}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.avatarGridContent}
           >
