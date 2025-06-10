@@ -92,21 +92,21 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       onPress: handleJoinCampaign,
     },
     {
-      icon: <User size={24} color="#fff" />,
-      title: 'Profile',
-      subtitle: 'Manage your account',
-      onPress: () => {
-        onClose();
-        router.push('/profile');
-      },
-    },
-    {
       icon: <UserPlus size={24} color="#fff" />,
       title: 'Create Character',
       subtitle: 'Build a new D&D character',
       onPress: () => {
         onClose();
         router.push('/creation');
+      },
+    },
+    {
+      icon: <User size={24} color="#fff" />,
+      title: 'Profile',
+      subtitle: 'Manage your account',
+      onPress: () => {
+        onClose();
+        router.push('/profile');
       },
     },
     {
