@@ -234,6 +234,12 @@ export default function CharacterViewScreen() {
     return character?.campaign_id ? 'Adventure Campaign' : 'No Campaign Set';
   };
 
+  const hasSpellcasting = () => {
+    // Check if the character's class supports spellcasting
+    const classData = character?.character_data?.class;
+    return classData?.spellcasting || false;
+  };
+
   if (!character) {
     return (
       <SafeAreaView style={styles.container}>
@@ -315,42 +321,44 @@ export default function CharacterViewScreen() {
           </View>
         )}
 
-        {/* Spells */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Spells</Text>
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => setIsEditingSpells(true)}
-            >
-              <Edit3 size={16} color="#4CAF50" />
-              <Text style={styles.editButtonText}>Edit</Text>
-            </TouchableOpacity>
-          </View>
-          {character.spells && character.spells.length > 0 ? (
-            <View style={styles.spellsList}>
-              {character.spells.map((spell, index) => (
-                <View key={index} style={styles.spellItem}>
-                  <Text style={styles.spellName}>
-                    {spell.name} ({spell.level === 0 ? 'c' : spell.level})
-                  </Text>
-                  <Text style={styles.spellSchool}>{spell.school?.name || 'Unknown'}</Text>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.noSpellsContainer}>
-              <Text style={styles.noSpellsText}>No spells selected</Text>
+        {/* Spells - Only show if class supports spellcasting */}
+        {hasSpellcasting() && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Spells</Text>
               <TouchableOpacity
-                style={styles.addSpellsButton}
+                style={styles.editButton}
                 onPress={() => setIsEditingSpells(true)}
               >
-                <Scroll size={16} color="#4CAF50" />
-                <Text style={styles.addSpellsButtonText}>Add Spells</Text>
+                <Edit3 size={16} color="#4CAF50" />
+                <Text style={styles.editButtonText}>Edit</Text>
               </TouchableOpacity>
             </View>
-          )}
-        </View>
+            {character.spells && character.spells.length > 0 ? (
+              <View style={styles.spellsList}>
+                {character.spells.map((spell, index) => (
+                  <View key={index} style={styles.spellItem}>
+                    <Text style={styles.spellName}>
+                      {spell.name} ({spell.level === 0 ? 'c' : spell.level})
+                    </Text>
+                    <Text style={styles.spellSchool}>{spell.school?.name || 'Unknown'}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.noSpellsContainer}>
+                <Text style={styles.noSpellsText}>No spells selected</Text>
+                <TouchableOpacity
+                  style={styles.addSpellsButton}
+                  onPress={() => setIsEditingSpells(true)}
+                >
+                  <Scroll size={16} color="#4CAF50" />
+                  <Text style={styles.addSpellsButtonText}>Add Spells</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Equipment */}
         <View style={styles.section}>
@@ -360,7 +368,7 @@ export default function CharacterViewScreen() {
             <Text style={styles.equipmentItem}>• Simple Weapon (1d6 damage)</Text>
             <Text style={styles.equipmentItem}>• Adventuring Pack</Text>
             <Text style={styles.equipmentItem}>• 50 Gold Pieces</Text>
-            {character.character_data?.class?.spellcasting && (
+            {hasSpellcasting() && (
               <Text style={styles.equipmentItem}>• Spellcasting Focus</Text>
             )}
           </View>
@@ -395,69 +403,71 @@ export default function CharacterViewScreen() {
         </View>
       </Modal>
 
-      {/* Spells Edit Modal */}
-      <Modal
-        visible={isEditingSpells}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setIsEditingSpells(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Spells</Text>
-              <TouchableOpacity onPress={() => setIsEditingSpells(false)}>
-                <X size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalBody}>
-              <Text style={styles.modalSubtitle}>
-                Selected: {selectedSpells.length} spells
-              </Text>
-              {availableSpells.map((spell) => (
+      {/* Spells Edit Modal - Only show if class supports spellcasting */}
+      {hasSpellcasting() && (
+        <Modal
+          visible={isEditingSpells}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setIsEditingSpells(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Edit Spells</Text>
+                <TouchableOpacity onPress={() => setIsEditingSpells(false)}>
+                  <X size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.modalBody}>
+                <Text style={styles.modalSubtitle}>
+                  Selected: {selectedSpells.length} spells
+                </Text>
+                {availableSpells.map((spell) => (
+                  <TouchableOpacity
+                    key={spell.index}
+                    style={[
+                      styles.spellOptionItem,
+                      selectedSpells.some(s => s.index === spell.index) && styles.spellOptionSelected,
+                    ]}
+                    onPress={() => {
+                      if (selectedSpells.some(s => s.index === spell.index)) {
+                        setSelectedSpells(prev => prev.filter(s => s.index !== spell.index));
+                      } else {
+                        setSelectedSpells(prev => [...prev, spell]);
+                      }
+                    }}
+                  >
+                    <Text style={[
+                      styles.spellOptionName,
+                      selectedSpells.some(s => s.index === spell.index) && styles.spellOptionNameSelected,
+                    ]}>
+                      {spell.name}
+                    </Text>
+                    <Text style={[
+                      styles.spellOptionDetails,
+                      selectedSpells.some(s => s.index === spell.index) && styles.spellOptionDetailsSelected,
+                    ]}>
+                      {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`} • {spell.school}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <View style={styles.modalFooter}>
                 <TouchableOpacity
-                  key={spell.index}
-                  style={[
-                    styles.spellOptionItem,
-                    selectedSpells.some(s => s.index === spell.index) && styles.spellOptionSelected,
-                  ]}
-                  onPress={() => {
-                    if (selectedSpells.some(s => s.index === spell.index)) {
-                      setSelectedSpells(prev => prev.filter(s => s.index !== spell.index));
-                    } else {
-                      setSelectedSpells(prev => [...prev, spell]);
-                    }
-                  }}
+                  style={styles.saveSpellsButton}
+                  onPress={updateCharacterSpells}
+                  disabled={isLoading}
                 >
-                  <Text style={[
-                    styles.spellOptionName,
-                    selectedSpells.some(s => s.index === spell.index) && styles.spellOptionNameSelected,
-                  ]}>
-                    {spell.name}
-                  </Text>
-                  <Text style={[
-                    styles.spellOptionDetails,
-                    selectedSpells.some(s => s.index === spell.index) && styles.spellOptionDetailsSelected,
-                  ]}>
-                    {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`} • {spell.school}
+                  <Text style={styles.saveSpellsButtonText}>
+                    {isLoading ? 'Saving...' : 'Save Changes'}
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.saveSpellsButton}
-                onPress={updateCharacterSpells}
-                disabled={isLoading}
-              >
-                <Text style={styles.saveSpellsButtonText}>
-                  {isLoading ? 'Saving...' : 'Save Changes'}
-                </Text>
-              </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        )}
+      )}
     </SafeAreaView>
   );
 }
