@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "storylines",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
@@ -32,6 +32,9 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "web": {
+      "output": "server"
     }
   }
 }
