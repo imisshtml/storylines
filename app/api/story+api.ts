@@ -1,8 +1,29 @@
-import OpenAI from 'openai';
+// Import OpenAI with proper error handling for React Native/Expo
+let OpenAI: any;
+let openai: any = null;
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+try {
+  // Try to import with node shims
+  require('openai/shims/node');
+  OpenAI = require('openai').default;
+} catch (e) {
+  try {
+    // Fallback to regular import
+    OpenAI = require('openai').default;
+  } catch (e2) {
+    console.error('Failed to import OpenAI:', e2);
+  }
+}
+
+if (OpenAI) {
+  try {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  } catch (e) {
+    console.error('Failed to initialize OpenAI:', e);
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -11,6 +32,13 @@ export async function POST(request: Request) {
     if (!campaignId || !message) {
       return new Response('Missing required fields', {
         status: 400,
+        headers: { 'Content-Type': 'text/plain' },
+      });
+    }
+
+    if (!openai) {
+      return new Response('OpenAI service unavailable', {
+        status: 503,
         headers: { 'Content-Type': 'text/plain' },
       });
     }
@@ -57,11 +85,11 @@ export async function POST(request: Request) {
 function parseStoryResponse(response: string) {
   // Look for choices section in the response
   const choicesMatch = response.match(/\[CHOICES\](.*?)\[\/CHOICES\]/s);
-  
+
   if (choicesMatch) {
     // Extract story (everything before [CHOICES])
     const story = response.split('[CHOICES]')[0].trim();
-    
+
     // Extract and parse choices
     const choicesText = choicesMatch[1].trim();
     const choices = choicesText
@@ -69,14 +97,14 @@ function parseStoryResponse(response: string) {
       .map(line => line.replace(/^\d+\.\s*/, '').trim())
       .filter(choice => choice.length > 0)
       .slice(0, 4); // Limit to 4 choices max
-    
+
     return { story, choices };
   }
-  
+
   // If no choices section found, return the full response as story with empty choices
-  return { 
-    story: response.trim(), 
-    choices: [] 
+  return {
+    story: response.trim(),
+    choices: []
   };
 }
 
