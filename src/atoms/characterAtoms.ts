@@ -35,6 +35,21 @@ export type DnDEquipment = {
   other: any[];
 };
 
+export type Equipment = {
+  id: string;
+  name: string;
+  type: string;
+  category?: string;
+  cost_gold: number;
+  cost_silver: number;
+  cost_copper: number;
+  weight: number;
+  description?: string;
+  properties: any;
+  rarity: string;
+  created_at?: string;
+};
+
 export type Character = {
   id: string;
   user_id: string;
@@ -49,6 +64,14 @@ export type Character = {
   spells: DnDSpell[];
   equipment: DnDEquipment;
   character_data: any;
+  current_hitpoints: number;
+  max_hitpoints: number;
+  temp_hitpoints: number;
+  armor_class: number;
+  conditions: any[];
+  gold: number;
+  silver: number;
+  copper: number;
   created_at?: string;
   updated_at?: string;
 };
@@ -122,10 +145,19 @@ export const characterEquipmentAtom = atom<DnDEquipment>({
   other: [],
 });
 
+// Currency atoms for character creation
+export const characterGoldAtom = atom(50); // Starting gold
+export const characterSilverAtom = atom(0);
+export const characterCopperAtom = atom(0);
+
+// Purchased equipment atom
+export const purchasedEquipmentAtom = atom<Equipment[]>([]);
+
 // API data atoms
 export const racesAtom = atom<Race[]>([]);
 export const classesAtom = atom<Class[]>([]);
 export const spellsAtom = atom<DnDSpell[]>([]);
+export const equipmentAtom = atom<Equipment[]>([]);
 
 // Characters storage
 export const charactersAtom = atom<Character[]>([]);
@@ -238,6 +270,29 @@ export const fetchSpellsAtom = atom(
   }
 );
 
+// Fetch equipment from Supabase
+export const fetchEquipmentAtom = atom(
+  null,
+  async (get, set) => {
+    try {
+      const { data: equipment, error } = await supabase
+        .from('equipment')
+        .select('*')
+        .order('type')
+        .order('name');
+
+      if (error) {
+        throw error;
+      }
+
+      set(equipmentAtom, equipment || []);
+    } catch (error) {
+      console.error('Error fetching equipment:', error);
+      set(equipmentAtom, []); // Set empty array on error
+    }
+  }
+);
+
 // Save character to Supabase
 export const saveCharacterAtom = atom(
   null,
@@ -321,5 +376,89 @@ export const resetCharacterCreationAtom = atom(
       tools: [],
       other: [],
     });
+    set(characterGoldAtom, 50);
+    set(characterSilverAtom, 0);
+    set(characterCopperAtom, 0);
+    set(purchasedEquipmentAtom, []);
+  }
+);
+
+// Helper functions for currency conversion
+export const convertToCopper = (gold: number, silver: number, copper: number): number => {
+  return (gold * 100) + (silver * 10) + copper;
+};
+
+export const convertFromCopper = (totalCopper: number): { gold: number; silver: number; copper: number } => {
+  const gold = Math.floor(totalCopper / 100);
+  const remaining = totalCopper % 100;
+  const silver = Math.floor(remaining / 10);
+  const copper = remaining % 10;
+  
+  return { gold, silver, copper };
+};
+
+// Calculate total cost in copper
+export const getEquipmentCostInCopper = (equipment: Equipment): number => {
+  return convertToCopper(equipment.cost_gold, equipment.cost_silver, equipment.cost_copper);
+};
+
+// Check if player can afford equipment
+export const canAffordEquipment = (equipment: Equipment, gold: number, silver: number, copper: number): boolean => {
+  const totalPlayerCopper = convertToCopper(gold, silver, copper);
+  const equipmentCost = getEquipmentCostInCopper(equipment);
+  return totalPlayerCopper >= equipmentCost;
+};
+
+// Purchase equipment atom
+export const purchaseEquipmentAtom = atom(
+  null,
+  (get, set, equipment: Equipment) => {
+    const currentGold = get(characterGoldAtom);
+    const currentSilver = get(characterSilverAtom);
+    const currentCopper = get(characterCopperAtom);
+    const purchasedEquipment = get(purchasedEquipmentAtom);
+
+    if (!canAffordEquipment(equipment, currentGold, currentSilver, currentCopper)) {
+      throw new Error('Cannot afford this equipment');
+    }
+
+    // Calculate new currency amounts
+    const totalPlayerCopper = convertToCopper(currentGold, currentSilver, currentCopper);
+    const equipmentCost = getEquipmentCostInCopper(equipment);
+    const remainingCopper = totalPlayerCopper - equipmentCost;
+    const newCurrency = convertFromCopper(remainingCopper);
+
+    // Update currency
+    set(characterGoldAtom, newCurrency.gold);
+    set(characterSilverAtom, newCurrency.silver);
+    set(characterCopperAtom, newCurrency.copper);
+
+    // Add equipment to purchased list
+    set(purchasedEquipmentAtom, [...purchasedEquipment, equipment]);
+  }
+);
+
+// Remove equipment atom
+export const removeEquipmentAtom = atom(
+  null,
+  (get, set, equipment: Equipment) => {
+    const currentGold = get(characterGoldAtom);
+    const currentSilver = get(characterSilverAtom);
+    const currentCopper = get(characterCopperAtom);
+    const purchasedEquipment = get(purchasedEquipmentAtom);
+
+    // Calculate refund (full price back)
+    const totalPlayerCopper = convertToCopper(currentGold, currentSilver, currentCopper);
+    const equipmentCost = getEquipmentCostInCopper(equipment);
+    const newTotalCopper = totalPlayerCopper + equipmentCost;
+    const newCurrency = convertFromCopper(newTotalCopper);
+
+    // Update currency
+    set(characterGoldAtom, newCurrency.gold);
+    set(characterSilverAtom, newCurrency.silver);
+    set(characterCopperAtom, newCurrency.copper);
+
+    // Remove equipment from purchased list
+    set(purchasedEquipmentAtom, purchasedEquipment.filter(item => item.id !== equipment.id));
   }
 );
