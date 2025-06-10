@@ -262,13 +262,13 @@ export default function HomeScreen() {
                 <User size={48} color="#666" />
                 <Text style={styles.noCharacters}>No characters created yet</Text>
                 <Text style={styles.noCharactersSubtext}>
-                  Create your first D&D character to begin your adventures!
+                  Create your first character to begin your adventures!
                 </Text>
                 <TouchableOpacity
                   style={styles.createCharacterButton}
                   onPress={() => router.push('/creation')}
                 >
-                  <Text style={styles.createCharacterButtonText}>Create Your First Character</Text>
+                  <Text style={styles.createCharacterButtonText}>Create Character</Text>
                 </TouchableOpacity>
               </View>
             )}
