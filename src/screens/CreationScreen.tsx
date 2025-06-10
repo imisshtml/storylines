@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,25 +6,16 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  SafeAreaView,
   ActivityIndicator,
   Alert,
+  Image,
+  Platform,
+  Modal,
 } from 'react-native';
-import { useAtom } from 'jotai';
+import { ArrowLeft, ArrowRight, Save, User, Dices, Scroll, Package, Camera, Upload, ShieldUser, Dna, Brain, BookOpen, X, ShoppingCart, Trash2, Coins } from 'lucide-react-native';
 import { router } from 'expo-router';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Save,
-  Dice6,
-  User,
-  Shield,
-  Zap,
-  Sword,
-  Package,
-  Book,
-  ChevronDown,
-  ChevronUp,
-} from 'lucide-react-native';
+import { useAtom } from 'jotai';
 import {
   characterCreationStepAtom,
   characterNameAtom,
@@ -34,32 +25,55 @@ import {
   selectedSkillsAtom,
   selectedSpellsAtom,
   characterEquipmentAtom,
+  characterGoldAtom,
+  characterSilverAtom,
+  characterCopperAtom,
+  purchasedEquipmentAtom,
   racesAtom,
   classesAtom,
   spellsAtom,
+  equipmentAtom,
   fetchRacesAtom,
   fetchClassesAtom,
   fetchSpellsAtom,
+  fetchEquipmentAtom,
   saveCharacterAtom,
   resetCharacterCreationAtom,
+  setStartingWealthAtom,
+  purchaseEquipmentAtom,
+  removeEquipmentAtom,
+  canAffordEquipment,
+  getEquipmentCostInCopper,
+  convertFromCopper,
+  getStartingGold,
+  STARTING_WEALTH_BY_CLASS,
   type Race,
   type Class,
   type DnDSpell,
   type DnDAbilities,
+  type DnDEquipment,
+  type Equipment,
 } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
-import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { getSpellcastingInfo } from '../data/spellcastingData';
+import { pickAndUploadAvatar, getRandomFantasyPortrait, getDefaultAvatar } from '../utils/avatarStorage';
 
 const CREATION_STEPS = [
-  { title: 'Name & Race', icon: User },
-  { title: 'Class', icon: Shield },
-  { title: 'Abilities', icon: Dice6 },
-  { title: 'Skills', icon: Zap },
-  { title: 'Spells', icon: Sword },
-  { title: 'Equipment', icon: Package },
-  { title: 'Review', icon: Save },
+  { id: 0, title: 'Info', icon: User },
+  { id: 1, title: 'Class', icon: ShieldUser },
+  { id: 2, title: 'Race', icon: Dna },
+  { id: 3, title: 'Stats', icon: Dices },
+  { id: 4, title: 'Skills', icon: Brain },
+  { id: 5, title: 'Spells', icon: Scroll },
+  { id: 6, title: 'Equip', icon: Package },
+  { id: 7, title: 'Review', icon: Save },
 ];
+
+// Point buy cost chart for D&D 5e
+const POINT_BUY_COSTS: { [key: number]: number } = {
+  8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9
+};
+
+const POINT_BUY_TOTAL = 27;
 
 export default function CreationScreen() {
   const [user] = useAtom(userAtom);
@@ -71,909 +85,954 @@ export default function CreationScreen() {
   const [selectedSkills, setSelectedSkills] = useAtom(selectedSkillsAtom);
   const [selectedSpells, setSelectedSpells] = useAtom(selectedSpellsAtom);
   const [equipment, setEquipment] = useAtom(characterEquipmentAtom);
-
+  const [characterGold, setCharacterGold] = useAtom(characterGoldAtom);
+  const [characterSilver, setCharacterSilver] = useAtom(characterSilverAtom);
+  const [characterCopper, setCharacterCopper] = useAtom(characterCopperAtom);
+  const [purchasedEquipment, setPurchasedEquipment] = useAtom(purchasedEquipmentAtom);
+  
   const [races] = useAtom(racesAtom);
   const [classes] = useAtom(classesAtom);
   const [spells] = useAtom(spellsAtom);
-
+  const [availableEquipment] = useAtom(equipmentAtom);
+  
   const [, fetchRaces] = useAtom(fetchRacesAtom);
   const [, fetchClasses] = useAtom(fetchClassesAtom);
   const [, fetchSpells] = useAtom(fetchSpellsAtom);
+  const [, fetchEquipment] = useAtom(fetchEquipmentAtom);
   const [, saveCharacter] = useAtom(saveCharacterAtom);
-  const [, resetCreation] = useAtom(resetCharacterCreationAtom);
+  const [, resetCharacterCreation] = useAtom(resetCharacterCreationAtom);
+  const [, setStartingWealth] = useAtom(setStartingWealthAtom);
+  const [, purchaseEquipment] = useAtom(purchaseEquipmentAtom);
+  const [, removeEquipment] = useAtom(removeEquipmentAtom);
 
-  const [loading, setLoading] = useState(false);
-  const [selectedRaceForDetails, setSelectedRaceForDetails] = useState<Race | null>(null);
-  const [selectedClassForDetails, setSelectedClassForDetails] = useState<Class | null>(null);
-
-  // Bottom sheet refs and snap points
-  const raceBottomSheetRef = useRef<BottomSheet>(null);
-  const classBottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = ['50%', '90%'];
-
-  // Add state for expanded spells
-  const [expandedSpells, setExpandedSpells] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [showClassDetails, setShowClassDetails] = useState<Class | null>(null);
+  const [showRaceDetails, setShowRaceDetails] = useState<Race | null>(null);
+  const [equipmentFilter, setEquipmentFilter] = useState<string>('all');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
 
   useEffect(() => {
-    // Fetch all D&D data when component mounts
     const loadData = async () => {
-      setLoading(true);
+      setIsLoading(true);
       try {
         await Promise.all([
           fetchRaces(),
           fetchClasses(),
           fetchSpells(),
+          fetchEquipment(),
         ]);
       } catch (error) {
-        console.error('Error loading D&D data:', error);
+        console.error('Error loading character creation data:', error);
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
 
     loadData();
-  }, []);
+  }, [fetchRaces, fetchClasses, fetchSpells, fetchEquipment]);
 
-  // Check if current class has spellcasting
-  const hasSpellcasting = selectedClass?.spellcasting !== undefined;
-
-  // Get the actual step index, skipping disabled steps
-  const getActualStepIndex = (step: number) => {
-    let actualStep = step;
-    
-    // Skip spells if not a spellcaster
-    if (!hasSpellcasting && actualStep >= 4) {
-      actualStep += 1;
+  // Set starting wealth when class is selected
+  useEffect(() => {
+    if (selectedClass) {
+      setStartingWealth();
     }
-    
-    return actualStep;
-  };
-
-  // Get the display step index for progress
-  const getDisplayStepIndex = (step: number) => {
-    let displayStep = step;
-    
-    // Adjust for skipped spells step
-    if (!hasSpellcasting && step > 4) {
-      displayStep -= 1;
-    }
-    
-    return displayStep;
-  };
-
-  // Get total steps (adjusting for disabled features)
-  const getTotalSteps = () => {
-    let total = CREATION_STEPS.length;
-    
-    // Subtract 1 if spells are disabled for this class
-    if (!hasSpellcasting) {
-      total -= 1;
-    }
-    
-    return total;
-  };
-
-  // Get skill choice information
-  const getSkillChoiceInfo = () => {
-    if (!selectedClass?.proficiency_choices?.[0]) {
-      return { maxChoices: 0, availableSkills: [] };
-    }
-
-    const choiceData = selectedClass.proficiency_choices[0];
-    return {
-      maxChoices: choiceData.choose,
-      availableSkills: choiceData.from?.options || []
-    };
-  };
+  }, [selectedClass, setStartingWealth]);
 
   const handleBack = () => {
     if (currentStep > 0) {
-      let newStep = currentStep - 1;
-      
-      // Skip spells step when going back if not a spellcaster
-      if (!hasSpellcasting && newStep === 4) {
-        newStep = 3;
-      }
-      
-      setCurrentStep(newStep);
+      setCurrentStep(currentStep - 1);
     } else {
-      resetCreation();
       router.back();
     }
   };
 
   const handleNext = () => {
-    let newStep = currentStep + 1;
-    
-    // Skip spells step if not a spellcaster
-    if (!hasSpellcasting && newStep === 4) {
-      newStep = 5;
-    }
-    
-    if (newStep < CREATION_STEPS.length) {
-      setCurrentStep(newStep);
+    if (currentStep < CREATION_STEPS.length - 1) {
+      setCurrentStep(currentStep + 1);
     }
   };
 
-  const canProceed = () => {
-    switch (currentStep) {
-      case 0: return characterName.length >= 2 && selectedRace;
-      case 1: return selectedClass;
-      case 2: return true; // Abilities always valid
-      case 3: {
-        // Skills - must select exactly the required number
-        const { maxChoices } = getSkillChoiceInfo();
-        return maxChoices === 0 || selectedSkills.length === maxChoices;
+  const pickImage = async () => {
+    if (!user) return;
+
+    setIsUploadingAvatar(true);
+    try {
+      if (Platform.OS === 'web') {
+        // For web, use a random fantasy portrait
+        const randomPortrait = getRandomFantasyPortrait();
+        setAvatarUri(randomPortrait);
+      } else {
+        // For mobile, use the avatar upload utility
+        const result = await pickAndUploadAvatar(
+          user.id,
+          undefined, // No character ID yet since we're creating
+          setUploadProgress
+        );
+
+        if (result.success && result.url) {
+          setAvatarUri(result.url);
+        } else {
+          Alert.alert('Upload Failed', result.error || 'Failed to upload avatar');
+        }
       }
-      case 4: {
-        // Spells - must select required number of cantrips and spells
-        if (!hasSpellcasting) return true;
-        
-        const spellcastingInfo = getSpellcastingInfo(selectedClass?.name || '', 1);
-        if (!spellcastingInfo) return true;
-
-        const selectedCantrips = selectedSpells.filter(spell => spell.level === 0);
-        const selectedLevel1Spells = selectedSpells.filter(spell => spell.level === 1);
-
-        // Must select exact number of cantrips
-        const hasRequiredCantrips = selectedCantrips.length === spellcastingInfo.cantripsKnown;
-
-        // If spellsKnown is specified, must select exact number of level 1 spells
-        // If not specified (like for prepared casters), any number is valid
-        const hasRequiredSpells = spellcastingInfo.spellsKnown === null || 
-                                 selectedLevel1Spells.length === spellcastingInfo.spellsKnown;
-
-        return hasRequiredCantrips && hasRequiredSpells;
-      }
-      case 5: return true; // Equipment can be empty
-      case 6: return true; // Review step
-      default: return false;
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to select avatar');
+    } finally {
+      setIsUploadingAvatar(false);
+      setUploadProgress('');
     }
   };
 
-  const rollAbilityScore = () => {
-    // Roll 4d6, drop lowest
-    const rolls = Array.from({ length: 4 }, () => Math.floor(Math.random() * 6) + 1);
-    rolls.sort((a, b) => b - a);
-    return rolls.slice(0, 3).reduce((sum, roll) => sum + roll, 0);
+  const calculatePointsUsed = () => {
+    return Object.values(abilities).reduce((total, score) => {
+      return total + (POINT_BUY_COSTS[score] || 0);
+    }, 0);
   };
 
-  const rollAllAbilities = () => {
-    setAbilities({
-      strength: rollAbilityScore(),
-      dexterity: rollAbilityScore(),
-      constitution: rollAbilityScore(),
-      intelligence: rollAbilityScore(),
-      wisdom: rollAbilityScore(),
-      charisma: rollAbilityScore(),
-    });
+  const getRemainingPoints = () => {
+    return POINT_BUY_TOTAL - calculatePointsUsed();
   };
 
-  const getModifier = (score: number) => {
+  const canIncreaseAbility = (ability: keyof DnDAbilities) => {
+    const currentScore = abilities[ability];
+    const nextScore = currentScore + 1;
+    
+    if (nextScore > 15) return false;
+    
+    const currentCost = POINT_BUY_COSTS[currentScore] || 0;
+    const nextCost = POINT_BUY_COSTS[nextScore] || 0;
+    const costDifference = nextCost - currentCost;
+    
+    return getRemainingPoints() >= costDifference;
+  };
+
+  const getAbilityModifier = (score: number) => {
     return Math.floor((score - 10) / 2);
   };
 
-  // Get racial bonus for a specific ability
-  const getRacialBonus = (abilityName: string): number => {
-    if (!selectedRace) return 0;
+  const getFinalAbilityScore = (ability: keyof DnDAbilities) => {
+    let baseScore = abilities[ability];
     
-    const bonus = selectedRace.ability_bonuses.find(
-      bonus => bonus.ability_score.index === abilityName.substring(0, 3).toLowerCase()
+    // Add racial bonuses
+    if (selectedRace?.ability_bonuses) {
+      const bonus = selectedRace.ability_bonuses.find(
+        (bonus) => bonus.ability_score.index === ability.substring(0, 3)
+      );
+      if (bonus) {
+        baseScore += bonus.bonus;
+      }
+    }
+    
+    return baseScore;
+  };
+
+  const calculateHitPoints = () => {
+    if (!selectedClass) return 8;
+    
+    const hitDie = selectedClass.hit_die;
+    const conModifier = getAbilityModifier(getFinalAbilityScore('constitution'));
+    
+    // Max hit die + CON modifier (minimum 1)
+    return Math.max(1, hitDie + conModifier);
+  };
+
+  const calculateArmorClass = () => {
+    const dexModifier = getAbilityModifier(getFinalAbilityScore('dexterity'));
+    
+    // Find equipped armor
+    const equippedArmor = purchasedEquipment.find(item => 
+      item.type === 'armor' && item.category !== 'shield'
     );
     
-    return bonus ? bonus.bonus : 0;
-  };
-
-  // Get final ability score (base + racial bonus)
-  const getFinalAbilityScore = (abilityName: keyof DnDAbilities): number => {
-    const baseScore = abilities[abilityName];
-    const racialBonus = getRacialBonus(abilityName);
-    return baseScore + racialBonus;
-  };
-
-  // Helper function to format ability bonuses
-  const formatAbilityBonuses = (race: Race) => {
-    if (!race.ability_bonuses || race.ability_bonuses.length === 0) {
-      return 'No ability bonuses';
-    }
-
-    return race.ability_bonuses
-      .map(increase => {
-        const abilityName = increase.ability_score.name;
-        const bonus = increase.bonus;
-        return `+${bonus} ${abilityName}`;
-      })
-      .join(', ');
-  };
-
-  // Helper function to format class hit die
-  const formatHitDie = (cls: Class) => {
-    return `d${cls.hit_die}`;
-  };
-
-  // Helper function to format class proficiencies
-  const formatProficiencies = (cls: Class) => {
-    if (!cls.proficiencies || cls.proficiencies.length === 0) {
-      return 'None';
-    }
-    return cls.proficiencies.map(prof => prof.name).join(', ');
-  };
-
-  // Helper function to format saving throws
-  const formatSavingThrows = (cls: Class) => {
-    if (!cls.saving_throws || cls.saving_throws.length === 0) {
-      return 'None';
-    }
-    return cls.saving_throws.map(save => save.name).join(', ');
-  };
-
-  // Handle race details bottom sheet
-  const handleRaceDetailsPress = useCallback((race: Race) => {
-    setSelectedRaceForDetails(race);
-    raceBottomSheetRef.current?.expand();
-  }, []);
-
-  const handleCloseRaceBottomSheet = useCallback(() => {
-    raceBottomSheetRef.current?.close();
-  }, []);
-
-  // Handle class details bottom sheet
-  const handleClassDetailsPress = useCallback((cls: Class) => {
-    setSelectedClassForDetails(cls);
-    classBottomSheetRef.current?.expand();
-  }, []);
-
-  const handleCloseClassBottomSheet = useCallback(() => {
-    classBottomSheetRef.current?.close();
-  }, []);
-
-  // Get race description
-  const getRaceDescription = (race: Race): string => {
-    const descriptions: { [key: string]: string } = {
-      dragonborn: 'Dragonborn are proud, honorable beings with draconic ancestry. They often possess strong physiques, a breath weapon tied to their lineage, and a natural sense of leadership and loyalty. Their appearance resembles upright dragons, with scales, tails, and a draconic snout.',
-      dwarf: 'Dwarves are a stout and resilient people known for their craftsmanship, traditions, and strong sense of community. They typically live in mountainous or underground strongholds and have a natural affinity for stonework, mining, and forging.',
-      elf: 'Elves are graceful and long-lived beings attuned to magic and nature. Known for their keen senses and agility, elves often live in forested or mystical regions and maintain deep cultural traditions rooted in beauty, artistry, and longevity.',
-      gnome: 'Gnomes are clever and curious folk, often driven by a thirst for knowledge and invention. They are small in stature but energetic in personality, frequently engaging in magical experimentation or intricate mechanical designs.',
-      'half-elf': 'Half-elves combine traits from both elves and humans, blending adaptability with grace. They often serve as bridges between cultures, showing a talent for diplomacy, creativity, and a deep personal drive.',
-      'half-orc': 'Half-orcs inherit strength and resilience from their orcish ancestry and ambition from their human side. They are often formidable warriors or survivors, driven by personal purpose and inner strength.',
-      halfling: 'Halflings are cheerful, nimble folk known for their optimism and quiet resourcefulness. They value home and community, often living in rural areas, and possess a knack for staying out of trouble—or escaping it quickly.',
-      human: 'Humans are the most adaptable and ambitious of the common races. They thrive in diverse environments and cultures, often driven by a desire to explore, build, and lead. Their diversity makes them capable of great innovation.',
-      tiefling: 'Tieflings are descended from ancient pacts with infernal powers, marked by their horns, tails, and other features. Despite their appearance, tieflings have the same capacity for good or evil as any other race and often live with a strong sense of self-determination.',
-    };
-    return descriptions[race.index] || 'No description available.';
-  };
-
-  // Get class description
-  const getClassDescription = (cls: Class): string => {
-    const descriptions: { [key: string]: string } = {
-      barbarian: 'A fierce warrior of primitive background who can enter a battle rage. Barbarians excel in melee combat and can take tremendous amounts of damage while dealing devastating attacks.',
-      bard: 'A master of song, speech, and the magic they contain. Bards are versatile spellcasters and skilled performers who can inspire allies, control the battlefield, and solve problems with creativity.',
-      cleric: 'A priestly champion who wields divine magic in service of a higher power. Clerics are powerful healers and support characters who can also hold their own in combat.',
-      druid: 'A priest of nature, wielding elemental forces and transforming into animals. Druids are versatile spellcasters with a deep connection to the natural world.',
-      fighter: 'A master of martial combat, skilled with a variety of weapons and armor. Fighters are the most versatile combatants, capable of adapting to any fighting style.',
-      monk: 'A master of martial arts, harnessing inner power through discipline and training. Monks are agile combatants who can perform supernatural feats through ki.',
-      paladin: 'A holy warrior bound to a sacred oath. Paladins combine martial prowess with divine magic, serving as champions of justice and righteousness.',
-      ranger: 'A warrior of the wilderness, skilled in tracking, survival, and combat. Rangers are versatile fighters who excel in natural environments.',
-      rogue: 'A scoundrel who uses stealth and trickery to accomplish goals. Rogues are skilled in infiltration, trap detection, and dealing massive damage from the shadows.',
-      sorcerer: 'A spellcaster who draws on inherent magic from a draconic or other exotic bloodline. Sorcerers have fewer spells than wizards but can modify them with metamagic.',
-      warlock: 'A wielder of magic derived from a bargain with an extraplanar entity. Warlocks have unique spellcasting abilities and powerful supernatural invocations.',
-      wizard: 'A scholarly magic-user capable of manipulating the structures of spellcasting. Wizards have the largest spell selection and can prepare different spells each day.',
-    };
-    return descriptions[cls.index] || 'No description available.';
-  };
-
-  // Add toggle function
-  const toggleSpellExpanded = (spellIndex: string) => {
-    setExpandedSpells(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(spellIndex)) {
-        newSet.delete(spellIndex);
-      } else {
-        newSet.add(spellIndex);
+    if (equippedArmor && equippedArmor.properties) {
+      const armorProps = equippedArmor.properties as any;
+      let ac = armorProps.ac || 10;
+      
+      // Apply DEX modifier based on armor type
+      if (armorProps.dex_bonus === 'full') {
+        ac += dexModifier;
+      } else if (armorProps.dex_bonus === 'max_2') {
+        ac += Math.min(2, dexModifier);
       }
-      return newSet;
-    });
+      
+      return ac;
+    }
+    
+    // No armor: 10 + DEX modifier
+    return 10 + dexModifier;
+  };
+
+  const formatCurrency = (gold: number, silver: number, copper: number) => {
+    const parts = [];
+    if (gold > 0) parts.push(`${gold} gp`);
+    if (silver > 0) parts.push(`${silver} sp`);
+    if (copper > 0) parts.push(`${copper} cp`);
+    return parts.length > 0 ? parts.join(', ') : '0 cp';
+  };
+
+  const getEquipmentCategories = () => {
+    const categories = ['all', ...new Set(availableEquipment.map(item => item.category))];
+    return categories.filter(Boolean);
+  };
+
+  const getFilteredEquipment = () => {
+    if (equipmentFilter === 'all') {
+      return availableEquipment;
+    }
+    return availableEquipment.filter(item => item.category === equipmentFilter);
+  };
+
+  const handlePurchaseEquipment = (item: Equipment) => {
+    try {
+      purchaseEquipment(item);
+    } catch (error) {
+      Alert.alert('Cannot Purchase', 'You cannot afford this item.');
+    }
+  };
+
+  const handleRemoveEquipment = (item: Equipment) => {
+    removeEquipment(item);
+  };
+
+  const formatEquipmentCost = (item: Equipment) => {
+    const { cost_quantity, cost_unit } = item;
+    return `${cost_quantity} ${cost_unit}`;
   };
 
   const handleSaveCharacter = async () => {
-    if (!user) return;
+    if (!user || !characterName || !selectedRace || !selectedClass) {
+      Alert.alert('Error', 'Please complete all required fields');
+      return;
+    }
 
+    setIsSaving(true);
     try {
-      setLoading(true);
-      
-      // Calculate final abilities with racial bonuses
-      const finalAbilities = {
-        strength: getFinalAbilityScore('strength'),
-        dexterity: getFinalAbilityScore('dexterity'),
-        constitution: getFinalAbilityScore('constitution'),
-        intelligence: getFinalAbilityScore('intelligence'),
-        wisdom: getFinalAbilityScore('wisdom'),
-        charisma: getFinalAbilityScore('charisma'),
-      };
-      
+      const hitPoints = calculateHitPoints();
+      const armorClass = calculateArmorClass();
+
       const characterData = {
         user_id: user.id,
         name: characterName,
-        race: selectedRace!.name,
-        class: selectedClass!.name,
-        background: 'None', // No backgrounds used
+        race: selectedRace.name,
+        class: selectedClass.name,
+        background: 'Folk Hero', // Default background for now
         level: 1,
-        abilities: finalAbilities, // Save final abilities with racial bonuses
-        skills: selectedSkills.map(skill => ({
-          name: skill,
-          proficient: true,
-          ability: 'dexterity' // Default ability, should be determined based on skill
-        })),
+        abilities,
+        skills: selectedSkills,
         spells: selectedSpells,
         equipment,
+        current_hitpoints: hitPoints,
+        max_hitpoints: hitPoints,
+        temp_hitpoints: 0,
+        armor_class: armorClass,
+        conditions: [],
+        gold: characterGold,
+        silver: characterSilver,
+        copper: characterCopper,
         character_data: {
           race: selectedRace,
           class: selectedClass,
-          background: null, // No backgrounds
-          baseAbilities: abilities, // Also save base abilities for reference
+          abilities,
+          skills: selectedSkills,
+          spells: selectedSpells,
+          equipment,
+          purchasedEquipment,
+          avatar: avatarUri || getDefaultAvatar(selectedClass.name),
         },
       };
 
       await saveCharacter(characterData);
       
       Alert.alert(
-        'Character Created!',
-        `${characterName} has been successfully created.`,
+        'Success!',
+        'Your character has been created successfully.',
         [
           {
             text: 'OK',
             onPress: () => {
-              resetCreation();
+              resetCharacterCreation();
+              setAvatarUri(null);
               router.back();
             },
           },
         ]
       );
     } catch (error) {
+      console.error('Error saving character:', error);
       Alert.alert('Error', 'Failed to save character. Please try again.');
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
-  const renderStepContent = () => {
-    switch (currentStep) {
-      case 0: // Name & Race
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Character Name & Race</Text>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Character Name</Text>
-              <TextInput
-                style={styles.input}
-                value={characterName}
-                onChangeText={setCharacterName}
-                placeholder="Enter character name"
-                placeholderTextColor="#666"
-              />
-            </View>
-
-            <Text style={styles.label}>Choose Race</Text>
-            <ScrollView style={styles.optionsList}>
-              {races.map((race) => (
-                <View key={race.index} style={styles.raceCardContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.optionCard,
-                      selectedRace?.index === race.index && styles.selectedOption,
-                    ]}
-                    onPress={() => setSelectedRace(race)}
-                  >
-                    <View style={styles.raceCardContent}>
-                      <View style={styles.raceInfo}>
-                        <Text style={styles.optionTitle}>{race.name}</Text>
-                        <Text style={styles.optionDescription}>
-                          Size: {race.size} • Speed: {race.speed}ft
-                        </Text>
-                        <Text style={styles.optionBonus}>
-                          {formatAbilityBonuses(race)}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.bookIcon}
-                        onPress={() => handleRaceDetailsPress(race)}
-                      >
-                        <Book size={20} color="#4CAF50" />
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        );
-
-      case 1: // Class
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Choose Class</Text>
-            <ScrollView style={styles.optionsList}>
-              {classes.map((cls) => (
-                <View key={cls.index} style={styles.classCardContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.optionCard,
-                      selectedClass?.index === cls.index && styles.selectedOption,
-                    ]}
-                    onPress={() => setSelectedClass(cls)}
-                  >
-                    <View style={styles.classCardContent}>
-                      <View style={styles.classInfo}>
-                        <Text style={styles.optionTitle}>{cls.name}</Text>
-                        <Text style={styles.optionDescription}>
-                          Hit Die: {formatHitDie(cls)}
-                        </Text>
-                        {cls.spellcasting && (
-                          <Text style={styles.optionBonus}>
-                            Spellcaster (Level {cls.spellcasting.level})
-                          </Text>
-                        )}
-                      </View>
-                      <TouchableOpacity
-                        style={styles.bookIcon}
-                        onPress={() => handleClassDetailsPress(cls)}
-                      >
-                        <Book size={20} color="#4CAF50" />
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        );
-
-      case 2: // Abilities
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Ability Scores</Text>
-            
-            <TouchableOpacity style={styles.rollButton} onPress={rollAllAbilities}>
-              <Dice6 size={20} color="#fff" />
-              <Text style={styles.rollButtonText}>Roll All Abilities</Text>
-            </TouchableOpacity>
-
-            {selectedRace && (
-              <View style={styles.racialBonusInfo}>
-                <Text style={styles.racialBonusTitle}>
-                  {selectedRace.name} Racial Bonuses:
-                </Text>
-                <Text style={styles.racialBonusText}>
-                  {formatAbilityBonuses(selectedRace)}
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.abilitiesGrid}>
-              {Object.entries(abilities).map(([ability, score]) => {
-                const racialBonus = getRacialBonus(ability);
-                const finalScore = getFinalAbilityScore(ability as keyof DnDAbilities);
-                
-                return (
-                  <View key={ability} style={styles.abilityCard}>
-                    <Text style={styles.abilityName}>
-                      {ability.charAt(0).toUpperCase() + ability.slice(1, 3).toUpperCase()}
-                    </Text>
-                    <View style={styles.abilityScoreContainer}>
-                      <Text style={styles.abilityScore}>{score}</Text>
-                      {racialBonus > 0 && (
-                        <Text style={styles.racialBonusScore}>+{racialBonus}</Text>
-                      )}
-                    </View>
-                    <Text style={styles.finalScore}>= {finalScore}</Text>
-                    <Text style={styles.abilityModifier}>
-                      {getModifier(finalScore) >= 0 ? '+' : ''}{getModifier(finalScore)}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        );
-
-      case 3: // Skills
-        const { maxChoices, availableSkills } = getSkillChoiceInfo();
-        
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Choose Skills</Text>
-            <View style={styles.skillsHeader}>
-              <Text style={styles.stepDescription}>
-                Select {maxChoices} skill{maxChoices !== 1 ? 's' : ''} for your proficiencies
-              </Text>
-              <View style={styles.skillCounter}>
-                <Text style={styles.skillCounterText}>
-                  {selectedSkills.length} / {maxChoices}
-                </Text>
-              </View>
-            </View>
-            
-            {maxChoices === 0 ? (
-              <View style={styles.noSkillsContainer}>
-                <Text style={styles.noSkillsText}>
-                  Your class does not provide skill proficiency choices.
-                </Text>
-              </View>
-            ) : (
-              <ScrollView style={styles.optionsList}>
-                {availableSkills.map((skillOption) => {
-                  const isSelected = selectedSkills.includes(skillOption.item.name);
-                  const canSelect = selectedSkills.length < maxChoices || isSelected;
-                  
-                  return (
-                    <TouchableOpacity
-                      key={skillOption.item.index}
-                      style={[
-                        styles.skillCard,
-                        isSelected && styles.selectedSkill,
-                        !canSelect && styles.disabledSkill,
-                      ]}
-                      onPress={() => {
-                        if (!canSelect) return;
-                        
-                        if (isSelected) {
-                          setSelectedSkills(selectedSkills.filter(s => s !== skillOption.item.name));
-                        } else {
-                          setSelectedSkills([...selectedSkills, skillOption.item.name]);
-                        }
-                      }}
-                      disabled={!canSelect}
-                    >
-                      <Text style={[
-                        styles.skillName,
-                        isSelected && styles.selectedSkillText,
-                        !canSelect && styles.disabledSkillText,
-                      ]}>
-                        {skillOption.item.name}
-                      </Text>
-                      {isSelected && (
-                        <View style={styles.selectedIndicator}>
-                          <Text style={styles.selectedIndicatorText}>✓</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            )}
-          </View>
-        );
-
-      case 4: // Spells (only shown for spellcasters)
-        if (!hasSpellcasting) {
-          return null; // This step should be skipped
-        }
-
-        // Get spellcasting info for the selected class at level 1
-        const spellcastingInfo = getSpellcastingInfo(selectedClass?.name || '', 1);
-        if (!spellcastingInfo) {
-          return null;
-        }
-
-        const cantrips = spells.filter(spell => spell.level === 0);
-        const level1Spells = spells.filter(spell => spell.level === 1);
-        
-        const selectedCantrips = selectedSpells.filter(spell => spell.level === 0);
-        const selectedLevel1Spells = selectedSpells.filter(spell => spell.level === 1);
-
-        const cantripsRemaining = spellcastingInfo.cantripsKnown - selectedCantrips.length;
-        const spellsRemaining = spellcastingInfo.spellsKnown 
-          ? spellcastingInfo.spellsKnown - selectedLevel1Spells.length 
-          : null;
-
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Choose Spells</Text>
-            <Text style={styles.stepDescription}>
-              Select your starting spells for your {selectedClass?.name}
-            </Text>
-            
-            <View style={styles.spellRequirements}>
-              <Text style={[
-                styles.spellRequirementText,
-                cantripsRemaining === 0 && styles.spellRequirementMet
+  const renderStepIndicator = () => (
+    <View style={styles.stepIndicatorContainer}>
+      <ScrollView 
+        horizontal
+        scrollEnabled={false}
+        showsHorizontalScrollIndicator={false}
+        style={styles.stepIndicator}
+        contentContainerStyle={styles.stepIndicatorContent}
+      >
+        {CREATION_STEPS.map((step, index) => {
+          const Icon = step.icon;
+          const isActive = index === currentStep;
+          const isCompleted = index < currentStep;
+          
+          return (
+            <View key={step.id} style={styles.stepItem}>
+              <View style={[
+                styles.stepCircle,
+                isActive && styles.stepCircleActive,
+                isCompleted && styles.stepCircleCompleted,
               ]}>
-                {cantripsRemaining === 0 
-                  ? '✓ All cantrips selected' 
-                  : `Select ${cantripsRemaining} more cantrip${cantripsRemaining !== 1 ? 's' : ''}`}
+                <Icon 
+                  size={16} 
+                  color={isActive || isCompleted ? '#fff' : '#666'} 
+                />
+              </View>
+              <Text style={[
+                styles.stepText,
+                isActive && styles.stepTextActive,
+              ]}>
+                {step.title}
               </Text>
-              {spellsRemaining !== null && (
+            </View>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+
+  const renderBasicInfo = () => (
+    <View style={styles.stepContent}>
+      <Text style={styles.stepTitle}>Character Details</Text>
+      
+      <View style={styles.avatarSection}>
+        <Text style={styles.avatarLabel}>Character Portrait</Text>
+        <TouchableOpacity style={styles.avatarContainer} onPress={pickImage} disabled={isUploadingAvatar}>
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Camera size={32} color="#666" />
+              <Text style={styles.avatarPlaceholderText}>Add Portrait</Text>
+            </View>
+          )}
+          {isUploadingAvatar && (
+            <View style={styles.uploadingOverlay}>
+              <ActivityIndicator size="small" color="#4CAF50" />
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.uploadButton, isUploadingAvatar && styles.uploadButtonDisabled]} 
+          onPress={pickImage}
+          disabled={isUploadingAvatar}
+        >
+          <Upload size={16} color="#4CAF50" />
+          <Text style={styles.uploadButtonText}>
+            {isUploadingAvatar 
+              ? (uploadProgress || 'Uploading...') 
+              : (avatarUri ? 'Change Portrait' : 'Upload Portrait')
+            }
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.inputLabel}>Character Name</Text>
+      <TextInput
+        style={styles.input}
+        value={characterName}
+        onChangeText={setCharacterName}
+        placeholder="Enter character name"
+        placeholderTextColor="#666"
+      />
+    </View>
+  );
+
+  const renderClassSelection = () => (
+    <View style={styles.stepContent}>
+      <Text style={styles.stepTitle}>Choose Your Class</Text>
+      <Text style={styles.subtitle}>Your class determines your abilities, skills, and role in the party</Text>
+      <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
+        {classes.map((cls) => {
+          const wealthData = STARTING_WEALTH_BY_CLASS[cls.name];
+          
+          return (
+            <TouchableOpacity
+              key={cls.index}
+              style={[
+                styles.classOptionItem,
+                selectedClass?.index === cls.index && styles.optionItemSelected,
+              ]}
+              onPress={() => setSelectedClass(cls)}
+            >
+              <View style={styles.classOptionContent}>
+                <View style={styles.classOptionHeader}>
+                  <Text style={[
+                    styles.classOptionTitle,
+                    selectedClass?.index === cls.index && styles.optionTextSelected,
+                  ]}>
+                    {cls.name}
+                  </Text>
+                  {wealthData && (
+                    <View style={styles.goldBadge}>
+                      <Coins size={14} color="#FFD700" />
+                      <Text style={styles.goldBadgeText}>{wealthData.maxRoll} gp</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={[
-                  styles.spellRequirementText,
-                  spellsRemaining === 0 && styles.spellRequirementMet
+                  styles.classOptionDescription,
+                  selectedClass?.index === cls.index && styles.classOptionDescriptionSelected,
                 ]}>
-                  {spellsRemaining === 0 
-                    ? '✓ All 1st-level spells selected' 
-                    : `Select ${spellsRemaining} more 1st-level spell${spellsRemaining !== 1 ? 's' : ''}`}
+                  Hit Die: d{cls.hit_die} • {cls.spellcasting ? 'Spellcaster' : 'Non-spellcaster'}
+                </Text>
+                {wealthData && (
+                  <Text style={[
+                    styles.classWealthInfo,
+                    selectedClass?.index === cls.index && styles.classWealthInfoSelected,
+                  ]}>
+                    Starting Wealth: {wealthData.dice} × {wealthData.multiplier} gp
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity
+                style={styles.detailsButton}
+                onPress={() => setShowClassDetails(cls)}
+              >
+                <BookOpen size={20} color={selectedClass?.index === cls.index ? '#fff' : '#4CAF50'} />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+
+  const renderRaceSelection = () => (
+    <View style={styles.stepContent}>
+      <Text style={styles.stepTitle}>Choose Your Race</Text>
+      <Text style={styles.subtitle}>Your race provides ability bonuses and special traits</Text>
+      <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
+        {races.map((race) => (
+          <TouchableOpacity
+            key={race.index}
+            style={[
+              styles.raceOptionItem,
+              selectedRace?.index === race.index && styles.optionItemSelected,
+            ]}
+            onPress={() => setSelectedRace(race)}
+          >
+            <View style={styles.raceOptionContent}>
+              <Text style={[
+                styles.raceOptionTitle,
+                selectedRace?.index === race.index && styles.optionTextSelected,
+              ]}>
+                {race.name}
+              </Text>
+              <Text style={[
+                styles.raceOptionDescription,
+                selectedRace?.index === race.index && styles.raceOptionDescriptionSelected,
+              ]}>
+                Size: {race.size} • Speed: {race.speed} ft
+              </Text>
+              {race.ability_bonuses && race.ability_bonuses.length > 0 && (
+                <Text style={[
+                  styles.raceAbilityBonuses,
+                  selectedRace?.index === race.index && styles.raceAbilityBonusesSelected,
+                ]}>
+                  Bonuses: {race.ability_bonuses.map(bonus => 
+                    `+${bonus.bonus} ${bonus.ability_score.name}`
+                  ).join(', ')}
                 </Text>
               )}
             </View>
-            
-            <ScrollView style={styles.optionsList}>
-              {loading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color="#4CAF50" />
-                  <Text style={styles.loadingText}>Loading spells...</Text>
-                </View>
-              ) : spells && spells.length > 0 ? (
-                <>
-                  <View style={styles.spellSection}>
-                    <Text style={styles.spellSectionTitle}>
-                      Cantrips ({cantripsRemaining} remaining)
-                    </Text>
-                    {cantrips.map((spell) => (
-                      <TouchableOpacity
-                        key={spell.index}
-                        style={[
-                          styles.spellCard,
-                          selectedSpells.some(s => s.index === spell.index) && styles.selectedSpell,
-                        ]}
-                        onPress={() => {
-                          if (selectedSpells.some(s => s.index === spell.index)) {
-                            setSelectedSpells(selectedSpells.filter(s => s.index !== spell.index));
-                          } else if (selectedCantrips.length < spellcastingInfo.cantripsKnown) {
-                            setSelectedSpells([...selectedSpells, spell]);
-                          }
-                        }}
-                        disabled={!selectedSpells.some(s => s.index === spell.index) && 
-                                selectedCantrips.length >= spellcastingInfo.cantripsKnown}
-                      >
-                        <View style={styles.spellHeader}>
-                          <View style={styles.spellHeaderLeft}>
-                            <Text style={styles.spellName}>{spell.name}</Text>
-                            <Text style={styles.spellSchool}>{spell.school.name}</Text>
-                          </View>
-                          <TouchableOpacity
-                            style={styles.chevronButton}
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              toggleSpellExpanded(spell.index);
-                            }}
-                          >
-                            {expandedSpells.has(spell.index) ? (
-                              <ChevronUp size={20} color="#666666" />
-                            ) : (
-                              <ChevronDown size={20} color="#666666" />
-                            )}
-                          </TouchableOpacity>
-                        </View>
-                        {expandedSpells.has(spell.index) && (
-                          <View style={styles.spellDetails}>
-                            <Text style={styles.spellProperty}>Casting Time: {spell.casting_time}</Text>
-                            <Text style={styles.spellProperty}>Range: {spell.range}</Text>
-                            <Text style={styles.spellProperty}>Duration: {spell.duration}</Text>
-                            {spell.description && spell.description.map((desc, i) => (
-                              <Text key={i} style={styles.spellDescription}>{desc}</Text>
-                            ))}
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+            <TouchableOpacity
+              style={styles.detailsButton}
+              onPress={() => setShowRaceDetails(race)}
+            >
+              <BookOpen size={20} color={selectedRace?.index === race.index ? '#fff' : '#4CAF50'} />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
 
-                  <View style={styles.spellSection}>
-                    <Text style={styles.spellSectionTitle}>
-                      1st Level Spells {spellsRemaining !== null ? `(${spellsRemaining} remaining)` : ''}
-                    </Text>
-                    {level1Spells.map((spell) => (
-                      <TouchableOpacity
-                        key={spell.index}
-                        style={[
-                          styles.spellCard,
-                          selectedSpells.some(s => s.index === spell.index) && styles.selectedSpell,
-                        ]}
-                        onPress={() => {
-                          if (selectedSpells.some(s => s.index === spell.index)) {
-                            setSelectedSpells(selectedSpells.filter(s => s.index !== spell.index));
-                          } else if (!spellcastingInfo?.spellsKnown || selectedLevel1Spells.length < spellcastingInfo.spellsKnown) {
-                            setSelectedSpells([...selectedSpells, spell]);
-                          }
-                        }}
-                        disabled={!selectedSpells.some(s => s.index === spell.index) && 
-                                spellcastingInfo?.spellsKnown !== undefined && 
-                                selectedLevel1Spells.length >= spellcastingInfo.spellsKnown}
-                      >
-                        <View style={styles.spellHeader}>
-                          <View style={styles.spellHeaderLeft}>
-                            <Text style={styles.spellName}>{spell.name}</Text>
-                            <Text style={styles.spellSchool}>{spell.school.name}</Text>
-                          </View>
-                          <TouchableOpacity
-                            style={styles.chevronButton}
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              toggleSpellExpanded(spell.index);
-                            }}
-                          >
-                            {expandedSpells.has(spell.index) ? (
-                              <ChevronUp size={20} color="#666666" />
-                            ) : (
-                              <ChevronDown size={20} color="#666666" />
-                            )}
-                          </TouchableOpacity>
-                        </View>
-                        {expandedSpells.has(spell.index) && (
-                          <View style={styles.spellDetails}>
-                            <Text style={styles.spellProperty}>Casting Time: {spell.casting_time}</Text>
-                            <Text style={styles.spellProperty}>Range: {spell.range}</Text>
-                            <Text style={styles.spellProperty}>Duration: {spell.duration}</Text>
-                            {spell.description && spell.description.map((desc, i) => (
-                              <Text key={i} style={styles.spellDescription}>{desc}</Text>
-                            ))}
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </>
-              ) : (
-                <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>
-                    Failed to load spells. Please try again later.
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.retryButton}
-                    onPress={() => {
-                      setLoading(true);
-                      fetchSpells().finally(() => setLoading(false));
-                    }}
-                  >
-                    <Text style={styles.retryButtonText}>Retry</Text>
-                  </TouchableOpacity>
+  const renderAbilities = () => {
+    const abilityNames = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'];
+    const remainingPoints = getRemainingPoints();
+    
+    return (
+      <View style={styles.stepContent}>
+        <Text style={styles.stepTitle}>Ability Scores (Point Buy)</Text>
+        <Text style={styles.subtitle}>
+          You have {POINT_BUY_TOTAL} points to spend. Remaining: {remainingPoints}
+        </Text>
+        
+        <View style={styles.pointBuyRules}>
+          <Text style={styles.rulesTitle}>Point Buy Rules:</Text>
+          <Text style={styles.rulesText}>• Scores range from 8-15 (before racial bonuses)</Text>
+          <Text style={styles.rulesText}>• Cost increases as scores get higher</Text>
+          <Text style={styles.rulesText}>• You can freely mix and match as long as total cost ≤ 27</Text>
+          
+          <View style={styles.costChart}>
+            <Text style={styles.costChartTitle}>Cost Chart:</Text>
+            <View style={styles.costChartGrid}>
+              {Object.entries(POINT_BUY_COSTS).map(([score, cost]) => (
+                <View key={score} style={styles.costChartItem}>
+                  <Text style={styles.costChartScore}>{score}</Text>
+                  <Text style={styles.costChartCost}>{cost}</Text>
                 </View>
-              )}
-            </ScrollView>
-          </View>
-        );
-
-      case 5: // Equipment
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Starting Equipment</Text>
-            <Text style={styles.stepDescription}>
-              Your starting equipment is determined by your class
-            </Text>
-            
-            <View style={styles.equipmentSummary}>
-              <Text style={styles.equipmentTitle}>Class Equipment:</Text>
-              {selectedClass?.starting_equipment?.map((item, index) => (
-                <Text key={index} style={styles.equipmentItem}>
-                  • {item.equipment.name} x{item.quantity}
-                </Text>
               ))}
             </View>
           </View>
-        );
+        </View>
 
-      case 6: // Review
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Character Review</Text>
-            
-            <ScrollView style={styles.reviewContainer}>
-              <View style={styles.reviewSection}>
-                <Text style={styles.reviewLabel}>Name:</Text>
-                <Text style={styles.reviewValue}>{characterName}</Text>
+        {abilityNames.map((ability) => {
+          const baseScore = abilities[ability as keyof DnDAbilities];
+          const finalScore = getFinalAbilityScore(ability as keyof DnDAbilities);
+          const modifier = getAbilityModifier(finalScore);
+          const racialBonus = finalScore - baseScore;
+          
+          return (
+            <View key={ability} style={styles.abilityRow}>
+              <View style={styles.abilityInfo}>
+                <Text style={styles.abilityLabel}>
+                  {ability.charAt(0).toUpperCase() + ability.slice(1)}
+                </Text>
+                <View style={styles.abilityScores}>
+                  <Text style={styles.abilityBaseScore}>{baseScore}</Text>
+                  {racialBonus > 0 && (
+                    <Text style={styles.abilityRacialBonus}>+{racialBonus}</Text>
+                  )}
+                  <Text style={styles.abilityFinalScore}>= {finalScore}</Text>
+                  <Text style={styles.abilityModifier}>
+                    ({modifier >= 0 ? '+' : ''}{modifier})
+                  </Text>
+                </View>
               </View>
-              
-              <View style={styles.reviewSection}>
-                <Text style={styles.reviewLabel}>Race:</Text>
-                <Text style={styles.reviewValue}>{selectedRace?.name}</Text>
+              <View style={styles.abilityControls}>
+                <TouchableOpacity
+                  style={[
+                    styles.abilityButton,
+                    baseScore <= 8 && styles.abilityButtonDisabled,
+                  ]}
+                  onPress={() => setAbilities(prev => ({
+                    ...prev,
+                    [ability]: Math.max(8, prev[ability as keyof DnDAbilities] - 1)
+                  }))}
+                  disabled={baseScore <= 8}
+                >
+                  <Text style={styles.abilityButtonText}>-</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.abilityButton,
+                    !canIncreaseAbility(ability as keyof DnDAbilities) && styles.abilityButtonDisabled,
+                  ]}
+                  onPress={() => setAbilities(prev => ({
+                    ...prev,
+                    [ability]: Math.min(15, prev[ability as keyof DnDAbilities] + 1)
+                  }))}
+                  disabled={!canIncreaseAbility(ability as keyof DnDAbilities)}
+                >
+                  <Text style={styles.abilityButtonText}>+</Text>
+                </TouchableOpacity>
               </View>
-              
-              <View style={styles.reviewSection}>
-                <Text style={styles.reviewLabel}>Class:</Text>
-                <Text style={styles.reviewValue}>{selectedClass?.name}</Text>
-                {hasSpellcasting && (
-                  <Text style={styles.reviewSubtext}>Spellcaster</Text>
+            </View>
+          );
+        })}
+        
+        <View style={styles.pointSummary}>
+          <Text style={styles.pointSummaryText}>
+            Points Used: {calculatePointsUsed()} / {POINT_BUY_TOTAL}
+          </Text>
+          {remainingPoints < 0 && (
+            <Text style={styles.pointsOverLimit}>
+              Over limit by {Math.abs(remainingPoints)} points!
+            </Text>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  const renderSkills = () => {
+    const availableSkills = [
+      'Acrobatics', 'Animal Handling', 'Arcana', 'Athletics', 'Deception',
+      'History', 'Insight', 'Intimidation', 'Investigation', 'Medicine',
+      'Nature', 'Perception', 'Performance', 'Persuasion', 'Religion',
+      'Sleight of Hand', 'Stealth', 'Survival'
+    ];
+
+    return (
+      <View style={styles.stepContent}>
+        <Text style={styles.stepTitle}>Choose Skills</Text>
+        <Text style={styles.subtitle}>Select up to 4 skills your character is proficient in</Text>
+        <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
+          {availableSkills.map((skill) => (
+            <TouchableOpacity
+              key={skill}
+              style={[
+                styles.optionItem,
+                selectedSkills.includes(skill) && styles.optionItemSelected,
+              ]}
+              onPress={() => {
+                if (selectedSkills.includes(skill)) {
+                  setSelectedSkills(prev => prev.filter(s => s !== skill));
+                } else if (selectedSkills.length < 4) {
+                  setSelectedSkills(prev => [...prev, skill]);
+                }
+              }}
+              disabled={!selectedSkills.includes(skill) && selectedSkills.length >= 4}
+            >
+              <Text style={[
+                styles.optionText,
+                selectedSkills.includes(skill) && styles.optionTextSelected,
+                !selectedSkills.includes(skill) && selectedSkills.length >= 4 && styles.optionTextDisabled,
+              ]}>
+                {skill}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const renderSpells = () => {
+    if (!selectedClass || !selectedClass.spellcasting) {
+      return (
+        <View style={styles.stepContent}>
+          <Text style={styles.stepTitle}>Spells</Text>
+          <Text style={styles.subtitle}>This class doesn't have spellcasting abilities.</Text>
+          <View style={styles.noSpellsContainer}>
+            <Text style={styles.noSpellsText}>
+              {selectedClass?.name} is a martial class that relies on physical prowess rather than magic.
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.stepContent}>
+        <Text style={styles.stepTitle}>Choose Spells</Text>
+        <Text style={styles.subtitle}>Select cantrips and 1st level spells for your spellcaster</Text>
+        <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
+          {spells.map((spell) => (
+            <TouchableOpacity
+              key={spell.index}
+              style={[
+                styles.spellOptionItem,
+                selectedSpells.some(s => s.index === spell.index) && styles.optionItemSelected,
+              ]}
+              onPress={() => {
+                if (selectedSpells.some(s => s.index === spell.index)) {
+                  setSelectedSpells(prev => prev.filter(s => s.index !== spell.index));
+                } else if (selectedSpells.length < 6) {
+                  setSelectedSpells(prev => [...prev, spell]);
+                }
+              }}
+              disabled={!selectedSpells.some(s => s.index === spell.index) && selectedSpells.length >= 6}
+            >
+              <View style={styles.spellOptionContent}>
+                <Text style={[
+                  styles.spellOptionTitle,
+                  selectedSpells.some(s => s.index === spell.index) && styles.optionTextSelected,
+                ]}>
+                  {spell.name}
+                </Text>
+                <Text style={[
+                  styles.spellOptionLevel,
+                  selectedSpells.some(s => s.index === spell.index) && styles.spellOptionLevelSelected,
+                ]}>
+                  {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`} • {spell.school.name}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const renderEquipment = () => (
+    <View style={styles.stepContent}>
+      <Text style={styles.stepTitle}>Purchase Equipment</Text>
+      <Text style={styles.subtitle}>Use your starting gold to buy equipment for your adventure</Text>
+      
+      {/* Currency Display */}
+      <View style={styles.currencyContainer}>
+        <View style={styles.currencyDisplay}>
+          <Coins size={20} color="#FFD700" />
+          <Text style={styles.currencyText}>
+            {formatCurrency(characterGold, characterSilver, characterCopper)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Equipment Categories */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryFilter}>
+        {getEquipmentCategories().map((category) => (
+          <TouchableOpacity
+            key={category}
+            style={[
+              styles.categoryButton,
+              equipmentFilter === category && styles.categoryButtonActive,
+            ]}
+            onPress={() => setEquipmentFilter(category)}
+          >
+            <Text style={[
+              styles.categoryButtonText,
+              equipmentFilter === category && styles.categoryButtonTextActive,
+            ]}>
+              {category === 'all' ? 'All' : category.replace(/^\w/, c => c.toUpperCase())}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Equipment List */}
+      <ScrollView style={styles.equipmentList} showsVerticalScrollIndicator={false}>
+        {getFilteredEquipment().map((item) => {
+          const canAfford = canAffordEquipment(item, characterGold, characterSilver, characterCopper);
+          const isPurchased = purchasedEquipment.some(purchased => purchased.id === item.id);
+          
+          return (
+            <View key={item.id} style={[
+              styles.equipmentItem,
+              !canAfford && !isPurchased && styles.equipmentItemDisabled,
+              isPurchased && styles.equipmentItemPurchased,
+            ]}>
+              <View style={styles.equipmentInfo}>
+                <Text style={[
+                  styles.equipmentName,
+                  !canAfford && !isPurchased && styles.equipmentNameDisabled,
+                  isPurchased && styles.equipmentNamePurchased,
+                ]}>
+                  {item.name}
+                </Text>
+                <Text style={[
+                  styles.equipmentDetails,
+                  !canAfford && !isPurchased && styles.equipmentDetailsDisabled,
+                  isPurchased && styles.equipmentDetailsPurchased,
+                ]}>
+                  {item.category} • {item.weight} lb • {formatEquipmentCost(item)}
+                </Text>
+                {item.description && item.description.length > 0 && (
+                  <Text style={[
+                    styles.equipmentDescription,
+                    !canAfford && !isPurchased && styles.equipmentDescriptionDisabled,
+                    isPurchased && styles.equipmentDescriptionPurchased,
+                  ]} numberOfLines={2}>
+                    {item.description[0]}
+                  </Text>
                 )}
               </View>
               
-              <View style={styles.reviewSection}>
-                <Text style={styles.reviewLabel}>Final Abilities (with racial bonuses):</Text>
-                <View style={styles.reviewAbilities}>
-                  {Object.entries(abilities).map(([ability, score]) => {
-                    const finalScore = getFinalAbilityScore(ability as keyof DnDAbilities);
-                    const racialBonus = getRacialBonus(ability);
-                    
-                    return (
-                      <Text key={ability} style={styles.reviewAbility}>
-                        {ability.charAt(0).toUpperCase() + ability.slice(1, 3).toUpperCase()}: {finalScore} 
-                        {racialBonus > 0 && (
-                          <Text style={styles.reviewRacialBonus}> ({score}+{racialBonus})</Text>
-                        )}
-                        {' '}({getModifier(finalScore) >= 0 ? '+' : ''}{getModifier(finalScore)})
-                      </Text>
-                    );
-                  })}
-                </View>
+              <View style={styles.equipmentActions}>
+                {isPurchased ? (
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveEquipment(item)}
+                  >
+                    <Trash2 size={20} color="#f44336" />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[
+                      styles.purchaseButton,
+                      !canAfford && styles.purchaseButtonDisabled,
+                    ]}
+                    onPress={() => handlePurchaseEquipment(item)}
+                    disabled={!canAfford}
+                  >
+                    <ShoppingCart size={20} color={canAfford ? '#4CAF50' : '#666'} />
+                  </TouchableOpacity>
+                )}
               </View>
-              
-              <View style={styles.reviewSection}>
-                <Text style={styles.reviewLabel}>Skills:</Text>
-                <Text style={styles.reviewValue}>
-                  {selectedSkills.length > 0 ? selectedSkills.join(', ') : 'None selected'}
-                </Text>
-              </View>
-              
-              {hasSpellcasting && (
-                <View style={styles.reviewSection}>
-                  <Text style={styles.reviewLabel}>Spells:</Text>
-                  <Text style={styles.reviewValue}>
-                    {selectedSpells.length > 0 ? selectedSpells.map(s => s.name).join(', ') : 'None selected'}
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
-            
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={handleSaveCharacter}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Save size={20} color="#fff" />
-                  <Text style={styles.saveButtonText}>Create Character</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        );
+            </View>
+          );
+        })}
+      </ScrollView>
 
-      default:
-        return null;
+      {/* Purchased Equipment Summary */}
+      {purchasedEquipment.length > 0 && (
+        <View style={styles.purchasedSummary}>
+          <Text style={styles.purchasedTitle}>Purchased Equipment ({purchasedEquipment.length})</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.purchasedList}>
+            {purchasedEquipment.map((item) => (
+              <View key={item.id} style={styles.purchasedItem}>
+                <Text style={styles.purchasedItemName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.purchasedItemCost}>{formatEquipmentCost(item)}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderReview = () => (
+    <View style={styles.stepContent}>
+      <Text style={styles.stepTitle}>Character Review</Text>
+      
+      {avatarUri && (
+        <View style={styles.reviewAvatarContainer}>
+          <Image source={{ uri: avatarUri }} style={styles.reviewAvatar} />
+        </View>
+      )}
+      
+      <View style={styles.reviewSection}>
+        <Text style={styles.reviewLabel}>Name:</Text>
+        <Text style={styles.reviewValue}>{characterName}</Text>
+      </View>
+
+      <View style={styles.reviewSection}>
+        <Text style={styles.reviewLabel}>Class:</Text>
+        <Text style={styles.reviewValue}>{selectedClass?.name}</Text>
+      </View>
+
+      <View style={styles.reviewSection}>
+        <Text style={styles.reviewLabel}>Race:</Text>
+        <Text style={styles.reviewValue}>{selectedRace?.name}</Text>
+      </View>
+
+      <View style={styles.reviewSection}>
+        <Text style={styles.reviewLabel}>Level:</Text>
+        <Text style={styles.reviewValue}>1</Text>
+      </View>
+
+      <View style={styles.reviewSection}>
+        <Text style={styles.reviewLabel}>Hit Points:</Text>
+        <Text style={styles.reviewValue}>{calculateHitPoints()}</Text>
+      </View>
+
+      <View style={styles.reviewSection}>
+        <Text style={styles.reviewLabel}>Armor Class:</Text>
+        <Text style={styles.reviewValue}>{calculateArmorClass()}</Text>
+      </View>
+
+      <View style={styles.reviewSection}>
+        <Text style={styles.reviewLabel}>Abilities:</Text>
+        <Text style={styles.reviewValue}>
+          STR {getFinalAbilityScore('strength')}, DEX {getFinalAbilityScore('dexterity')}, CON {getFinalAbilityScore('constitution')}, INT {getFinalAbilityScore('intelligence')}, WIS {getFinalAbilityScore('wisdom')}, CHA {getFinalAbilityScore('charisma')}
+        </Text>
+      </View>
+
+      {selectedSkills.length > 0 && (
+        <View style={styles.reviewSection}>
+          <Text style={styles.reviewLabel}>Skills:</Text>
+          <Text style={styles.reviewValue}>{selectedSkills.join(', ')}</Text>
+        </View>
+      )}
+
+      {selectedSpells.length > 0 && (
+        <View style={styles.reviewSection}>
+          <Text style={styles.reviewLabel}>Spells:</Text>
+          <Text style={styles.reviewValue}>
+            {selectedSpells.map(spell => 
+              `${spell.name}(${spell.level === 0 ? 'c' : spell.level})`
+            ).join(', ')}
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.reviewSection}>
+        <Text style={styles.reviewLabel}>Remaining Currency:</Text>
+        <Text style={styles.reviewValue}>
+          {formatCurrency(characterGold, characterSilver, characterCopper)}
+        </Text>
+      </View>
+
+      {purchasedEquipment.length > 0 && (
+        <View style={styles.reviewSection}>
+          <Text style={styles.reviewLabel}>Equipment:</Text>
+          <Text style={styles.reviewValue}>
+            {purchasedEquipment.map(item => item.name).join(', ')}
+          </Text>
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+        onPress={handleSaveCharacter}
+        disabled={isSaving}
+      >
+        {isSaving ? (
+          <ActivityIndicator size="small\" color="#fff" />
+        ) : (
+          <>
+            <Save size={20} color="#fff" />
+            <Text style={styles.saveButtonText}>Create Character</Text>
+          </>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case 0: return renderBasicInfo();
+      case 1: return renderClassSelection();
+      case 2: return renderRaceSelection();
+      case 3: return renderAbilities();
+      case 4: return renderSkills();
+      case 5: return renderSpells();
+      case 6: return renderEquipment();
+      case 7: return renderReview();
+      default: return renderBasicInfo();
     }
   };
 
-  if (loading && races.length === 0) {
+  const canProceed = () => {
+    switch (currentStep) {
+      case 0: return characterName.length > 0;
+      case 1: return selectedClass !== null;
+      case 2: return selectedRace !== null;
+      case 3: return getRemainingPoints() >= 0; // Must not exceed point limit
+      case 4: return true; // Skills are optional
+      case 5: return true; // Spells are optional
+      case 6: return true; // Equipment is optional
+      case 7: return true; // Review step
+      default: return false;
+    }
+  };
+
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingText}>Loading D&D data...</Text>
+        <Text style={styles.loadingText}>Loading character creation...</Text>
       </View>
     );
   }
 
-  const displayStep = getDisplayStepIndex(currentStep);
-  const totalSteps = getTotalSteps();
-
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ArrowLeft color="#fff" size={24} />
         </TouchableOpacity>
-        <Text style={styles.title}>Character Creation</Text>
-        <View style={styles.placeholder} />
+        <Text style={styles.title}>Create Character</Text>
       </View>
 
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View 
-            style={[
-              styles.progressFill, 
-              { width: `${((displayStep + 1) / totalSteps) * 100}%` }
-            ]} 
-          />
-        </View>
-        <Text style={styles.progressText}>
-          Step {displayStep + 1} of {totalSteps}: {CREATION_STEPS[currentStep].title}
-        </Text>
-      </View>
+      {renderStepIndicator()}
 
-      {renderStepContent()}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {renderCurrentStep()}
+      </ScrollView>
 
       {currentStep < CREATION_STEPS.length - 1 && (
-        <View style={styles.navigationContainer}>
+        <View style={styles.footer}>
           <TouchableOpacity
             style={[styles.nextButton, !canProceed() && styles.nextButtonDisabled]}
             onPress={handleNext}
@@ -985,197 +1044,204 @@ export default function CreationScreen() {
         </View>
       )}
 
-      {/* Race Details Bottom Sheet */}
-      <BottomSheet
-        ref={raceBottomSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backgroundStyle={styles.bottomSheetBackground}
-        handleIndicatorStyle={styles.bottomSheetIndicator}
+      {/* Class Details Modal */}
+      <Modal
+        visible={showClassDetails !== null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowClassDetails(null)}
       >
-        <BottomSheetView style={styles.bottomSheetContent}>
-          {selectedRaceForDetails && (
-            <>
-              <View style={styles.bottomSheetHeader}>
-                <Text style={styles.bottomSheetTitle}>{selectedRaceForDetails.name}</Text>
-                <TouchableOpacity onPress={handleCloseRaceBottomSheet} style={styles.closeButton}>
-                  <Text style={styles.closeButtonText}>✕</Text>
-                </TouchableOpacity>
-              </View>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{showClassDetails?.name}</Text>
+              <TouchableOpacity onPress={() => setShowClassDetails(null)}>
+                <X size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              <Text style={styles.modalSectionTitle}>Hit Die</Text>
+              <Text style={styles.modalText}>d{showClassDetails?.hit_die}</Text>
               
-              <BottomSheetScrollView style={styles.bottomSheetScroll}>
-                <View style={styles.raceDetailSection}>
-                  <Text style={styles.raceDetailText}>{getRaceDescription(selectedRaceForDetails)}</Text>
-                </View>
-                <View style={styles.raceDetailSection}>
-                  <Text style={styles.raceDetailLabel}>Basic Information</Text>
-                  <Text style={styles.raceDetailText}>Size: {selectedRaceForDetails.size}</Text>
-                  <Text style={styles.raceDetailText}>Speed: {selectedRaceForDetails.speed} feet</Text>
-                </View>
+              {showClassDetails && STARTING_WEALTH_BY_CLASS[showClassDetails.name] && (
+                <>
+                  <Text style={styles.modalSectionTitle}>Starting Wealth</Text>
+                  <Text style={styles.modalText}>
+                    {STARTING_WEALTH_BY_CLASS[showClassDetails.name].dice} × {STARTING_WEALTH_BY_CLASS[showClassDetails.name].multiplier} gp
+                  </Text>
+                  <Text style={styles.modalText}>
+                    Maximum: {STARTING_WEALTH_BY_CLASS[showClassDetails.name].maxRoll} gp
+                  </Text>
+                </>
+              )}
+              
+              <Text style={styles.modalSectionTitle}>Proficiencies</Text>
+              {showClassDetails?.proficiencies.map((prof, index) => (
+                <Text key={index} style={styles.modalText}>• {prof.name}</Text>
+              ))}
+              
+              <Text style={styles.modalSectionTitle}>Saving Throws</Text>
+              {showClassDetails?.saving_throws.map((save, index) => (
+                <Text key={index} style={styles.modalText}>• {save.name}</Text>
+              ))}
+              
+              {showClassDetails?.spellcasting && (
+                <>
+                  <Text style={styles.modalSectionTitle}>Spellcasting</Text>
+                  <Text style={styles.modalText}>
+                    Spellcasting ability: {showClassDetails.spellcasting.spellcasting_ability.name}
+                  </Text>
+                  <Text style={styles.modalText}>
+                    Spellcasting starts at level {showClassDetails.spellcasting.level}
+                  </Text>
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
-                {selectedRaceForDetails.ability_bonuses && selectedRaceForDetails.ability_bonuses.length > 0 && (
-                  <View style={styles.raceDetailSection}>
-                    <Text style={styles.raceDetailLabel}>Ability Score Increases</Text>
-                    {selectedRaceForDetails.ability_bonuses.map((bonus, index) => (
-                      <Text key={index} style={styles.raceDetailText}>
-                        +{bonus.bonus} {bonus.ability_score.name}
-                      </Text>
-                    ))}
-                  </View>
-                )}
-
-                {selectedRaceForDetails.languages && selectedRaceForDetails.languages.length > 0 && (
-                  <View style={styles.raceDetailSection}>
-                    <Text style={styles.raceDetailLabel}>Languages</Text>
-                    {selectedRaceForDetails.languages.map((language, index) => (
-                      <Text key={index} style={styles.raceDetailText}>• {language.name}</Text>
-                    ))}
-                  </View>
-                )}
-
-                {selectedRaceForDetails.traits && selectedRaceForDetails.traits.length > 0 && (
-                  <View style={styles.raceDetailSection}>
-                    <Text style={styles.raceDetailLabel}>Racial Traits</Text>
-                    {selectedRaceForDetails.traits.map((trait, index) => (
-                      <Text key={index} style={styles.raceDetailText}>• {trait.name}</Text>
-                    ))}
-                  </View>
-                )}
-              </BottomSheetScrollView>
-            </>
-          )}
-        </BottomSheetView>
-      </BottomSheet>
-
-      {/* Class Details Bottom Sheet */}
-      <BottomSheet
-        ref={classBottomSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose={true}
-        backgroundStyle={styles.bottomSheetBackground}
-        handleIndicatorStyle={styles.bottomSheetIndicator}
+      {/* Race Details Modal */}
+      <Modal
+        visible={showRaceDetails !== null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowRaceDetails(null)}
       >
-        <BottomSheetView style={styles.bottomSheetContent}>
-          {selectedClassForDetails && (
-            <>
-              <View style={styles.bottomSheetHeader}>
-                <Text style={styles.bottomSheetTitle}>{selectedClassForDetails.name}</Text>
-                <TouchableOpacity onPress={handleCloseClassBottomSheet} style={styles.closeButton}>
-                  <Text style={styles.closeButtonText}>✕</Text>
-                </TouchableOpacity>
-              </View>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{showRaceDetails?.name}</Text>
+              <TouchableOpacity onPress={() => setShowRaceDetails(null)}>
+                <X size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              <Text style={styles.modalSectionTitle}>Size & Speed</Text>
+              <Text style={styles.modalText}>Size: {showRaceDetails?.size}</Text>
+              <Text style={styles.modalText}>Speed: {showRaceDetails?.speed} feet</Text>
               
-              <BottomSheetScrollView style={styles.bottomSheetScroll}>
-                <View style={styles.classDetailSection}>
-                  <Text style={styles.classDetailText}>{getClassDescription(selectedClassForDetails)}</Text>
-                </View>
-
-                <View style={styles.classDetailSection}>
-                  <Text style={styles.classDetailLabel}>Hit Die</Text>
-                  <Text style={styles.classDetailText}>d{selectedClassForDetails.hit_die}</Text>
-                </View>
-
-                <View style={styles.classDetailSection}>
-                  <Text style={styles.classDetailLabel}>Proficiencies</Text>
-                  <Text style={styles.classDetailText}>{formatProficiencies(selectedClassForDetails)}</Text>
-                </View>
-
-                <View style={styles.classDetailSection}>
-                  <Text style={styles.classDetailLabel}>Saving Throws</Text>
-                  <Text style={styles.classDetailText}>{formatSavingThrows(selectedClassForDetails)}</Text>
-                </View>
-
-                {selectedClassForDetails.spellcasting && (
-                  <View style={styles.classDetailSection}>
-                    <Text style={styles.classDetailLabel}>Spellcasting</Text>
-                    <Text style={styles.classDetailText}>
-                      Spellcasting begins at level {selectedClassForDetails.spellcasting.level}
-                    </Text>
-                    <Text style={styles.classDetailText}>
-                      Spellcasting Ability: {selectedClassForDetails.spellcasting.spellcasting_ability.name}
-                    </Text>
-                  </View>
-                )}
-
-                {selectedClassForDetails.starting_equipment && selectedClassForDetails.starting_equipment.length > 0 && (
-                  <View style={styles.classDetailSection}>
-                    <Text style={styles.classDetailLabel}>Starting Equipment</Text>
-                    {selectedClassForDetails.starting_equipment.map((item, index) => (
-                      <Text key={index} style={styles.classDetailText}>
-                        • {item.equipment.name} x{item.quantity}
-                      </Text>
-                    ))}
-                  </View>
-                )}
-              </BottomSheetScrollView>
-            </>
-          )}
-        </BottomSheetView>
-      </BottomSheet>
-    </View>
+              <Text style={styles.modalSectionTitle}>Ability Score Increases</Text>
+              {showRaceDetails?.ability_bonuses.map((bonus, index) => (
+                <Text key={index} style={styles.modalText}>
+                  • {bonus.ability_score.name} +{bonus.bonus}
+                </Text>
+              ))}
+              
+              <Text style={styles.modalSectionTitle}>Languages</Text>
+              {showRaceDetails?.languages.map((lang, index) => (
+                <Text key={index} style={styles.modalText}>• {lang.name}</Text>
+              ))}
+              
+              <Text style={styles.modalSectionTitle}>Traits</Text>
+              {showRaceDetails?.traits.map((trait, index) => (
+                <Text key={index} style={styles.modalText}>• {trait.name}</Text>
+              ))}
+              
+              {showRaceDetails?.subraces && showRaceDetails.subraces.length > 0 && (
+                <>
+                  <Text style={styles.modalSectionTitle}>Subraces</Text>
+                  {showRaceDetails.subraces.map((subrace, index) => (
+                    <Text key={index} style={styles.modalText}>• {subrace.name}</Text>
+                  ))}
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#121212',
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#121212',
   },
   loadingText: {
     color: '#fff',
-    marginTop: 16,
     fontSize: 16,
     fontFamily: 'Inter-Regular',
+    marginTop: 16,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 20,
-    paddingTop: 40,
+    paddingHorizontal: 16,
+    height: 52,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
   },
   backButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     fontSize: 20,
+    fontWeight: 'bold',
     color: '#fff',
     fontFamily: 'Inter-Bold',
+    flex: 1,
+    textAlign: 'center',
+    marginRight: 40,
   },
-  placeholder: {
-    width: 40,
+  stepIndicatorContainer: {
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+    paddingVertical: 12,
   },
-  progressContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+  stepIndicator: {
+    flexGrow: 0,
   },
-  progressBar: {
-    height: 4,
-    backgroundColor: '#333',
-    borderRadius: 2,
-    marginBottom: 8,
+  stepIndicatorContent: {
+    paddingHorizontal: 16,
+    alignItems: 'center',
   },
-  progressFill: {
-    height: '100%',
+  stepItem: {
+    alignItems: 'center',
+    marginRight: 20,
+    minWidth: 30,
+  },
+  stepCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#2a2a2a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  stepCircleActive: {
     backgroundColor: '#4CAF50',
-    borderRadius: 2,
   },
-  progressText: {
-    color: '#888',
-    fontSize: 14,
+  stepCircleCompleted: {
+    backgroundColor: '#4CAF50',
+  },
+  stepText: {
+    fontSize: 10,
+    color: '#666',
     fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+  },
+  stepTextActive: {
+    color: '#4CAF50',
+    fontFamily: 'Inter-Bold',
+  },
+  content: {
+    flex: 1,
   },
   stepContent: {
-    flex: 1,
-    paddingHorizontal: 20,
+    padding: 20,
   },
   stepTitle: {
     fontSize: 24,
@@ -1183,361 +1249,565 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     marginBottom: 8,
   },
-  stepDescription: {
+  subtitle: {
     fontSize: 16,
     color: '#888',
     fontFamily: 'Inter-Regular',
     marginBottom: 20,
   },
-  inputContainer: {
-    marginBottom: 20,
+  avatarSection: {
+    alignItems: 'center',
+    marginBottom: 24,
   },
-  label: {
+  avatarLabel: {
     fontSize: 16,
     color: '#fff',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 12,
+  },
+  avatarContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    overflow: 'hidden',
+    marginBottom: 12,
+    position: 'relative',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#2a2a2a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    borderStyle: 'dashed',
+  },
+  avatarPlaceholderText: {
+    color: '#666',
+    fontSize: 12,
     fontFamily: 'Inter-Regular',
+    marginTop: 4,
+  },
+  uploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  uploadButtonDisabled: {
+    opacity: 0.5,
+  },
+  uploadButtonText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  inputLabel: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
     marginBottom: 8,
   },
   input: {
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
-    padding: 12,
+    padding: 16,
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Regular',
+    marginBottom: 20,
   },
   optionsList: {
-    flex: 1,
+    maxHeight: 400,
+    marginBottom: 20,
   },
-  raceCardContainer: {
-    marginBottom: 0,
+  optionItem: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 8,
   },
-  classCardContainer: {
-    marginBottom: 0,
+  optionItemSelected: {
+    backgroundColor: '#4CAF50',
   },
-  optionCard: {
+  optionText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+  },
+  optionTextSelected: {
+    fontFamily: 'Inter-Bold',
+  },
+  optionTextDisabled: {
+    color: '#666',
+  },
+  classOptionItem: {
     backgroundColor: '#2a2a2a',
     borderRadius: 12,
     padding: 16,
+    marginBottom: 12,
     borderWidth: 2,
     borderColor: 'transparent',
-    marginBottom: 12,
-  },
-  selectedOption: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#1a3a1a',
-  },
-  raceCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  classCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  raceInfo: {
-    flex: 1,
-  },
-  classInfo: {
-    flex: 1,
-  },
-  bookIcon: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  optionTitle: {
-    fontSize: 18,
-    color: '#fff',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 4,
-  },
-  optionDescription: {
-    fontSize: 14,
-    color: '#888',
-    fontFamily: 'Inter-Regular',
-    marginBottom: 4,
-  },
-  optionBonus: {
-    fontSize: 14,
-    color: '#4CAF50',
-    fontFamily: 'Inter-Bold',
-  },
-  rollButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
   },
-  rollButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-    marginLeft: 8,
+  classOptionContent: {
+    flex: 1,
   },
-  racialBonusInfo: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
-  },
-  racialBonusTitle: {
-    fontSize: 16,
-    color: '#4CAF50',
-    fontFamily: 'Inter-Bold',
+  classOptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
-  racialBonusText: {
-    fontSize: 14,
+  classOptionTitle: {
     color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    flex: 1,
+  },
+  goldBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  goldBadgeText: {
+    color: '#FFD700',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+  },
+  classOptionDescription: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 4,
+  },
+  classOptionDescriptionSelected: {
+    color: '#fff',
+  },
+  classWealthInfo: {
+    color: '#FFD700',
+    fontSize: 12,
     fontFamily: 'Inter-Regular',
   },
-  abilitiesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+  classWealthInfoSelected: {
+    color: '#fff',
   },
-  abilityCard: {
+  raceOptionItem: {
     backgroundColor: '#2a2a2a',
     borderRadius: 12,
     padding: 16,
-    alignItems: 'center',
-    width: '30%',
-  },
-  abilityName: {
-    fontSize: 14,
-    color: '#888',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 4,
-  },
-  abilityScoreContainer: {
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
   },
-  abilityScore: {
-    fontSize: 20,
+  raceOptionContent: {
+    flex: 1,
+  },
+  raceOptionTitle: {
     color: '#fff',
-    fontFamily: 'Inter-Bold',
-  },
-  racialBonusScore: {
-    fontSize: 16,
-    color: '#4CAF50',
-    fontFamily: 'Inter-Bold',
-    marginLeft: 4,
-  },
-  finalScore: {
-    fontSize: 24,
-    color: '#4CAF50',
+    fontSize: 18,
     fontFamily: 'Inter-Bold',
     marginBottom: 4,
   },
-  abilityModifier: {
-    fontSize: 16,
+  raceOptionDescription: {
     color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 4,
+  },
+  raceOptionDescriptionSelected: {
+    color: '#fff',
+  },
+  raceAbilityBonuses: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  raceAbilityBonusesSelected: {
+    color: '#fff',
+  },
+  detailsButton: {
+    padding: 8,
+    marginLeft: 12,
+  },
+  spellOptionItem: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  spellOptionContent: {
+    flex: 1,
+  },
+  spellOptionTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  spellOptionLevel: {
+    color: '#888',
+    fontSize: 14,
     fontFamily: 'Inter-Regular',
   },
-  skillsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+  spellOptionLevelSelected: {
+    color: '#fff',
   },
-  skillCounter: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 2,
-    borderColor: '#4CAF50',
-    marginTop: -15,
-  },
-  skillCounterText: {
-    color: '#4CAF50',
-    fontSize: 14,
-    fontFamily: 'Inter-Bold',
-  },
-  noSkillsContainer: {
+  noSpellsContainer: {
     backgroundColor: '#2a2a2a',
     borderRadius: 12,
     padding: 20,
     alignItems: 'center',
   },
-  noSkillsText: {
+  noSpellsText: {
     color: '#888',
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
+    lineHeight: 24,
   },
-  skillCard: {
+  pointBuyRules: {
     backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  selectedSkill: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#1a3a1a',
-  },
-  disabledSkill: {
-    backgroundColor: '#1a1a1a',
-    opacity: 0.5,
-  },
-  skillName: {
-    fontSize: 16,
-    color: '#fff',
-    fontFamily: 'Inter-Regular',
-    flex: 1,
-  },
-  selectedSkillText: {
-    fontFamily: 'Inter-Bold',
-    color: '#4CAF50',
-  },
-  disabledSkillText: {
-    color: '#666',
-  },
-  selectedIndicator: {
-    width: 24,
-    height: 24,
     borderRadius: 12,
-    backgroundColor: '#4CAF50',
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 16,
+    marginBottom: 20,
   },
-  selectedIndicatorText: {
+  rulesTitle: {
+    color: '#4CAF50',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
+  rulesText: {
     color: '#fff',
     fontSize: 14,
-    fontFamily: 'Inter-Bold',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 4,
   },
-  spellSection: {
-    marginBottom: 24,
-    borderRadius: 8,
-    backgroundColor: '#f5f5f5',
-    padding: 12,
-  },
-  spellSectionTitle: {
-    fontSize: 18,
-    color: '#4CAF50',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 12,
-  },
-  spellCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  selectedSpell: {
-    backgroundColor: '#e8f5e9',
-    borderColor: '#4CAF50',
-  },
-  spellHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  spellHeaderLeft: {
-    flex: 1,
-  },
-  chevronButton: {
-    padding: 4,
-  },
-  spellDetails: {
+  costChart: {
     marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
   },
-  spellName: {
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-    marginBottom: 4,
-  },
-  spellSchool: {
+  costChartTitle: {
+    color: '#4CAF50',
     fontSize: 14,
-    color: '#666666',
-    fontStyle: 'italic',
+    fontFamily: 'Inter-Bold',
     marginBottom: 8,
   },
-  spellProperty: {
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  spellDescription: {
-    fontSize: 14,
-    color: '#333333',
-    marginTop: 8,
-  },
-  equipmentSummary: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
-  },
-  equipmentTitle: {
-    fontSize: 16,
-    color: '#4CAF50',
-    fontFamily: 'Inter-Bold',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  equipmentItem: {
-    fontSize: 14,
-    color: '#fff',
-    fontFamily: 'Inter-Regular',
-    marginBottom: 4,
-  },
-  reviewContainer: {
-    flex: 1,
-  },
-  reviewSection: {
-    marginBottom: 16,
-  },
-  reviewLabel: {
-    fontSize: 16,
-    color: '#4CAF50',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 4,
-  },
-  reviewValue: {
-    fontSize: 16,
-    color: '#fff',
-    fontFamily: 'Inter-Regular',
-  },
-  reviewSubtext: {
-    fontSize: 14,
-    color: '#888',
-    fontFamily: 'Inter-Regular',
-    marginTop: 2,
-  },
-  reviewAbilities: {
+  costChartGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  reviewAbility: {
-    fontSize: 14,
-    color: '#fff',
-    fontFamily: 'Inter-Regular',
-    backgroundColor: '#2a2a2a',
-    padding: 8,
+  costChartItem: {
+    backgroundColor: '#1a1a1a',
     borderRadius: 6,
+    padding: 8,
+    minWidth: 40,
+    alignItems: 'center',
   },
-  reviewRacialBonus: {
+  costChartScore: {
+    color: '#fff',
     fontSize: 12,
+    fontFamily: 'Inter-Bold',
+  },
+  costChartCost: {
+    color: '#888',
+    fontSize: 10,
+    fontFamily: 'Inter-Regular',
+  },
+  abilityRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 8,
+  },
+  abilityInfo: {
+    flex: 1,
+  },
+  abilityLabel: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  abilityScores: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  abilityBaseScore: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  abilityRacialBonus: {
     color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  abilityFinalScore: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  abilityModifier: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  abilityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  abilityButton: {
+    width: 32,
+    height: 32,
+    backgroundColor: '#4CAF50',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  abilityButtonDisabled: {
+    backgroundColor: '#666',
+  },
+  abilityButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+  },
+  pointSummary: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  pointSummaryText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  pointsOverLimit: {
+    color: '#f44336',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    marginTop: 4,
+  },
+  currencyContainer: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  currencyDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  currencyText: {
+    color: '#FFD700',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+  },
+  categoryFilter: {
+    marginBottom: 16,
+  },
+  categoryButton: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+  categoryButtonActive: {
+    backgroundColor: '#4CAF50',
+  },
+  categoryButtonText: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  categoryButtonTextActive: {
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  equipmentList: {
+    maxHeight: 300,
+    marginBottom: 20,
+  },
+  equipmentItem: {
+    flexDirection: 'row',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  equipmentItemDisabled: {
+    opacity: 0.5,
+  },
+  equipmentItemPurchased: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  equipmentInfo: {
+    flex: 1,
+  },
+  equipmentName: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 2,
+  },
+  equipmentNameDisabled: {
+    color: '#666',
+  },
+  equipmentNamePurchased: {
+    color: '#4CAF50',
+  },
+  equipmentDetails: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 2,
+  },
+  equipmentDetailsDisabled: {
+    color: '#555',
+  },
+  equipmentDetailsPurchased: {
+    color: '#4CAF50',
+  },
+  equipmentDescription: {
+    color: '#888',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+  },
+  equipmentDescriptionDisabled: {
+    color: '#555',
+  },
+  equipmentDescriptionPurchased: {
+    color: '#4CAF50',
+  },
+  equipmentActions: {
+    marginLeft: 12,
+  },
+  purchaseButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  purchaseButtonDisabled: {
+    backgroundColor: '#333',
+    borderColor: '#666',
+  },
+  removeButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f44336',
+  },
+  purchasedSummary: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+  },
+  purchasedTitle: {
+    color: '#4CAF50',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 12,
+  },
+  purchasedList: {
+    flexDirection: 'row',
+  },
+  purchasedItem: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    padding: 8,
+    marginRight: 8,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  purchasedItemName: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  purchasedItemCost: {
+    color: '#888',
+    fontSize: 10,
+    fontFamily: 'Inter-Regular',
+  },
+  reviewAvatarContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  reviewAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  reviewSection: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+  },
+  reviewLabel: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  reviewValue: {
+    color: '#fff',
+    fontSize: 16,
     fontFamily: 'Inter-Regular',
   },
   saveButton: {
@@ -1547,16 +1817,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
     marginTop: 20,
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#666',
   },
   saveButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: 'Inter-Bold',
-    marginLeft: 8,
   },
-  navigationContainer: {
+  footer: {
     padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#2a2a2a',
   },
   nextButton: {
     backgroundColor: '#4CAF50',
@@ -1565,6 +1840,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
   nextButtonDisabled: {
     backgroundColor: '#666',
@@ -1573,118 +1849,48 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
-    marginRight: 8,
   },
-  // Bottom Sheet Styles
-  bottomSheetBackground: {
-    backgroundColor: '#1a1a1a',
-  },
-  bottomSheetIndicator: {
-    backgroundColor: '#666',
-  },
-  bottomSheetContent: {
+  modalOverlay: {
     flex: 1,
-    padding: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  bottomSheetHeader: {
+  modalContent: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    width: '90%',
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    paddingBottom: 16,
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: '#2a2a2a',
   },
-  bottomSheetTitle: {
-    fontSize: 24,
+  modalTitle: {
+    fontSize: 20,
     color: '#fff',
     fontFamily: 'Inter-Bold',
   },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#333',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontFamily: 'Inter-Bold',
-  },
-  bottomSheetScroll: {
-    flex: 1,
-  },
-  raceDetailSection: {
-    marginBottom: 20,
-  },
-  classDetailSection: {
-    marginBottom: 20,
-  },
-  raceDetailLabel: {
-    fontSize: 18,
-    color: '#4CAF50',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 8,
-  },
-  classDetailLabel: {
-    fontSize: 18,
-    color: '#4CAF50',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 8,
-  },
-  raceDetailText: {
-    fontSize: 16,
-    color: '#fff',
-    fontFamily: 'Inter-Regular',
-    marginBottom: 4,
-    lineHeight: 22,
-  },
-  classDetailText: {
-    fontSize: 16,
-    color: '#fff',
-    fontFamily: 'Inter-Regular',
-    marginBottom: 4,
-    lineHeight: 22,
-  },
-  errorContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  modalBody: {
     padding: 20,
   },
-  errorText: {
+  modalSectionTitle: {
     fontSize: 16,
-    color: '#666',
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
+    color: '#4CAF50',
     fontFamily: 'Inter-Bold',
+    marginTop: 16,
+    marginBottom: 8,
   },
-  spellRequirements: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  spellRequirementText: {
+  modalText: {
     fontSize: 14,
-    color: '#ff9800',
+    color: '#fff',
     fontFamily: 'Inter-Regular',
     marginBottom: 4,
-  },
-  spellRequirementMet: {
-    color: '#4CAF50',
+    lineHeight: 20,
   },
 });
