@@ -89,12 +89,12 @@ export default function CreationScreen() {
   const [characterSilver, setCharacterSilver] = useAtom(characterSilverAtom);
   const [characterCopper, setCharacterCopper] = useAtom(characterCopperAtom);
   const [purchasedEquipment, setPurchasedEquipment] = useAtom(purchasedEquipmentAtom);
-  
+
   const [races] = useAtom(racesAtom);
   const [classes] = useAtom(classesAtom);
   const [spells] = useAtom(spellsAtom);
   const [availableEquipment] = useAtom(equipmentAtom);
-  
+
   const [, fetchRaces] = useAtom(fetchRacesAtom);
   const [, fetchClasses] = useAtom(fetchClassesAtom);
   const [, fetchSpells] = useAtom(fetchSpellsAtom);
@@ -200,13 +200,13 @@ export default function CreationScreen() {
   const canIncreaseAbility = (ability: keyof DnDAbilities) => {
     const currentScore = abilities[ability];
     const nextScore = currentScore + 1;
-    
+
     if (nextScore > 15) return false;
-    
+
     const currentCost = POINT_BUY_COSTS[currentScore] || 0;
     const nextCost = POINT_BUY_COSTS[nextScore] || 0;
     const costDifference = nextCost - currentCost;
-    
+
     return getRemainingPoints() >= costDifference;
   };
 
@@ -216,7 +216,7 @@ export default function CreationScreen() {
 
   const getFinalAbilityScore = (ability: keyof DnDAbilities) => {
     let baseScore = abilities[ability];
-    
+
     // Add racial bonuses
     if (selectedRace?.ability_bonuses) {
       const bonus = selectedRace.ability_bonuses.find(
@@ -226,42 +226,42 @@ export default function CreationScreen() {
         baseScore += bonus.bonus;
       }
     }
-    
+
     return baseScore;
   };
 
   const calculateHitPoints = () => {
     if (!selectedClass) return 8;
-    
+
     const hitDie = selectedClass.hit_die;
     const conModifier = getAbilityModifier(getFinalAbilityScore('constitution'));
-    
+
     // Max hit die + CON modifier (minimum 1)
     return Math.max(1, hitDie + conModifier);
   };
 
   const calculateArmorClass = () => {
     const dexModifier = getAbilityModifier(getFinalAbilityScore('dexterity'));
-    
+
     // Find equipped armor
-    const equippedArmor = purchasedEquipment.find(item => 
+    const equippedArmor = purchasedEquipment.find(item =>
       item.type === 'armor' && item.category !== 'shield'
     );
-    
+
     if (equippedArmor && equippedArmor.properties) {
       const armorProps = equippedArmor.properties as any;
       let ac = armorProps.ac || 10;
-      
+
       // Apply DEX modifier based on armor type
       if (armorProps.dex_bonus === 'full') {
         ac += dexModifier;
       } else if (armorProps.dex_bonus === 'max_2') {
         ac += Math.min(2, dexModifier);
       }
-      
+
       return ac;
     }
-    
+
     // No armor: 10 + DEX modifier
     return 10 + dexModifier;
   };
@@ -346,7 +346,7 @@ export default function CreationScreen() {
       };
 
       await saveCharacter(characterData);
-      
+
       Alert.alert(
         'Success!',
         'Your character has been created successfully.',
@@ -371,7 +371,7 @@ export default function CreationScreen() {
 
   const renderStepIndicator = () => (
     <View style={styles.stepIndicatorContainer}>
-      <ScrollView 
+      <ScrollView
         horizontal
         scrollEnabled={false}
         showsHorizontalScrollIndicator={false}
@@ -382,7 +382,7 @@ export default function CreationScreen() {
           const Icon = step.icon;
           const isActive = index === currentStep;
           const isCompleted = index < currentStep;
-          
+
           return (
             <View key={step.id} style={styles.stepItem}>
               <View style={[
@@ -390,9 +390,9 @@ export default function CreationScreen() {
                 isActive && styles.stepCircleActive,
                 isCompleted && styles.stepCircleCompleted,
               ]}>
-                <Icon 
-                  size={16} 
-                  color={isActive || isCompleted ? '#fff' : '#666'} 
+                <Icon
+                  size={16}
+                  color={isActive || isCompleted ? '#fff' : '#666'}
                 />
               </View>
               <Text style={[
@@ -411,7 +411,7 @@ export default function CreationScreen() {
   const renderBasicInfo = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Character Details</Text>
-      
+
       <View style={styles.avatarSection}>
         <Text style={styles.avatarLabel}>Character Portrait</Text>
         <TouchableOpacity style={styles.avatarContainer} onPress={pickImage} disabled={isUploadingAvatar}>
@@ -429,15 +429,15 @@ export default function CreationScreen() {
             </View>
           )}
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.uploadButton, isUploadingAvatar && styles.uploadButtonDisabled]} 
+        <TouchableOpacity
+          style={[styles.uploadButton, isUploadingAvatar && styles.uploadButtonDisabled]}
           onPress={pickImage}
           disabled={isUploadingAvatar}
         >
           <Upload size={16} color="#4CAF50" />
           <Text style={styles.uploadButtonText}>
-            {isUploadingAvatar 
-              ? (uploadProgress || 'Uploading...') 
+            {isUploadingAvatar
+              ? (uploadProgress || 'Uploading...')
               : (avatarUri ? 'Change Portrait' : 'Upload Portrait')
             }
           </Text>
@@ -462,7 +462,7 @@ export default function CreationScreen() {
       <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
         {classes.map((cls) => {
           const wealthData = STARTING_WEALTH_BY_CLASS[cls.name];
-          
+
           return (
             <TouchableOpacity
               key={cls.index}
@@ -547,7 +547,7 @@ export default function CreationScreen() {
                   styles.raceAbilityBonuses,
                   selectedRace?.index === race.index && styles.raceAbilityBonusesSelected,
                 ]}>
-                  Bonuses: {race.ability_bonuses.map(bonus => 
+                  Bonuses: {race.ability_bonuses.map(bonus =>
                     `+${bonus.bonus} ${bonus.ability_score.name}`
                   ).join(', ')}
                 </Text>
@@ -568,20 +568,20 @@ export default function CreationScreen() {
   const renderAbilities = () => {
     const abilityNames = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'];
     const remainingPoints = getRemainingPoints();
-    
+
     return (
       <View style={styles.stepContent}>
         <Text style={styles.stepTitle}>Ability Scores (Point Buy)</Text>
         <Text style={styles.subtitle}>
           You have {POINT_BUY_TOTAL} points to spend. Remaining: {remainingPoints}
         </Text>
-        
+
         <View style={styles.pointBuyRules}>
           <Text style={styles.rulesTitle}>Point Buy Rules:</Text>
           <Text style={styles.rulesText}>• Scores range from 8-15 (before racial bonuses)</Text>
           <Text style={styles.rulesText}>• Cost increases as scores get higher</Text>
           <Text style={styles.rulesText}>• You can freely mix and match as long as total cost ≤ 27</Text>
-          
+
           <View style={styles.costChart}>
             <Text style={styles.costChartTitle}>Cost Chart:</Text>
             <View style={styles.costChartGrid}>
@@ -600,7 +600,7 @@ export default function CreationScreen() {
           const finalScore = getFinalAbilityScore(ability as keyof DnDAbilities);
           const modifier = getAbilityModifier(finalScore);
           const racialBonus = finalScore - baseScore;
-          
+
           return (
             <View key={ability} style={styles.abilityRow}>
               <View style={styles.abilityInfo}>
@@ -649,7 +649,7 @@ export default function CreationScreen() {
             </View>
           );
         })}
-        
+
         <View style={styles.pointSummary}>
           <Text style={styles.pointSummaryText}>
             Points Used: {calculatePointsUsed()} / {POINT_BUY_TOTAL}
@@ -768,7 +768,7 @@ export default function CreationScreen() {
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Purchase Equipment</Text>
       <Text style={styles.subtitle}>Use your starting gold to buy equipment for your adventure</Text>
-      
+
       {/* Currency Display */}
       <View style={styles.currencyContainer}>
         <View style={styles.currencyDisplay}>
@@ -805,7 +805,7 @@ export default function CreationScreen() {
         {getFilteredEquipment().map((item) => {
           const canAfford = canAffordEquipment(item, characterGold, characterSilver, characterCopper);
           const isPurchased = purchasedEquipment.some(purchased => purchased.id === item.id);
-          
+
           return (
             <View key={item.id} style={[
               styles.equipmentItem,
@@ -837,7 +837,7 @@ export default function CreationScreen() {
                   </Text>
                 )}
               </View>
-              
+
               <View style={styles.equipmentActions}>
                 {isPurchased ? (
                   <TouchableOpacity
@@ -884,13 +884,13 @@ export default function CreationScreen() {
   const renderReview = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Character Review</Text>
-      
+
       {avatarUri && (
         <View style={styles.reviewAvatarContainer}>
           <Image source={{ uri: avatarUri }} style={styles.reviewAvatar} />
         </View>
       )}
-      
+
       <View style={styles.reviewSection}>
         <Text style={styles.reviewLabel}>Name:</Text>
         <Text style={styles.reviewValue}>{characterName}</Text>
@@ -939,7 +939,7 @@ export default function CreationScreen() {
         <View style={styles.reviewSection}>
           <Text style={styles.reviewLabel}>Spells:</Text>
           <Text style={styles.reviewValue}>
-            {selectedSpells.map(spell => 
+            {selectedSpells.map(spell =>
               `${spell.name}(${spell.level === 0 ? 'c' : spell.level})`
             ).join(', ')}
           </Text>
@@ -968,7 +968,7 @@ export default function CreationScreen() {
         disabled={isSaving}
       >
         {isSaving ? (
-          <ActivityIndicator size="small\" color="#fff" />
+          <ActivityIndicator size="small" color="#fff" />
         ) : (
           <>
             <Save size={20} color="#fff" />
@@ -1062,7 +1062,7 @@ export default function CreationScreen() {
             <ScrollView style={styles.modalBody}>
               <Text style={styles.modalSectionTitle}>Hit Die</Text>
               <Text style={styles.modalText}>d{showClassDetails?.hit_die}</Text>
-              
+
               {showClassDetails && STARTING_WEALTH_BY_CLASS[showClassDetails.name] && (
                 <>
                   <Text style={styles.modalSectionTitle}>Starting Wealth</Text>
@@ -1074,17 +1074,17 @@ export default function CreationScreen() {
                   </Text>
                 </>
               )}
-              
+
               <Text style={styles.modalSectionTitle}>Proficiencies</Text>
               {showClassDetails?.proficiencies.map((prof, index) => (
                 <Text key={index} style={styles.modalText}>• {prof.name}</Text>
               ))}
-              
+
               <Text style={styles.modalSectionTitle}>Saving Throws</Text>
               {showClassDetails?.saving_throws.map((save, index) => (
                 <Text key={index} style={styles.modalText}>• {save.name}</Text>
               ))}
-              
+
               {showClassDetails?.spellcasting && (
                 <>
                   <Text style={styles.modalSectionTitle}>Spellcasting</Text>
@@ -1120,24 +1120,24 @@ export default function CreationScreen() {
               <Text style={styles.modalSectionTitle}>Size & Speed</Text>
               <Text style={styles.modalText}>Size: {showRaceDetails?.size}</Text>
               <Text style={styles.modalText}>Speed: {showRaceDetails?.speed} feet</Text>
-              
+
               <Text style={styles.modalSectionTitle}>Ability Score Increases</Text>
               {showRaceDetails?.ability_bonuses.map((bonus, index) => (
                 <Text key={index} style={styles.modalText}>
                   • {bonus.ability_score.name} +{bonus.bonus}
                 </Text>
               ))}
-              
+
               <Text style={styles.modalSectionTitle}>Languages</Text>
               {showRaceDetails?.languages.map((lang, index) => (
                 <Text key={index} style={styles.modalText}>• {lang.name}</Text>
               ))}
-              
+
               <Text style={styles.modalSectionTitle}>Traits</Text>
               {showRaceDetails?.traits.map((trait, index) => (
                 <Text key={index} style={styles.modalText}>• {trait.name}</Text>
               ))}
-              
+
               {showRaceDetails?.subraces && showRaceDetails.subraces.length > 0 && (
                 <>
                   <Text style={styles.modalSectionTitle}>Subraces</Text>
