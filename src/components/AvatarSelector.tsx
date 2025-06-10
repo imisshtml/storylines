@@ -12,7 +12,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { X, Upload, Sparkles } from 'lucide-react-native';
-import { DEFAULT_AVATARS, AVATAR_CATEGORIES, getRandomAvatarSelection, type DefaultAvatar } from '../data/defaultAvatars';
+import { DEFAULT_AVATARS, type DefaultAvatar } from '../data/defaultAvatars';
 import { pickAndUploadAvatar, type AvatarUploadResult } from '../utils/avatarStorage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -35,18 +35,11 @@ export default function AvatarSelector({
   userId,
   characterId,
 }: AvatarSelectorProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
 
-  const getAvatarsToShow = () => {
-    if (selectedCategory === 'all') {
-      return DEFAULT_AVATARS;
-    }
-    return DEFAULT_AVATARS.filter(avatar => avatar.category === selectedCategory);
-  };
-
   const handleDefaultAvatarSelect = (avatar: DefaultAvatar) => {
+    // For local images, we need to pass the require() result
     onAvatarSelect(avatar.imagePath);
     onClose();
   };
@@ -75,14 +68,14 @@ export default function AvatarSelector({
     }
   };
 
-  const isCurrentAvatar = (avatarUrl: any) => {
+  const isCurrentAvatar = (avatarPath: any) => {
     // For local images (require() results), we need to compare differently
     // Since currentAvatar might be a require() result or a URL string
-    if (typeof currentAvatar === 'string' && typeof avatarUrl === 'string') {
-      return currentAvatar === avatarUrl;
+    if (typeof currentAvatar === 'string' && typeof avatarPath === 'string') {
+      return currentAvatar === avatarPath;
     }
     // For require() results, they should be the same object reference
-    return currentAvatar === avatarUrl;
+    return currentAvatar === avatarPath;
   };
 
   return (
@@ -111,7 +104,7 @@ export default function AvatarSelector({
             >
               {isUploading ? (
                 <>
-                  <ActivityIndicator size="small\" color="#fff" />
+                  <ActivityIndicator size="small" color="#fff" />
                   <Text style={styles.uploadButtonText}>
                     {uploadProgress || 'Uploading...'}
                   </Text>
@@ -125,37 +118,16 @@ export default function AvatarSelector({
             </TouchableOpacity>
           </View>
 
-          {/* Category Tabs */}
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoryTabs}
-            contentContainerStyle={styles.categoryTabsContent}
-          >
-            {AVATAR_CATEGORIES.map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={[
-                  styles.categoryTab,
-                  selectedCategory === category.id && styles.activeCategoryTab
-                ]}
-                onPress={() => setSelectedCategory(category.id)}
-              >
-                <Text style={styles.categoryEmoji}>{category.icon}</Text>
-                <Text style={[
-                  styles.categoryTabText,
-                  selectedCategory === category.id && styles.activeCategoryTabText
-                ]}>
-                  {category.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {/* Section Title */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Default Avatars</Text>
+            <Text style={styles.sectionSubtitle}>Choose from {DEFAULT_AVATARS.length} available options</Text>
+          </View>
 
           {/* Avatar Grid */}
           <ScrollView style={styles.avatarGrid} showsVerticalScrollIndicator={false}>
             <View style={styles.avatarRow}>
-              {getAvatarsToShow().map((avatar, index) => (
+              {DEFAULT_AVATARS.map((avatar) => (
                 <TouchableOpacity
                   key={avatar.id}
                   style={[
@@ -164,15 +136,14 @@ export default function AvatarSelector({
                   ]}
                   onPress={() => handleDefaultAvatarSelect(avatar)}
                 >
-                  <Image source={avatar.imagePath} style={styles.avatarImage} />
-                  {isCurrentAvatar(avatar.imagePath) && (
-                    <View style={styles.selectedOverlay}>
-                      <Sparkles size={24} color="#fff" />
-                    </View>
-                  )}
-                  <Text style={styles.avatarName} numberOfLines={1}>
-                    {avatar.name}
-                  </Text>
+                  <View style={styles.avatarImageContainer}>
+                    <Image source={avatar.imagePath} style={styles.avatarImage} />
+                    {isCurrentAvatar(avatar.imagePath) && (
+                      <View style={styles.selectedOverlay}>
+                        <Sparkles size={20} color="#fff" />
+                      </View>
+                    )}
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
@@ -246,38 +217,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Bold',
   },
-  categoryTabs: {
+  sectionHeader: {
+    padding: 20,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
-  categoryTabsContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 12,
-  },
-  categoryTab: {
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    minWidth: 80,
-  },
-  activeCategoryTab: {
-    backgroundColor: '#4CAF50',
-  },
-  categoryEmoji: {
-    fontSize: 16,
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
     marginBottom: 4,
   },
-  categoryTabText: {
-    fontSize: 12,
+  sectionSubtitle: {
+    fontSize: 14,
     fontFamily: 'Inter-Regular',
-    color: '#ccc',
-  },
-  activeCategoryTabText: {
-    color: '#fff',
-    fontFamily: 'Inter-Bold',
+    color: '#888',
   },
   avatarGrid: {
     flex: 1,
@@ -293,36 +248,34 @@ const styles = StyleSheet.create({
     width: AVATAR_SIZE,
     alignItems: 'center',
     marginBottom: 16,
-    position: 'relative',
   },
   selectedAvatarItem: {
     transform: [{ scale: 1.05 }],
   },
-  avatarImage: {
+  avatarImageContainer: {
+    position: 'relative',
     width: AVATAR_SIZE - 8,
     height: AVATAR_SIZE - 8,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
     borderRadius: (AVATAR_SIZE - 8) / 2,
-    borderWidth: 3,
-    borderColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#333',
   },
   selectedOverlay: {
     position: 'absolute',
     top: 0,
-    left: 4,
-    right: 4,
-    bottom: 20,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(76, 175, 80, 0.8)',
     borderRadius: (AVATAR_SIZE - 8) / 2,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  avatarName: {
-    fontSize: 11,
-    fontFamily: 'Inter-Regular',
-    color: '#ccc',
-    textAlign: 'center',
-    marginTop: 4,
-    width: AVATAR_SIZE,
+    borderWidth: 3,
+    borderColor: '#4CAF50',
   },
   infoSection: {
     paddingHorizontal: 20,
