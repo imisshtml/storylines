@@ -152,6 +152,22 @@ export const DEFAULT_AVATARS: DefaultAvatar[] = [
     id: 'avatar-35',
     imagePath: require('../../assets/images/avatars/uyyuy.jpg'),
   },
+  {
+    id: 'avatar-36',
+    imagePath: require('../../assets/images/avatars/qwqwww.jpg'),
+  },
+  {
+    id: 'avatar-37',
+    imagePath: require('../../assets/images/avatars/saaaa.jpg'),
+  },
+  {
+    id: 'avatar-38',
+    imagePath: require('../../assets/images/avatars/erfff.jpg'),
+  },
+  {
+    id: 'avatar-39',
+    imagePath: require('../../assets/images/avatars/gggsss.jpg'),
+  },
 ];
 
 /**
