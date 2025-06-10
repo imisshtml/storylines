@@ -10,10 +10,9 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Platform,
   Modal,
 } from 'react-native';
-import { ArrowLeft, ArrowRight, Save, User, Dices, Scroll, Package, Camera, Upload, ShieldUser, Dna, Brain, BookOpen, X, ShoppingCart, Trash2, Coins } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Check, Camera, ChevronDown, ChevronUp, Plus, Minus } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import {
@@ -40,61 +39,49 @@ import {
   saveCharacterAtom,
   resetCharacterCreationAtom,
   setStartingWealthAtom,
+  canAffordEquipment,
   purchaseEquipmentAtom,
   removeEquipmentAtom,
-  canAffordEquipment,
-  getEquipmentCostInCopper,
-  convertFromCopper,
-  getStartingGold,
-  STARTING_WEALTH_BY_CLASS,
   type Race,
   type Class,
   type DnDSpell,
-  type DnDAbilities,
-  type DnDEquipment,
   type Equipment,
 } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
-import { pickAndUploadAvatar, getRandomFantasyPortrait, getDefaultAvatar } from '../utils/avatarStorage';
+import { SPELLCASTING_BY_CLASS, getSpellcastingInfo } from '../data/spellcastingData';
+import { getDefaultAvatar } from '../utils/avatarStorage';
+import AvatarSelector from '../components/AvatarSelector';
 
 const CREATION_STEPS = [
-  { id: 0, title: 'Info', icon: User },
-  { id: 1, title: 'Class', icon: ShieldUser },
-  { id: 2, title: 'Race', icon: Dna },
-  { id: 3, title: 'Stats', icon: Dices },
-  { id: 4, title: 'Skills', icon: Brain },
-  { id: 5, title: 'Spells', icon: Scroll },
-  { id: 6, title: 'Equip', icon: Package },
-  { id: 7, title: 'Review', icon: Save },
+  'Basic Info',
+  'Choose Race',
+  'Choose Class',
+  'Assign Abilities',
+  'Choose Skills',
+  'Choose Spells',
+  'Purchase Equipment',
+  'Review',
 ];
 
-// Point buy cost chart for D&D 5e
-const POINT_BUY_COSTS: { [key: number]: number } = {
-  8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9
-};
-
-const POINT_BUY_TOTAL = 27;
-
 export default function CreationScreen() {
-  const [user] = useAtom(userAtom);
   const [currentStep, setCurrentStep] = useAtom(characterCreationStepAtom);
   const [characterName, setCharacterName] = useAtom(characterNameAtom);
   const [selectedRace, setSelectedRace] = useAtom(selectedRaceAtom);
   const [selectedClass, setSelectedClass] = useAtom(selectedClassAtom);
-  const [abilities, setAbilities] = useAtom(characterAbilitiesAtom);
+  const [characterAbilities, setCharacterAbilities] = useAtom(characterAbilitiesAtom);
   const [selectedSkills, setSelectedSkills] = useAtom(selectedSkillsAtom);
   const [selectedSpells, setSelectedSpells] = useAtom(selectedSpellsAtom);
-  const [equipment, setEquipment] = useAtom(characterEquipmentAtom);
+  const [characterEquipment, setCharacterEquipment] = useAtom(characterEquipmentAtom);
   const [characterGold, setCharacterGold] = useAtom(characterGoldAtom);
   const [characterSilver, setCharacterSilver] = useAtom(characterSilverAtom);
   const [characterCopper, setCharacterCopper] = useAtom(characterCopperAtom);
   const [purchasedEquipment, setPurchasedEquipment] = useAtom(purchasedEquipmentAtom);
-  
-  const [races] = useAtom(racesAtom);
-  const [classes] = useAtom(classesAtom);
-  const [spells] = useAtom(spellsAtom);
-  const [availableEquipment] = useAtom(equipmentAtom);
-  
+
+  const [races, setRaces] = useAtom(racesAtom);
+  const [classes, setClasses] = useAtom(classesAtom);
+  const [spells, setSpells] = useAtom(spellsAtom);
+  const [equipment, setEquipment] = useAtom(equipmentAtom);
+
   const [, fetchRaces] = useAtom(fetchRacesAtom);
   const [, fetchClasses] = useAtom(fetchClassesAtom);
   const [, fetchSpells] = useAtom(fetchSpellsAtom);
@@ -105,14 +92,15 @@ export default function CreationScreen() {
   const [, purchaseEquipment] = useAtom(purchaseEquipmentAtom);
   const [, removeEquipment] = useAtom(removeEquipmentAtom);
 
+  const [user] = useAtom(userAtom);
+
   const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
-  const [showClassDetails, setShowClassDetails] = useState<Class | null>(null);
-  const [showRaceDetails, setShowRaceDetails] = useState<Race | null>(null);
-  const [equipmentFilter, setEquipmentFilter] = useState<string>('all');
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<string>('');
+  const [selectedAvatar, setSelectedAvatar] = useState<string>(getDefaultAvatar());
+  const [isAvatarSelectorVisible, setIsAvatarSelectorVisible] = useState(false);
+  const [expandedSpells, setExpandedSpells] = useState<Set<string>>(new Set());
+  const [activeSpellTab, setActiveSpellTab] = useState<'cantrips' | 'level1'>('cantrips');
+  const [selectedEquipmentCategory, setSelectedEquipmentCategory] = useState('All');
+  const [equipmentQuantities, setEquipmentQuantities] = useState<{ [key: string]: number }>({});
 
   useEffect(() => {
     const loadData = async () => {
@@ -126,6 +114,7 @@ export default function CreationScreen() {
         ]);
       } catch (error) {
         console.error('Error loading character creation data:', error);
+        Alert.alert('Error', 'Failed to load character creation data. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -134,7 +123,6 @@ export default function CreationScreen() {
     loadData();
   }, [fetchRaces, fetchClasses, fetchSpells, fetchEquipment]);
 
-  // Set starting wealth when class is selected
   useEffect(() => {
     if (selectedClass) {
       setStartingWealth();
@@ -145,6 +133,7 @@ export default function CreationScreen() {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
     } else {
+      resetCharacterCreation();
       router.back();
     }
   };
@@ -155,855 +144,606 @@ export default function CreationScreen() {
     }
   };
 
-  const pickImage = async () => {
-    if (!user) return;
-
-    setIsUploadingAvatar(true);
-    try {
-      if (Platform.OS === 'web') {
-        // For web, use a random fantasy portrait
-        const randomPortrait = getRandomFantasyPortrait();
-        setAvatarUri(randomPortrait);
-      } else {
-        // For mobile, use the avatar upload utility
-        const result = await pickAndUploadAvatar(
-          user.id,
-          undefined, // No character ID yet since we're creating
-          setUploadProgress
-        );
-
-        if (result.success && result.url) {
-          setAvatarUri(result.url);
-        } else {
-          Alert.alert('Upload Failed', result.error || 'Failed to upload avatar');
-        }
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to select avatar');
-    } finally {
-      setIsUploadingAvatar(false);
-      setUploadProgress('');
+  const canProceedToNext = () => {
+    switch (currentStep) {
+      case 0: // Basic Info
+        return characterName.trim().length > 0;
+      case 1: // Choose Race
+        return selectedRace !== null;
+      case 2: // Choose Class
+        return selectedClass !== null;
+      case 3: // Assign Abilities
+        return true; // Always allow proceeding from abilities
+      case 4: // Choose Skills
+        return selectedSkills.length > 0;
+      case 5: // Choose Spells
+        if (!selectedClass || !hasSpellcasting()) return true;
+        const spellcastingInfo = getSpellcastingInfo(selectedClass.name, 1);
+        if (!spellcastingInfo) return true;
+        
+        const cantrips = selectedSpells.filter(spell => spell.level === 0);
+        const level1Spells = selectedSpells.filter(spell => spell.level === 1);
+        
+        const requiredCantrips = spellcastingInfo.cantripsKnown || 0;
+        const requiredLevel1 = spellcastingInfo.spellsKnown || 0;
+        
+        return cantrips.length === requiredCantrips && level1Spells.length === requiredLevel1;
+      case 6: // Purchase Equipment
+        return true; // Always allow proceeding from equipment
+      default:
+        return true;
     }
   };
 
-  const calculatePointsUsed = () => {
-    return Object.values(abilities).reduce((total, score) => {
-      return total + (POINT_BUY_COSTS[score] || 0);
-    }, 0);
+  const hasSpellcasting = () => {
+    return selectedClass && SPELLCASTING_BY_CLASS[selectedClass.name.toLowerCase()];
   };
 
-  const getRemainingPoints = () => {
-    return POINT_BUY_TOTAL - calculatePointsUsed();
+  const handleAvatarSelect = (avatarUrl: string) => {
+    setSelectedAvatar(avatarUrl);
   };
 
-  const canIncreaseAbility = (ability: keyof DnDAbilities) => {
-    const currentScore = abilities[ability];
-    const nextScore = currentScore + 1;
-    
-    if (nextScore > 15) return false;
-    
-    const currentCost = POINT_BUY_COSTS[currentScore] || 0;
-    const nextCost = POINT_BUY_COSTS[nextScore] || 0;
-    const costDifference = nextCost - currentCost;
-    
-    return getRemainingPoints() >= costDifference;
-  };
-
-  const getAbilityModifier = (score: number) => {
-    return Math.floor((score - 10) / 2);
-  };
-
-  const getFinalAbilityScore = (ability: keyof DnDAbilities) => {
-    let baseScore = abilities[ability];
-    
-    // Add racial bonuses
-    if (selectedRace?.ability_bonuses) {
-      const bonus = selectedRace.ability_bonuses.find(
-        (bonus) => bonus.ability_score.index === ability.substring(0, 3)
-      );
-      if (bonus) {
-        baseScore += bonus.bonus;
-      }
+  const getAvatarSource = () => {
+    if (selectedAvatar.startsWith('default:')) {
+      const { getAvatarById } = require('../data/defaultAvatars');
+      const avatarId = selectedAvatar.replace('default:', '');
+      const defaultAvatar = getAvatarById(avatarId);
+      return defaultAvatar ? defaultAvatar.imagePath : require('../data/defaultAvatars').DEFAULT_AVATARS[0].imagePath;
     }
-    
-    return baseScore;
+    return { uri: selectedAvatar };
   };
 
-  const calculateHitPoints = () => {
-    if (!selectedClass) return 8;
-    
-    const hitDie = selectedClass.hit_die;
-    const conModifier = getAbilityModifier(getFinalAbilityScore('constitution'));
-    
-    // Max hit die + CON modifier (minimum 1)
-    return Math.max(1, hitDie + conModifier);
-  };
-
-  const calculateArmorClass = () => {
-    const dexModifier = getAbilityModifier(getFinalAbilityScore('dexterity'));
-    
-    // Find equipped armor
-    const equippedArmor = purchasedEquipment.find(item => 
-      item.type === 'armor' && item.category !== 'shield'
-    );
-    
-    if (equippedArmor && equippedArmor.properties) {
-      const armorProps = equippedArmor.properties as any;
-      let ac = armorProps.ac || 10;
-      
-      // Apply DEX modifier based on armor type
-      if (armorProps.dex_bonus === 'full') {
-        ac += dexModifier;
-      } else if (armorProps.dex_bonus === 'max_2') {
-        ac += Math.min(2, dexModifier);
-      }
-      
-      return ac;
+  const toggleSpellExpansion = (spellIndex: string) => {
+    const newExpanded = new Set(expandedSpells);
+    if (newExpanded.has(spellIndex)) {
+      newExpanded.delete(spellIndex);
+    } else {
+      newExpanded.add(spellIndex);
     }
-    
-    // No armor: 10 + DEX modifier
-    return 10 + dexModifier;
+    setExpandedSpells(newExpanded);
   };
 
-  const formatCurrency = (gold: number, silver: number, copper: number) => {
-    const parts = [];
-    if (gold > 0) parts.push(`${gold} gp`);
-    if (silver > 0) parts.push(`${silver} sp`);
-    if (copper > 0) parts.push(`${copper} cp`);
-    return parts.length > 0 ? parts.join(', ') : '0 cp';
+  const handleSpellSelection = (spell: DnDSpell) => {
+    const isSelected = selectedSpells.some(s => s.index === spell.index);
+    if (isSelected) {
+      setSelectedSpells(selectedSpells.filter(s => s.index !== spell.index));
+    } else {
+      setSelectedSpells([...selectedSpells, spell]);
+    }
+  };
+
+  const getFilteredSpells = (level: number) => {
+    return spells.filter(spell => spell.level === level);
+  };
+
+  const getSpellRequirements = () => {
+    if (!selectedClass || !hasSpellcasting()) return { cantrips: 0, level1: 0 };
+    const spellcastingInfo = getSpellcastingInfo(selectedClass.name, 1);
+    return {
+      cantrips: spellcastingInfo?.cantripsKnown || 0,
+      level1: spellcastingInfo?.spellsKnown || 0,
+    };
   };
 
   const getEquipmentCategories = () => {
-    const categories = ['all', ...new Set(availableEquipment.map(item => item.category))];
-    return categories.filter(Boolean);
+    const categories = ['All', 'Armor', 'Weapons'];
+    const otherCategories = [...new Set(equipment
+      .filter(item => !['armor', 'weapon'].includes(item.equipment_category))
+      .map(item => item.equipment_category)
+      .filter(Boolean)
+    )].sort();
+    return [...categories, ...otherCategories];
   };
 
   const getFilteredEquipment = () => {
-    if (equipmentFilter === 'all') {
-      return availableEquipment;
+    if (selectedEquipmentCategory === 'All') return equipment;
+    if (selectedEquipmentCategory === 'Armor') {
+      return equipment.filter(item => item.equipment_category === 'armor');
     }
-    return availableEquipment.filter(item => item.category === equipmentFilter);
+    if (selectedEquipmentCategory === 'Weapons') {
+      return equipment.filter(item => item.equipment_category === 'weapon');
+    }
+    return equipment.filter(item => item.equipment_category === selectedEquipmentCategory);
   };
 
-  const handlePurchaseEquipment = (item: Equipment) => {
+  const updateEquipmentQuantity = (equipmentId: string, change: number) => {
+    const newQuantity = Math.max(0, (equipmentQuantities[equipmentId] || 0) + change);
+    setEquipmentQuantities(prev => ({
+      ...prev,
+      [equipmentId]: newQuantity
+    }));
+  };
+
+  const handlePurchaseEquipment = (equipment: Equipment, quantity: number = 1) => {
     try {
-      purchaseEquipment(item);
+      for (let i = 0; i < quantity; i++) {
+        purchaseEquipment(equipment);
+      }
+      // Reset quantity after purchase
+      setEquipmentQuantities(prev => ({
+        ...prev,
+        [equipment.id]: 0
+      }));
     } catch (error) {
-      Alert.alert('Cannot Purchase', 'You cannot afford this item.');
+      Alert.alert('Cannot Purchase', 'You do not have enough gold to purchase this item.');
     }
-  };
-
-  const handleRemoveEquipment = (item: Equipment) => {
-    removeEquipment(item);
-  };
-
-  const formatEquipmentCost = (item: Equipment) => {
-    const { cost_quantity, cost_unit } = item;
-    return `${cost_quantity} ${cost_unit}`;
   };
 
   const handleSaveCharacter = async () => {
-    if (!user || !characterName || !selectedRace || !selectedClass) {
-      Alert.alert('Error', 'Please complete all required fields');
+    if (!user || !selectedRace || !selectedClass) {
+      Alert.alert('Error', 'Missing required character information.');
       return;
     }
 
-    setIsSaving(true);
+    setIsLoading(true);
     try {
-      const hitPoints = calculateHitPoints();
-      const armorClass = calculateArmorClass();
-
       const characterData = {
         user_id: user.id,
         name: characterName,
         race: selectedRace.name,
         class: selectedClass.name,
-        background: 'Folk Hero', // Default background for now
+        background: 'Folk Hero', // Default background
         level: 1,
-        abilities,
+        abilities: characterAbilities,
         skills: selectedSkills,
         spells: selectedSpells,
-        equipment,
-        current_hitpoints: hitPoints,
-        max_hitpoints: hitPoints,
+        equipment: characterEquipment,
+        character_data: {
+          race: selectedRace,
+          class: selectedClass,
+          avatar: selectedAvatar,
+          purchasedEquipment,
+        },
+        current_hitpoints: 10, // Default
+        max_hitpoints: 10, // Default
         temp_hitpoints: 0,
-        armor_class: armorClass,
+        armor_class: 10, // Default
         conditions: [],
         gold: characterGold,
         silver: characterSilver,
         copper: characterCopper,
-        character_data: {
-          race: selectedRace,
-          class: selectedClass,
-          abilities,
-          skills: selectedSkills,
-          spells: selectedSpells,
-          equipment,
-          purchasedEquipment,
-          avatar: avatarUri || getDefaultAvatar(selectedClass.name),
-        },
       };
 
       await saveCharacter(characterData);
-      
-      Alert.alert(
-        'Success!',
-        'Your character has been created successfully.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              resetCharacterCreation();
-              setAvatarUri(null);
-              router.back();
-            },
-          },
-        ]
-      );
+      resetCharacterCreation();
+      Alert.alert('Success', 'Character created successfully!', [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
     } catch (error) {
       console.error('Error saving character:', error);
       Alert.alert('Error', 'Failed to save character. Please try again.');
     } finally {
-      setIsSaving(false);
+      setIsLoading(false);
     }
   };
 
-  const renderStepIndicator = () => (
-    <View style={styles.stepIndicatorContainer}>
-      <ScrollView 
-        horizontal
-        scrollEnabled={false}
-        showsHorizontalScrollIndicator={false}
-        style={styles.stepIndicator}
-        contentContainerStyle={styles.stepIndicatorContent}
-      >
-        {CREATION_STEPS.map((step, index) => {
-          const Icon = step.icon;
-          const isActive = index === currentStep;
-          const isCompleted = index < currentStep;
-          
-          return (
-            <View key={step.id} style={styles.stepItem}>
-              <View style={[
-                styles.stepCircle,
-                isActive && styles.stepCircleActive,
-                isCompleted && styles.stepCircleCompleted,
-              ]}>
-                <Icon 
-                  size={16} 
-                  color={isActive || isCompleted ? '#fff' : '#666'} 
-                />
-              </View>
-              <Text style={[
-                styles.stepText,
-                isActive && styles.stepTextActive,
-              ]}>
-                {step.title}
-              </Text>
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 0: // Basic Info
+        return (
+          <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>Create Your Character</Text>
+            
+            <View style={styles.avatarSection}>
+              <Text style={styles.label}>Character Portrait</Text>
+              <TouchableOpacity
+                style={styles.avatarContainer}
+                onPress={() => setIsAvatarSelectorVisible(true)}
+              >
+                <Image source={getAvatarSource()} style={styles.avatar} />
+                <View style={styles.avatarOverlay}>
+                  <Camera size={24} color="#fff" />
+                </View>
+              </TouchableOpacity>
             </View>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
 
-  const renderBasicInfo = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Character Details</Text>
-      
-      <View style={styles.avatarSection}>
-        <Text style={styles.avatarLabel}>Character Portrait</Text>
-        <TouchableOpacity style={styles.avatarContainer} onPress={pickImage} disabled={isUploadingAvatar}>
-          {avatarUri ? (
-            <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Camera size={32} color="#666" />
-              <Text style={styles.avatarPlaceholderText}>Add Portrait</Text>
+            <View style={styles.inputSection}>
+              <Text style={styles.label}>Character Name</Text>
+              <TextInput
+                style={styles.input}
+                value={characterName}
+                onChangeText={setCharacterName}
+                placeholder="Enter character name"
+                placeholderTextColor="#666"
+              />
             </View>
-          )}
-          {isUploadingAvatar && (
-            <View style={styles.uploadingOverlay}>
-              <ActivityIndicator size="small" color="#4CAF50" />
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.uploadButton, isUploadingAvatar && styles.uploadButtonDisabled]} 
-          onPress={pickImage}
-          disabled={isUploadingAvatar}
-        >
-          <Upload size={16} color="#4CAF50" />
-          <Text style={styles.uploadButtonText}>
-            {isUploadingAvatar 
-              ? (uploadProgress || 'Uploading...') 
-              : (avatarUri ? 'Change Portrait' : 'Upload Portrait')
-            }
-          </Text>
-        </TouchableOpacity>
-      </View>
+          </View>
+        );
 
-      <Text style={styles.inputLabel}>Character Name</Text>
-      <TextInput
-        style={styles.input}
-        value={characterName}
-        onChangeText={setCharacterName}
-        placeholder="Enter character name"
-        placeholderTextColor="#666"
-      />
-    </View>
-  );
-
-  const renderClassSelection = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Choose Your Class</Text>
-      <Text style={styles.subtitle}>Your class determines your abilities, skills, and role in the party</Text>
-      <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
-        {classes.map((cls) => {
-          const wealthData = STARTING_WEALTH_BY_CLASS[cls.name];
-          
-          return (
-            <TouchableOpacity
-              key={cls.index}
-              style={[
-                styles.classOptionItem,
-                selectedClass?.index === cls.index && styles.optionItemSelected,
-              ]}
-              onPress={() => setSelectedClass(cls)}
-            >
-              <View style={styles.classOptionContent}>
-                <View style={styles.classOptionHeader}>
+      case 1: // Choose Race
+        return (
+          <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>Choose Your Race</Text>
+            <ScrollView style={styles.optionsList}>
+              {races.map((race) => (
+                <TouchableOpacity
+                  key={race.index}
+                  style={[
+                    styles.optionCard,
+                    selectedRace?.index === race.index && styles.selectedCard
+                  ]}
+                  onPress={() => setSelectedRace(race)}
+                >
                   <Text style={[
-                    styles.classOptionTitle,
-                    selectedClass?.index === cls.index && styles.optionTextSelected,
+                    styles.optionTitle,
+                    selectedRace?.index === race.index && styles.selectedText
+                  ]}>
+                    {race.name}
+                  </Text>
+                  <Text style={[
+                    styles.optionDescription,
+                    selectedRace?.index === race.index && styles.selectedText
+                  ]}>
+                    Size: {race.size} • Speed: {race.speed} ft
+                  </Text>
+                  {race.ability_bonuses.length > 0 && (
+                    <Text style={[
+                      styles.optionDescription,
+                      selectedRace?.index === race.index && styles.selectedText
+                    ]}>
+                      Ability Bonuses: {race.ability_bonuses.map(bonus => 
+                        `+${bonus.bonus} ${bonus.ability_score.name}`
+                      ).join(', ')}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        );
+
+      case 2: // Choose Class
+        return (
+          <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>Choose Your Class</Text>
+            <ScrollView style={styles.optionsList}>
+              {classes.map((cls) => (
+                <TouchableOpacity
+                  key={cls.index}
+                  style={[
+                    styles.optionCard,
+                    selectedClass?.index === cls.index && styles.selectedCard
+                  ]}
+                  onPress={() => setSelectedClass(cls)}
+                >
+                  <Text style={[
+                    styles.optionTitle,
+                    selectedClass?.index === cls.index && styles.selectedText
                   ]}>
                     {cls.name}
                   </Text>
-                  {wealthData && (
-                    <View style={styles.goldBadge}>
-                      <Coins size={14} color="#FFD700" />
-                      <Text style={styles.goldBadgeText}>{wealthData.maxRoll} gp</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={[
-                  styles.classOptionDescription,
-                  selectedClass?.index === cls.index && styles.classOptionDescriptionSelected,
-                ]}>
-                  Hit Die: d{cls.hit_die} • {cls.spellcasting ? 'Spellcaster' : 'Non-spellcaster'}
-                </Text>
-                {wealthData && (
                   <Text style={[
-                    styles.classWealthInfo,
-                    selectedClass?.index === cls.index && styles.classWealthInfoSelected,
+                    styles.optionDescription,
+                    selectedClass?.index === cls.index && styles.selectedText
                   ]}>
-                    Starting Wealth: {wealthData.dice} × {wealthData.multiplier} gp
+                    Hit Die: d{cls.hit_die} • Starting Gold: {characterGold} gp
                   </Text>
-                )}
-              </View>
-              <TouchableOpacity
-                style={styles.detailsButton}
-                onPress={() => setShowClassDetails(cls)}
-              >
-                <BookOpen size={20} color={selectedClass?.index === cls.index ? '#fff' : '#4CAF50'} />
-              </TouchableOpacity>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
+                  {cls.spellcasting && (
+                    <Text style={[
+                      styles.optionDescription,
+                      selectedClass?.index === cls.index && styles.selectedText
+                    ]}>
+                      Spellcaster (Level {cls.spellcasting.level})
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        );
 
-  const renderRaceSelection = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Choose Your Race</Text>
-      <Text style={styles.subtitle}>Your race provides ability bonuses and special traits</Text>
-      <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
-        {races.map((race) => (
-          <TouchableOpacity
-            key={race.index}
-            style={[
-              styles.raceOptionItem,
-              selectedRace?.index === race.index && styles.optionItemSelected,
-            ]}
-            onPress={() => setSelectedRace(race)}
-          >
-            <View style={styles.raceOptionContent}>
-              <Text style={[
-                styles.raceOptionTitle,
-                selectedRace?.index === race.index && styles.optionTextSelected,
-              ]}>
-                {race.name}
-              </Text>
-              <Text style={[
-                styles.raceOptionDescription,
-                selectedRace?.index === race.index && styles.raceOptionDescriptionSelected,
-              ]}>
-                Size: {race.size} • Speed: {race.speed} ft
-              </Text>
-              {race.ability_bonuses && race.ability_bonuses.length > 0 && (
-                <Text style={[
-                  styles.raceAbilityBonuses,
-                  selectedRace?.index === race.index && styles.raceAbilityBonusesSelected,
-                ]}>
-                  Bonuses: {race.ability_bonuses.map(bonus => 
-                    `+${bonus.bonus} ${bonus.ability_score.name}`
-                  ).join(', ')}
-                </Text>
-              )}
-            </View>
-            <TouchableOpacity
-              style={styles.detailsButton}
-              onPress={() => setShowRaceDetails(race)}
-            >
-              <BookOpen size={20} color={selectedRace?.index === race.index ? '#fff' : '#4CAF50'} />
-            </TouchableOpacity>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
-  );
-
-  const renderAbilities = () => {
-    const abilityNames = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'];
-    const remainingPoints = getRemainingPoints();
-    
-    return (
-      <View style={styles.stepContent}>
-        <Text style={styles.stepTitle}>Ability Scores (Point Buy)</Text>
-        <Text style={styles.subtitle}>
-          You have {POINT_BUY_TOTAL} points to spend. Remaining: {remainingPoints}
-        </Text>
-        
-        <View style={styles.pointBuyRules}>
-          <Text style={styles.rulesTitle}>Point Buy Rules:</Text>
-          <Text style={styles.rulesText}>• Scores range from 8-15 (before racial bonuses)</Text>
-          <Text style={styles.rulesText}>• Cost increases as scores get higher</Text>
-          <Text style={styles.rulesText}>• You can freely mix and match as long as total cost ≤ 27</Text>
-          
-          <View style={styles.costChart}>
-            <Text style={styles.costChartTitle}>Cost Chart:</Text>
-            <View style={styles.costChartGrid}>
-              {Object.entries(POINT_BUY_COSTS).map(([score, cost]) => (
-                <View key={score} style={styles.costChartItem}>
-                  <Text style={styles.costChartScore}>{score}</Text>
-                  <Text style={styles.costChartCost}>{cost}</Text>
+      case 3: // Assign Abilities
+        return (
+          <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>Assign Ability Scores</Text>
+            <Text style={styles.stepDescription}>
+              Standard array: 15, 14, 13, 12, 10, 8
+            </Text>
+            <View style={styles.abilitiesGrid}>
+              {Object.entries(characterAbilities).map(([ability, score]) => (
+                <View key={ability} style={styles.abilityCard}>
+                  <Text style={styles.abilityName}>
+                    {ability.charAt(0).toUpperCase() + ability.slice(1)}
+                  </Text>
+                  <Text style={styles.abilityScore}>{score}</Text>
                 </View>
               ))}
             </View>
           </View>
-        </View>
+        );
 
-        {abilityNames.map((ability) => {
-          const baseScore = abilities[ability as keyof DnDAbilities];
-          const finalScore = getFinalAbilityScore(ability as keyof DnDAbilities);
-          const modifier = getAbilityModifier(finalScore);
-          const racialBonus = finalScore - baseScore;
-          
+      case 4: // Choose Skills
+        return (
+          <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>Choose Skills</Text>
+            <Text style={styles.stepDescription}>
+              Select skills you are proficient in
+            </Text>
+            <ScrollView style={styles.skillsList}>
+              {['Acrobatics', 'Animal Handling', 'Arcana', 'Athletics', 'Deception', 
+                'History', 'Insight', 'Intimidation', 'Investigation', 'Medicine',
+                'Nature', 'Perception', 'Performance', 'Persuasion', 'Religion',
+                'Sleight of Hand', 'Stealth', 'Survival'].map((skill) => (
+                <TouchableOpacity
+                  key={skill}
+                  style={[
+                    styles.skillCard,
+                    selectedSkills.includes(skill) && styles.selectedCard
+                  ]}
+                  onPress={() => {
+                    if (selectedSkills.includes(skill)) {
+                      setSelectedSkills(selectedSkills.filter(s => s !== skill));
+                    } else {
+                      setSelectedSkills([...selectedSkills, skill]);
+                    }
+                  }}
+                >
+                  <Text style={[
+                    styles.skillName,
+                    selectedSkills.includes(skill) && styles.selectedText
+                  ]}>
+                    {skill}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        );
+
+      case 5: // Choose Spells
+        if (!hasSpellcasting()) {
           return (
-            <View key={ability} style={styles.abilityRow}>
-              <View style={styles.abilityInfo}>
-                <Text style={styles.abilityLabel}>
-                  {ability.charAt(0).toUpperCase() + ability.slice(1)}
+            <View style={styles.stepContent}>
+              <Text style={styles.stepTitle}>Spells</Text>
+              <Text style={styles.stepDescription}>
+                Your class does not have spellcasting abilities.
+              </Text>
+            </View>
+          );
+        }
+
+        const requirements = getSpellRequirements();
+        const selectedCantrips = selectedSpells.filter(spell => spell.level === 0);
+        const selectedLevel1 = selectedSpells.filter(spell => spell.level === 1);
+
+        return (
+          <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>Choose Spells</Text>
+            
+            <View style={styles.spellTabs}>
+              <TouchableOpacity
+                style={[
+                  styles.spellTab,
+                  activeSpellTab === 'cantrips' && styles.activeSpellTab
+                ]}
+                onPress={() => setActiveSpellTab('cantrips')}
+              >
+                <Text style={[
+                  styles.spellTabText,
+                  activeSpellTab === 'cantrips' && styles.activeSpellTabText
+                ]}>
+                  Cantrips ({selectedCantrips.length}/{requirements.cantrips})
                 </Text>
-                <View style={styles.abilityScores}>
-                  <Text style={styles.abilityBaseScore}>{baseScore}</Text>
-                  {racialBonus > 0 && (
-                    <Text style={styles.abilityRacialBonus}>+{racialBonus}</Text>
-                  )}
-                  <Text style={styles.abilityFinalScore}>= {finalScore}</Text>
-                  <Text style={styles.abilityModifier}>
-                    ({modifier >= 0 ? '+' : ''}{modifier})
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.spellTab,
+                  activeSpellTab === 'level1' && styles.activeSpellTab
+                ]}
+                onPress={() => setActiveSpellTab('level1')}
+              >
+                <Text style={[
+                  styles.spellTabText,
+                  activeSpellTab === 'level1' && styles.activeSpellTabText
+                ]}>
+                  1st Level ({selectedLevel1.length}/{requirements.level1})
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.spellsList}>
+              {getFilteredSpells(activeSpellTab === 'cantrips' ? 0 : 1).map((spell) => {
+                const isSelected = selectedSpells.some(s => s.index === spell.index);
+                const isExpanded = expandedSpells.has(spell.index);
+                
+                return (
+                  <View key={spell.index} style={styles.spellCard}>
+                    <TouchableOpacity
+                      style={[
+                        styles.spellHeader,
+                        isSelected && styles.selectedSpellHeader
+                      ]}
+                      onPress={() => handleSpellSelection(spell)}
+                    >
+                      <View style={styles.spellTitleRow}>
+                        <Text style={[
+                          styles.spellName,
+                          isSelected && styles.selectedText
+                        ]}>
+                          {spell.name}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => toggleSpellExpansion(spell.index)}
+                          style={styles.expandButton}
+                        >
+                          {isExpanded ? (
+                            <ChevronUp size={20} color={isSelected ? "#fff" : "#666"} />
+                          ) : (
+                            <ChevronDown size={20} color={isSelected ? "#fff" : "#666"} />
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={[
+                        styles.spellSchool,
+                        isSelected && styles.selectedText
+                      ]}>
+                        {spell.school} • {spell.casting_time} • {spell.range}
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    {isExpanded && (
+                      <View style={styles.spellDetails}>
+                        <Text style={styles.spellProperty}>
+                          <Text style={styles.spellPropertyLabel}>Components:</Text> {spell.components.join(', ')}
+                        </Text>
+                        <Text style={styles.spellProperty}>
+                          <Text style={styles.spellPropertyLabel}>Duration:</Text> {spell.duration}
+                        </Text>
+                        {spell.description.map((desc, index) => (
+                          <Text key={index} style={styles.spellDescription}>
+                            {desc}
+                          </Text>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        );
+
+      case 6: // Purchase Equipment
+        return (
+          <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>Purchase Equipment</Text>
+            <Text style={styles.stepDescription}>
+              Gold: {characterGold} • Silver: {characterSilver} • Copper: {characterCopper}
+            </Text>
+
+            <View style={styles.categoryTabs}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {getEquipmentCategories().map((category) => (
+                  <TouchableOpacity
+                    key={category}
+                    style={[
+                      styles.categoryTab,
+                      selectedEquipmentCategory === category && styles.activeCategoryTab
+                    ]}
+                    onPress={() => setSelectedEquipmentCategory(category)}
+                  >
+                    <Text style={[
+                      styles.categoryTabText,
+                      selectedEquipmentCategory === category && styles.activeCategoryTabText
+                    ]}>
+                      {category}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <ScrollView style={styles.equipmentList}>
+              {getFilteredEquipment().map((item) => {
+                const quantity = equipmentQuantities[item.id] || 0;
+                const canAfford = canAffordEquipment(item, characterGold, characterSilver, characterCopper);
+                
+                return (
+                  <View key={item.id} style={styles.equipmentCard}>
+                    <View style={styles.equipmentInfo}>
+                      <Text style={styles.equipmentName}>{item.name}</Text>
+                      <Text style={styles.equipmentCost}>
+                        {item.cost_quantity} {item.cost_unit}
+                      </Text>
+                      <Text style={styles.equipmentWeight}>
+                        Weight: {item.weight} lb
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.equipmentActions}>
+                      <View style={styles.quantityControls}>
+                        <TouchableOpacity
+                          style={styles.quantityButton}
+                          onPress={() => updateEquipmentQuantity(item.id, -1)}
+                          disabled={quantity === 0}
+                        >
+                          <Minus size={16} color={quantity === 0 ? "#666" : "#fff"} />
+                        </TouchableOpacity>
+                        <Text style={styles.quantityText}>{quantity}</Text>
+                        <TouchableOpacity
+                          style={styles.quantityButton}
+                          onPress={() => updateEquipmentQuantity(item.id, 1)}
+                        >
+                          <Plus size={16} color="#fff" />
+                        </TouchableOpacity>
+                      </View>
+                      
+                      <TouchableOpacity
+                        style={[
+                          styles.purchaseButton,
+                          (!canAfford || quantity === 0) && styles.purchaseButtonDisabled
+                        ]}
+                        onPress={() => handlePurchaseEquipment(item, quantity)}
+                        disabled={!canAfford || quantity === 0}
+                      >
+                        <Text style={styles.purchaseButtonText}>Buy</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+
+            {purchasedEquipment.length > 0 && (
+              <View style={styles.purchasedSection}>
+                <Text style={styles.purchasedTitle}>Purchased Equipment:</Text>
+                {purchasedEquipment.map((item, index) => (
+                  <View key={index} style={styles.purchasedItem}>
+                    <Text style={styles.purchasedItemName}>{item.name}</Text>
+                    <TouchableOpacity
+                      onPress={() => removeEquipment(item)}
+                      style={styles.removeButton}
+                    >
+                      <Text style={styles.removeButtonText}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        );
+
+      case 7: // Review
+        return (
+          <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>Review Character</Text>
+            <ScrollView style={styles.reviewContent}>
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewLabel}>Name:</Text>
+                <Text style={styles.reviewValue}>{characterName}</Text>
+              </View>
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewLabel}>Race:</Text>
+                <Text style={styles.reviewValue}>{selectedRace?.name}</Text>
+              </View>
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewLabel}>Class:</Text>
+                <Text style={styles.reviewValue}>{selectedClass?.name}</Text>
+              </View>
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewLabel}>Skills:</Text>
+                <Text style={styles.reviewValue}>{selectedSkills.join(', ')}</Text>
+              </View>
+              {hasSpellcasting() && selectedSpells.length > 0 && (
+                <View style={styles.reviewSection}>
+                  <Text style={styles.reviewLabel}>Spells:</Text>
+                  <Text style={styles.reviewValue}>
+                    {selectedSpells.map(spell => spell.name).join(', ')}
                   </Text>
                 </View>
+              )}
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewLabel}>Equipment:</Text>
+                <Text style={styles.reviewValue}>
+                  {purchasedEquipment.map(item => item.name).join(', ')}
+                </Text>
               </View>
-              <View style={styles.abilityControls}>
-                <TouchableOpacity
-                  style={[
-                    styles.abilityButton,
-                    baseScore <= 8 && styles.abilityButtonDisabled,
-                  ]}
-                  onPress={() => setAbilities(prev => ({
-                    ...prev,
-                    [ability]: Math.max(8, prev[ability as keyof DnDAbilities] - 1)
-                  }))}
-                  disabled={baseScore <= 8}
-                >
-                  <Text style={styles.abilityButtonText}>-</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.abilityButton,
-                    !canIncreaseAbility(ability as keyof DnDAbilities) && styles.abilityButtonDisabled,
-                  ]}
-                  onPress={() => setAbilities(prev => ({
-                    ...prev,
-                    [ability]: Math.min(15, prev[ability as keyof DnDAbilities] + 1)
-                  }))}
-                  disabled={!canIncreaseAbility(ability as keyof DnDAbilities)}
-                >
-                  <Text style={styles.abilityButtonText}>+</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        })}
-        
-        <View style={styles.pointSummary}>
-          <Text style={styles.pointSummaryText}>
-            Points Used: {calculatePointsUsed()} / {POINT_BUY_TOTAL}
-          </Text>
-          {remainingPoints < 0 && (
-            <Text style={styles.pointsOverLimit}>
-              Over limit by {Math.abs(remainingPoints)} points!
-            </Text>
-          )}
-        </View>
-      </View>
-    );
-  };
-
-  const renderSkills = () => {
-    const availableSkills = [
-      'Acrobatics', 'Animal Handling', 'Arcana', 'Athletics', 'Deception',
-      'History', 'Insight', 'Intimidation', 'Investigation', 'Medicine',
-      'Nature', 'Perception', 'Performance', 'Persuasion', 'Religion',
-      'Sleight of Hand', 'Stealth', 'Survival'
-    ];
-
-    return (
-      <View style={styles.stepContent}>
-        <Text style={styles.stepTitle}>Choose Skills</Text>
-        <Text style={styles.subtitle}>Select up to 4 skills your character is proficient in</Text>
-        <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
-          {availableSkills.map((skill) => (
-            <TouchableOpacity
-              key={skill}
-              style={[
-                styles.optionItem,
-                selectedSkills.includes(skill) && styles.optionItemSelected,
-              ]}
-              onPress={() => {
-                if (selectedSkills.includes(skill)) {
-                  setSelectedSkills(prev => prev.filter(s => s !== skill));
-                } else if (selectedSkills.length < 4) {
-                  setSelectedSkills(prev => [...prev, skill]);
-                }
-              }}
-              disabled={!selectedSkills.includes(skill) && selectedSkills.length >= 4}
-            >
-              <Text style={[
-                styles.optionText,
-                selectedSkills.includes(skill) && styles.optionTextSelected,
-                !selectedSkills.includes(skill) && selectedSkills.length >= 4 && styles.optionTextDisabled,
-              ]}>
-                {skill}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-    );
-  };
-
-  const renderSpells = () => {
-    if (!selectedClass || !selectedClass.spellcasting) {
-      return (
-        <View style={styles.stepContent}>
-          <Text style={styles.stepTitle}>Spells</Text>
-          <Text style={styles.subtitle}>This class doesn't have spellcasting abilities.</Text>
-          <View style={styles.noSpellsContainer}>
-            <Text style={styles.noSpellsText}>
-              {selectedClass?.name} is a martial class that relies on physical prowess rather than magic.
-            </Text>
+            </ScrollView>
           </View>
-        </View>
-      );
-    }
+        );
 
-    return (
-      <View style={styles.stepContent}>
-        <Text style={styles.stepTitle}>Choose Spells</Text>
-        <Text style={styles.subtitle}>Select cantrips and 1st level spells for your spellcaster</Text>
-        <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
-          {spells.map((spell) => (
-            <TouchableOpacity
-              key={spell.index}
-              style={[
-                styles.spellOptionItem,
-                selectedSpells.some(s => s.index === spell.index) && styles.optionItemSelected,
-              ]}
-              onPress={() => {
-                if (selectedSpells.some(s => s.index === spell.index)) {
-                  setSelectedSpells(prev => prev.filter(s => s.index !== spell.index));
-                } else if (selectedSpells.length < 6) {
-                  setSelectedSpells(prev => [...prev, spell]);
-                }
-              }}
-              disabled={!selectedSpells.some(s => s.index === spell.index) && selectedSpells.length >= 6}
-            >
-              <View style={styles.spellOptionContent}>
-                <Text style={[
-                  styles.spellOptionTitle,
-                  selectedSpells.some(s => s.index === spell.index) && styles.optionTextSelected,
-                ]}>
-                  {spell.name}
-                </Text>
-                <Text style={[
-                  styles.spellOptionLevel,
-                  selectedSpells.some(s => s.index === spell.index) && styles.spellOptionLevelSelected,
-                ]}>
-                  {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`} • {spell.school.name}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-    );
-  };
-
-  const renderEquipment = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Purchase Equipment</Text>
-      <Text style={styles.subtitle}>Use your starting gold to buy equipment for your adventure</Text>
-      
-      {/* Currency Display */}
-      <View style={styles.currencyContainer}>
-        <View style={styles.currencyDisplay}>
-          <Coins size={20} color="#FFD700" />
-          <Text style={styles.currencyText}>
-            {formatCurrency(characterGold, characterSilver, characterCopper)}
-          </Text>
-        </View>
-      </View>
-
-      {/* Equipment Categories */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryFilter}>
-        {getEquipmentCategories().map((category) => (
-          <TouchableOpacity
-            key={category}
-            style={[
-              styles.categoryButton,
-              equipmentFilter === category && styles.categoryButtonActive,
-            ]}
-            onPress={() => setEquipmentFilter(category)}
-          >
-            <Text style={[
-              styles.categoryButtonText,
-              equipmentFilter === category && styles.categoryButtonTextActive,
-            ]}>
-              {category === 'all' ? 'All' : category.replace(/^\w/, c => c.toUpperCase())}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Equipment List */}
-      <ScrollView style={styles.equipmentList} showsVerticalScrollIndicator={false}>
-        {getFilteredEquipment().map((item) => {
-          const canAfford = canAffordEquipment(item, characterGold, characterSilver, characterCopper);
-          const isPurchased = purchasedEquipment.some(purchased => purchased.id === item.id);
-          
-          return (
-            <View key={item.id} style={[
-              styles.equipmentItem,
-              !canAfford && !isPurchased && styles.equipmentItemDisabled,
-              isPurchased && styles.equipmentItemPurchased,
-            ]}>
-              <View style={styles.equipmentInfo}>
-                <Text style={[
-                  styles.equipmentName,
-                  !canAfford && !isPurchased && styles.equipmentNameDisabled,
-                  isPurchased && styles.equipmentNamePurchased,
-                ]}>
-                  {item.name}
-                </Text>
-                <Text style={[
-                  styles.equipmentDetails,
-                  !canAfford && !isPurchased && styles.equipmentDetailsDisabled,
-                  isPurchased && styles.equipmentDetailsPurchased,
-                ]}>
-                  {item.category} • {item.weight} lb • {formatEquipmentCost(item)}
-                </Text>
-                {item.description && item.description.length > 0 && (
-                  <Text style={[
-                    styles.equipmentDescription,
-                    !canAfford && !isPurchased && styles.equipmentDescriptionDisabled,
-                    isPurchased && styles.equipmentDescriptionPurchased,
-                  ]} numberOfLines={2}>
-                    {item.description[0]}
-                  </Text>
-                )}
-              </View>
-              
-              <View style={styles.equipmentActions}>
-                {isPurchased ? (
-                  <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => handleRemoveEquipment(item)}
-                  >
-                    <Trash2 size={20} color="#f44336" />
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={[
-                      styles.purchaseButton,
-                      !canAfford && styles.purchaseButtonDisabled,
-                    ]}
-                    onPress={() => handlePurchaseEquipment(item)}
-                    disabled={!canAfford}
-                  >
-                    <ShoppingCart size={20} color={canAfford ? '#4CAF50' : '#666'} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          );
-        })}
-      </ScrollView>
-
-      {/* Purchased Equipment Summary */}
-      {purchasedEquipment.length > 0 && (
-        <View style={styles.purchasedSummary}>
-          <Text style={styles.purchasedTitle}>Purchased Equipment ({purchasedEquipment.length})</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.purchasedList}>
-            {purchasedEquipment.map((item) => (
-              <View key={item.id} style={styles.purchasedItem}>
-                <Text style={styles.purchasedItemName} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.purchasedItemCost}>{formatEquipmentCost(item)}</Text>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-    </View>
-  );
-
-  const renderReview = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Character Review</Text>
-      
-      {avatarUri && (
-        <View style={styles.reviewAvatarContainer}>
-          <Image source={{ uri: avatarUri }} style={styles.reviewAvatar} />
-        </View>
-      )}
-      
-      <View style={styles.reviewSection}>
-        <Text style={styles.reviewLabel}>Name:</Text>
-        <Text style={styles.reviewValue}>{characterName}</Text>
-      </View>
-
-      <View style={styles.reviewSection}>
-        <Text style={styles.reviewLabel}>Class:</Text>
-        <Text style={styles.reviewValue}>{selectedClass?.name}</Text>
-      </View>
-
-      <View style={styles.reviewSection}>
-        <Text style={styles.reviewLabel}>Race:</Text>
-        <Text style={styles.reviewValue}>{selectedRace?.name}</Text>
-      </View>
-
-      <View style={styles.reviewSection}>
-        <Text style={styles.reviewLabel}>Level:</Text>
-        <Text style={styles.reviewValue}>1</Text>
-      </View>
-
-      <View style={styles.reviewSection}>
-        <Text style={styles.reviewLabel}>Hit Points:</Text>
-        <Text style={styles.reviewValue}>{calculateHitPoints()}</Text>
-      </View>
-
-      <View style={styles.reviewSection}>
-        <Text style={styles.reviewLabel}>Armor Class:</Text>
-        <Text style={styles.reviewValue}>{calculateArmorClass()}</Text>
-      </View>
-
-      <View style={styles.reviewSection}>
-        <Text style={styles.reviewLabel}>Abilities:</Text>
-        <Text style={styles.reviewValue}>
-          STR {getFinalAbilityScore('strength')}, DEX {getFinalAbilityScore('dexterity')}, CON {getFinalAbilityScore('constitution')}, INT {getFinalAbilityScore('intelligence')}, WIS {getFinalAbilityScore('wisdom')}, CHA {getFinalAbilityScore('charisma')}
-        </Text>
-      </View>
-
-      {selectedSkills.length > 0 && (
-        <View style={styles.reviewSection}>
-          <Text style={styles.reviewLabel}>Skills:</Text>
-          <Text style={styles.reviewValue}>{selectedSkills.join(', ')}</Text>
-        </View>
-      )}
-
-      {selectedSpells.length > 0 && (
-        <View style={styles.reviewSection}>
-          <Text style={styles.reviewLabel}>Spells:</Text>
-          <Text style={styles.reviewValue}>
-            {selectedSpells.map(spell => 
-              `${spell.name}(${spell.level === 0 ? 'c' : spell.level})`
-            ).join(', ')}
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.reviewSection}>
-        <Text style={styles.reviewLabel}>Remaining Currency:</Text>
-        <Text style={styles.reviewValue}>
-          {formatCurrency(characterGold, characterSilver, characterCopper)}
-        </Text>
-      </View>
-
-      {purchasedEquipment.length > 0 && (
-        <View style={styles.reviewSection}>
-          <Text style={styles.reviewLabel}>Equipment:</Text>
-          <Text style={styles.reviewValue}>
-            {purchasedEquipment.map(item => item.name).join(', ')}
-          </Text>
-        </View>
-      )}
-
-      <TouchableOpacity
-        style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
-        onPress={handleSaveCharacter}
-        disabled={isSaving}
-      >
-        {isSaving ? (
-          <ActivityIndicator size="small\" color="#fff" />
-        ) : (
-          <>
-            <Save size={20} color="#fff" />
-            <Text style={styles.saveButtonText}>Create Character</Text>
-          </>
-        )}
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderCurrentStep = () => {
-    switch (currentStep) {
-      case 0: return renderBasicInfo();
-      case 1: return renderClassSelection();
-      case 2: return renderRaceSelection();
-      case 3: return renderAbilities();
-      case 4: return renderSkills();
-      case 5: return renderSpells();
-      case 6: return renderEquipment();
-      case 7: return renderReview();
-      default: return renderBasicInfo();
-    }
-  };
-
-  const canProceed = () => {
-    switch (currentStep) {
-      case 0: return characterName.length > 0;
-      case 1: return selectedClass !== null;
-      case 2: return selectedRace !== null;
-      case 3: return getRemainingPoints() >= 0; // Must not exceed point limit
-      case 4: return true; // Skills are optional
-      case 5: return true; // Spells are optional
-      case 6: return true; // Equipment is optional
-      case 7: return true; // Review step
-      default: return false;
+      default:
+        return null;
     }
   };
 
@@ -1023,133 +763,64 @@ export default function CreationScreen() {
           <ArrowLeft color="#fff" size={24} />
         </TouchableOpacity>
         <Text style={styles.title}>Create Character</Text>
+        <View style={styles.stepIndicator}>
+          <Text style={styles.stepText}>
+            {currentStep + 1}/{CREATION_STEPS.length}
+          </Text>
+        </View>
       </View>
 
-      {renderStepIndicator()}
+      <View style={styles.progressBar}>
+        <View 
+          style={[
+            styles.progressFill,
+            { width: `${((currentStep + 1) / CREATION_STEPS.length) * 100}%` }
+          ]} 
+        />
+      </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {renderCurrentStep()}
+      <ScrollView style={styles.content}>
+        {renderStepContent()}
       </ScrollView>
 
-      {currentStep < CREATION_STEPS.length - 1 && (
-        <View style={styles.footer}>
+      <View style={styles.footer}>
+        {currentStep === CREATION_STEPS.length - 1 ? (
           <TouchableOpacity
-            style={[styles.nextButton, !canProceed() && styles.nextButtonDisabled]}
+            style={[styles.nextButton, isLoading && styles.nextButtonDisabled]}
+            onPress={handleSaveCharacter}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Check size={20} color="#fff" />
+                <Text style={styles.nextButtonText}>Create Character</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[
+              styles.nextButton,
+              !canProceedToNext() && styles.nextButtonDisabled
+            ]}
             onPress={handleNext}
-            disabled={!canProceed()}
+            disabled={!canProceedToNext()}
           >
             <Text style={styles.nextButtonText}>Next</Text>
             <ArrowRight size={20} color="#fff" />
           </TouchableOpacity>
-        </View>
-      )}
+        )}
+      </View>
 
-      {/* Class Details Modal */}
-      <Modal
-        visible={showClassDetails !== null}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowClassDetails(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{showClassDetails?.name}</Text>
-              <TouchableOpacity onPress={() => setShowClassDetails(null)}>
-                <X size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalBody}>
-              <Text style={styles.modalSectionTitle}>Hit Die</Text>
-              <Text style={styles.modalText}>d{showClassDetails?.hit_die}</Text>
-              
-              {showClassDetails && STARTING_WEALTH_BY_CLASS[showClassDetails.name] && (
-                <>
-                  <Text style={styles.modalSectionTitle}>Starting Wealth</Text>
-                  <Text style={styles.modalText}>
-                    {STARTING_WEALTH_BY_CLASS[showClassDetails.name].dice} × {STARTING_WEALTH_BY_CLASS[showClassDetails.name].multiplier} gp
-                  </Text>
-                  <Text style={styles.modalText}>
-                    Maximum: {STARTING_WEALTH_BY_CLASS[showClassDetails.name].maxRoll} gp
-                  </Text>
-                </>
-              )}
-              
-              <Text style={styles.modalSectionTitle}>Proficiencies</Text>
-              {showClassDetails?.proficiencies.map((prof, index) => (
-                <Text key={index} style={styles.modalText}>• {prof.name}</Text>
-              ))}
-              
-              <Text style={styles.modalSectionTitle}>Saving Throws</Text>
-              {showClassDetails?.saving_throws.map((save, index) => (
-                <Text key={index} style={styles.modalText}>• {save.name}</Text>
-              ))}
-              
-              {showClassDetails?.spellcasting && (
-                <>
-                  <Text style={styles.modalSectionTitle}>Spellcasting</Text>
-                  <Text style={styles.modalText}>
-                    Spellcasting ability: {showClassDetails.spellcasting.spellcasting_ability.name}
-                  </Text>
-                  <Text style={styles.modalText}>
-                    Spellcasting starts at level {showClassDetails.spellcasting.level}
-                  </Text>
-                </>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Race Details Modal */}
-      <Modal
-        visible={showRaceDetails !== null}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowRaceDetails(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{showRaceDetails?.name}</Text>
-              <TouchableOpacity onPress={() => setShowRaceDetails(null)}>
-                <X size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalBody}>
-              <Text style={styles.modalSectionTitle}>Size & Speed</Text>
-              <Text style={styles.modalText}>Size: {showRaceDetails?.size}</Text>
-              <Text style={styles.modalText}>Speed: {showRaceDetails?.speed} feet</Text>
-              
-              <Text style={styles.modalSectionTitle}>Ability Score Increases</Text>
-              {showRaceDetails?.ability_bonuses.map((bonus, index) => (
-                <Text key={index} style={styles.modalText}>
-                  • {bonus.ability_score.name} +{bonus.bonus}
-                </Text>
-              ))}
-              
-              <Text style={styles.modalSectionTitle}>Languages</Text>
-              {showRaceDetails?.languages.map((lang, index) => (
-                <Text key={index} style={styles.modalText}>• {lang.name}</Text>
-              ))}
-              
-              <Text style={styles.modalSectionTitle}>Traits</Text>
-              {showRaceDetails?.traits.map((trait, index) => (
-                <Text key={index} style={styles.modalText}>• {trait.name}</Text>
-              ))}
-              
-              {showRaceDetails?.subraces && showRaceDetails.subraces.length > 0 && (
-                <>
-                  <Text style={styles.modalSectionTitle}>Subraces</Text>
-                  {showRaceDetails.subraces.map((subrace, index) => (
-                    <Text key={index} style={styles.modalText}>• {subrace.name}</Text>
-                  ))}
-                </>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      <AvatarSelector
+        isVisible={isAvatarSelectorVisible}
+        onClose={() => setIsAvatarSelectorVisible(false)}
+        onAvatarSelect={handleAvatarSelect}
+        currentAvatar={selectedAvatar}
+        userId={user?.id || ''}
+      />
     </SafeAreaView>
   );
 }
@@ -1174,8 +845,9 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    height: 52,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#2a2a2a',
   },
@@ -1187,55 +859,27 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
     fontFamily: 'Inter-Bold',
+    color: '#fff',
     flex: 1,
     textAlign: 'center',
-    marginRight: 40,
-  },
-  stepIndicatorContainer: {
-    backgroundColor: '#1a1a1a',
-    borderBottomWidth: 1,
-    borderBottomColor: '#2a2a2a',
-    paddingVertical: 12,
   },
   stepIndicator: {
-    flexGrow: 0,
-  },
-  stepIndicatorContent: {
-    paddingHorizontal: 16,
+    width: 40,
     alignItems: 'center',
-  },
-  stepItem: {
-    alignItems: 'center',
-    marginRight: 20,
-    minWidth: 30,
-  },
-  stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#2a2a2a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  stepCircleActive: {
-    backgroundColor: '#4CAF50',
-  },
-  stepCircleCompleted: {
-    backgroundColor: '#4CAF50',
   },
   stepText: {
-    fontSize: 10,
-    color: '#666',
+    fontSize: 14,
     fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-  },
-  stepTextActive: {
     color: '#4CAF50',
-    fontFamily: 'Inter-Bold',
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: '#2a2a2a',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
   },
   content: {
     flex: 1,
@@ -1245,88 +889,51 @@ const styles = StyleSheet.create({
   },
   stepTitle: {
     fontSize: 24,
-    color: '#fff',
     fontFamily: 'Inter-Bold',
+    color: '#fff',
     marginBottom: 8,
   },
-  subtitle: {
+  stepDescription: {
     fontSize: 16,
-    color: '#888',
     fontFamily: 'Inter-Regular',
+    color: '#888',
     marginBottom: 20,
   },
   avatarSection: {
     alignItems: 'center',
     marginBottom: 24,
   },
-  avatarLabel: {
+  label: {
     fontSize: 16,
-    color: '#fff',
     fontFamily: 'Inter-Bold',
+    color: '#fff',
     marginBottom: 12,
   },
   avatarContainer: {
+    position: 'relative',
+  },
+  avatar: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    overflow: 'hidden',
-    marginBottom: 12,
-    position: 'relative',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  avatarPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#2a2a2a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#4CAF50',
-    borderStyle: 'dashed',
   },
-  avatarPlaceholderText: {
-    color: '#666',
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    marginTop: 4,
-  },
-  uploadingOverlay: {
+  avatarOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    right: 0,
+    backgroundColor: '#4CAF50',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#121212',
   },
-  uploadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-  },
-  uploadButtonDisabled: {
-    opacity: 0.5,
-  },
-  uploadButtonText: {
-    color: '#4CAF50',
-    fontSize: 14,
-    fontFamily: 'Inter-Bold',
-  },
-  inputLabel: {
-    fontSize: 16,
-    color: '#fff',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 8,
+  inputSection: {
+    marginBottom: 20,
   },
   input: {
     backgroundColor: '#2a2a2a',
@@ -1335,498 +942,301 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Regular',
-    marginBottom: 20,
   },
   optionsList: {
-    maxHeight: 400,
-    marginBottom: 20,
+    flex: 1,
   },
-  optionItem: {
+  optionCard: {
     backgroundColor: '#2a2a2a',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  optionItemSelected: {
+  selectedCard: {
     backgroundColor: '#4CAF50',
   },
-  optionText: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-  },
-  optionTextSelected: {
-    fontFamily: 'Inter-Bold',
-  },
-  optionTextDisabled: {
-    color: '#666',
-  },
-  classOptionItem: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  classOptionContent: {
-    flex: 1,
-  },
-  classOptionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  classOptionTitle: {
-    color: '#fff',
+  optionTitle: {
     fontSize: 18,
     fontFamily: 'Inter-Bold',
-    flex: 1,
-  },
-  goldBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    gap: 4,
-  },
-  goldBadgeText: {
-    color: '#FFD700',
-    fontSize: 12,
-    fontFamily: 'Inter-Bold',
-  },
-  classOptionDescription: {
-    color: '#888',
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
+    color: '#fff',
     marginBottom: 4,
   },
-  classOptionDescriptionSelected: {
-    color: '#fff',
-  },
-  classWealthInfo: {
-    color: '#FFD700',
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-  },
-  classWealthInfoSelected: {
-    color: '#fff',
-  },
-  raceOptionItem: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  raceOptionContent: {
-    flex: 1,
-  },
-  raceOptionTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontFamily: 'Inter-Bold',
-    marginBottom: 4,
-  },
-  raceOptionDescription: {
-    color: '#888',
+  optionDescription: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
-    marginBottom: 4,
+    color: '#ccc',
+    marginBottom: 2,
   },
-  raceOptionDescriptionSelected: {
+  selectedText: {
     color: '#fff',
   },
-  raceAbilityBonuses: {
-    color: '#4CAF50',
-    fontSize: 14,
-    fontFamily: 'Inter-Bold',
-  },
-  raceAbilityBonusesSelected: {
-    color: '#fff',
-  },
-  detailsButton: {
-    padding: 8,
-    marginLeft: 12,
-  },
-  spellOptionItem: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  spellOptionContent: {
-    flex: 1,
-  },
-  spellOptionTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-    marginBottom: 4,
-  },
-  spellOptionLevel: {
-    color: '#888',
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-  },
-  spellOptionLevelSelected: {
-    color: '#fff',
-  },
-  noSpellsContainer: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-  },
-  noSpellsText: {
-    color: '#888',
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  pointBuyRules: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-  },
-  rulesTitle: {
-    color: '#4CAF50',
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-    marginBottom: 8,
-  },
-  rulesText: {
-    color: '#fff',
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    marginBottom: 4,
-  },
-  costChart: {
-    marginTop: 12,
-  },
-  costChartTitle: {
-    color: '#4CAF50',
-    fontSize: 14,
-    fontFamily: 'Inter-Bold',
-    marginBottom: 8,
-  },
-  costChartGrid: {
+  abilitiesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-  },
-  costChartItem: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 6,
-    padding: 8,
-    minWidth: 40,
-    alignItems: 'center',
-  },
-  costChartScore: {
-    color: '#fff',
-    fontSize: 12,
-    fontFamily: 'Inter-Bold',
-  },
-  costChartCost: {
-    color: '#888',
-    fontSize: 10,
-    fontFamily: 'Inter-Regular',
-  },
-  abilityRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 8,
-  },
-  abilityInfo: {
-    flex: 1,
-  },
-  abilityLabel: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-    marginBottom: 4,
-  },
-  abilityScores: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  abilityBaseScore: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-  },
-  abilityRacialBonus: {
-    color: '#4CAF50',
-    fontSize: 14,
-    fontFamily: 'Inter-Bold',
-  },
-  abilityFinalScore: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-  },
-  abilityModifier: {
-    color: '#888',
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-  },
-  abilityControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 12,
   },
-  abilityButton: {
-    width: 32,
-    height: 32,
-    backgroundColor: '#4CAF50',
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  abilityButtonDisabled: {
-    backgroundColor: '#666',
-  },
-  abilityButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontFamily: 'Inter-Bold',
-  },
-  pointSummary: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    padding: 16,
-    marginTop: 12,
-    alignItems: 'center',
-  },
-  pointSummaryText: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-  },
-  pointsOverLimit: {
-    color: '#f44336',
-    fontSize: 14,
-    fontFamily: 'Inter-Bold',
-    marginTop: 4,
-  },
-  currencyContainer: {
+  abilityCard: {
     backgroundColor: '#2a2a2a',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 20,
-  },
-  currencyDisplay: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    width: '30%',
   },
-  currencyText: {
-    color: '#FFD700',
-    fontSize: 18,
-    fontFamily: 'Inter-Bold',
-  },
-  categoryFilter: {
-    marginBottom: 16,
-  },
-  categoryButton: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 8,
-  },
-  categoryButtonActive: {
-    backgroundColor: '#4CAF50',
-  },
-  categoryButtonText: {
-    color: '#888',
+  abilityName: {
     fontSize: 14,
-    fontFamily: 'Inter-Regular',
-  },
-  categoryButtonTextActive: {
-    color: '#fff',
     fontFamily: 'Inter-Bold',
+    color: '#888',
+    marginBottom: 4,
   },
-  equipmentList: {
-    maxHeight: 300,
-    marginBottom: 20,
+  abilityScore: {
+    fontSize: 24,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
   },
-  equipmentItem: {
-    flexDirection: 'row',
+  skillsList: {
+    flex: 1,
+  },
+  skillCard: {
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
+  },
+  skillName: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#fff',
+  },
+  spellTabs: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 4,
+  },
+  spellTab: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
     alignItems: 'center',
   },
-  equipmentItemDisabled: {
-    opacity: 0.5,
+  activeSpellTab: {
+    backgroundColor: '#4CAF50',
   },
-  equipmentItemPurchased: {
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    borderWidth: 1,
-    borderColor: '#4CAF50',
+  spellTabText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: '#888',
+  },
+  activeSpellTabText: {
+    color: '#fff',
+  },
+  spellsList: {
+    flex: 1,
+  },
+  spellCard: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  spellHeader: {
+    padding: 16,
+  },
+  selectedSpellHeader: {
+    backgroundColor: '#4CAF50',
+  },
+  spellTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  spellName: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    flex: 1,
+  },
+  expandButton: {
+    padding: 4,
+  },
+  spellSchool: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#ccc',
+  },
+  spellDetails: {
+    padding: 16,
+    paddingTop: 0,
+    backgroundColor: '#1a1a1a',
+  },
+  spellProperty: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#ccc',
+    marginBottom: 4,
+  },
+  spellPropertyLabel: {
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+  },
+  spellDescription: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#fff',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  categoryTabs: {
+    marginBottom: 16,
+  },
+  categoryTab: {
+    backgroundColor: '#2a2a2a',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  activeCategoryTab: {
+    backgroundColor: '#4CAF50',
+  },
+  categoryTabText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: '#888',
+  },
+  activeCategoryTabText: {
+    color: '#fff',
+  },
+  equipmentList: {
+    flex: 1,
+  },
+  equipmentCard: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   equipmentInfo: {
     flex: 1,
   },
   equipmentName: {
-    color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
-    marginBottom: 2,
+    color: '#fff',
+    marginBottom: 4,
   },
-  equipmentNameDisabled: {
-    color: '#666',
-  },
-  equipmentNamePurchased: {
-    color: '#4CAF50',
-  },
-  equipmentDetails: {
-    color: '#888',
+  equipmentCost: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
+    color: '#4CAF50',
     marginBottom: 2,
   },
-  equipmentDetailsDisabled: {
-    color: '#555',
-  },
-  equipmentDetailsPurchased: {
-    color: '#4CAF50',
-  },
-  equipmentDescription: {
-    color: '#888',
+  equipmentWeight: {
     fontSize: 12,
     fontFamily: 'Inter-Regular',
-  },
-  equipmentDescriptionDisabled: {
-    color: '#555',
-  },
-  equipmentDescriptionPurchased: {
-    color: '#4CAF50',
+    color: '#888',
   },
   equipmentActions: {
-    marginLeft: 12,
-  },
-  purchaseButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-  },
-  purchaseButtonDisabled: {
-    backgroundColor: '#333',
-    borderColor: '#666',
-  },
-  removeButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: 'rgba(244, 67, 54, 0.1)',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#f44336',
-  },
-  purchasedSummary: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
-  },
-  purchasedTitle: {
-    color: '#4CAF50',
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-    marginBottom: 12,
-  },
-  purchasedList: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  purchasedItem: {
+  quantityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#1a1a1a',
     borderRadius: 8,
-    padding: 8,
-    marginRight: 8,
-    minWidth: 80,
-    alignItems: 'center',
+    padding: 4,
   },
-  purchasedItemName: {
-    color: '#fff',
-    fontSize: 12,
+  quantityButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    borderRadius: 6,
+  },
+  quantityText: {
+    fontSize: 16,
     fontFamily: 'Inter-Bold',
+    color: '#fff',
+    marginHorizontal: 12,
+    minWidth: 20,
     textAlign: 'center',
-    marginBottom: 2,
   },
-  purchasedItemCost: {
-    color: '#888',
-    fontSize: 10,
-    fontFamily: 'Inter-Regular',
-  },
-  reviewAvatarContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  reviewAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-  },
-  reviewSection: {
-    backgroundColor: '#2a2a2a',
+  purchaseButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
   },
-  reviewLabel: {
-    color: '#4CAF50',
+  purchaseButtonDisabled: {
+    backgroundColor: '#666',
+  },
+  purchaseButtonText: {
     fontSize: 14,
     fontFamily: 'Inter-Bold',
+    color: '#fff',
+  },
+  purchasedSection: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+  },
+  purchasedTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    marginBottom: 12,
+  },
+  purchasedItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a1a',
+  },
+  purchasedItemName: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#fff',
+    flex: 1,
+  },
+  removeButton: {
+    backgroundColor: '#dc3545',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  removeButtonText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+  },
+  reviewContent: {
+    flex: 1,
+  },
+  reviewSection: {
+    marginBottom: 16,
+  },
+  reviewLabel: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: '#4CAF50',
     marginBottom: 4,
   },
   reviewValue: {
-    color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Regular',
-  },
-  saveButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 20,
-  },
-  saveButtonDisabled: {
-    backgroundColor: '#666',
-  },
-  saveButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
   },
   footer: {
     padding: 20,
@@ -1835,7 +1245,7 @@ const styles = StyleSheet.create({
   },
   nextButton: {
     backgroundColor: '#4CAF50',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1846,51 +1256,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#666',
   },
   nextButtonText: {
-    color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    width: '90%',
-    maxHeight: '80%',
-    overflow: 'hidden',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2a2a2a',
-  },
-  modalTitle: {
-    fontSize: 20,
     color: '#fff',
-    fontFamily: 'Inter-Bold',
-  },
-  modalBody: {
-    padding: 20,
-  },
-  modalSectionTitle: {
-    fontSize: 16,
-    color: '#4CAF50',
-    fontFamily: 'Inter-Bold',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  modalText: {
-    fontSize: 14,
-    color: '#fff',
-    fontFamily: 'Inter-Regular',
-    marginBottom: 4,
-    lineHeight: 20,
   },
 });
