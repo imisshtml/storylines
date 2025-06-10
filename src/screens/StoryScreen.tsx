@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Send, Chrome as Home, User as User2, X, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Send, Home, User as User2, X, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
@@ -61,6 +61,8 @@ export default function StoryScreen() {
       return;
     }
 
+    console.log('StoryScreen: Initializing for campaign:', currentCampaign.uid);
+
     // Clear previous campaign history when switching campaigns
     clearCampaignHistory();
 
@@ -105,12 +107,15 @@ export default function StoryScreen() {
   const sendPlayerAction = async (action: string, playerId: string = 'player1', playerName: string = 'Player') => {
     if (!currentCampaign || !action.trim()) return;
 
+    console.log('StoryScreen: Sending player action:', action);
+    
     setIsLoading(true);
     setError(null);
     setCurrentChoices([]); // Clear choices while loading
 
     try {
       // Add player message to campaign history
+      console.log('StoryScreen: Adding player message to history');
       await addCampaignMessage({
         campaign_uid: currentCampaign.uid,
         message: action,
@@ -123,6 +128,11 @@ export default function StoryScreen() {
         campaign: currentCampaign,
         storyHistory: campaignHistory.slice(-5), // Get last 5 messages for context
       };
+
+      console.log('StoryScreen: Sending request to API with context:', {
+        campaignId: currentCampaign.id,
+        historyLength: context.storyHistory.length
+      });
 
       // Send request to our API route
       const response = await fetch('/api/story', {
@@ -138,13 +148,19 @@ export default function StoryScreen() {
         }),
       });
 
+      console.log('StoryScreen: API response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('StoryScreen: API error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('StoryScreen: API response data:', data);
 
       // Add DM response to campaign history
+      console.log('StoryScreen: Adding DM response to history');
       await addCampaignMessage({
         campaign_uid: currentCampaign.uid,
         message: data.response,
@@ -153,9 +169,10 @@ export default function StoryScreen() {
       });
 
       setCurrentChoices(data.choices || []); // Use choices from AI response
+      console.log('StoryScreen: Set new choices:', data.choices);
 
     } catch (error) {
-      console.error('Error sending player action:', error);
+      console.error('StoryScreen: Error sending player action:', error);
       setError(error instanceof Error ? error.message : 'Failed to get DM response');
       setCurrentChoices([]); // Clear choices on error
     } finally {
