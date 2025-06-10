@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as SMS from 'expo-sms';
 import { supabase } from '../config/supabase';
+import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 
 export default function InviteFriendsScreen() {
   const [currentCampaign, setCurrentCampaign] = useAtom(currentCampaignAtom);
@@ -111,25 +112,6 @@ export default function InviteFriendsScreen() {
     return characters.filter(char => 
       char.user_id === user.id && (!char.campaign_id || char.campaign_id === currentCampaign?.uid)
     );
-  };
-
-  const getCharacterAvatar = (character: Character) => {
-    // Try to get avatar from character_data, fallback to a default fantasy portrait
-    const avatar = character.character_data?.avatar;
-    if (avatar) {
-      return avatar;
-    }
-    
-    // Use different default avatars based on class
-    const classAvatars: { [key: string]: string } = {
-      'Fighter': 'https://images.pexels.com/photos/1040881/pexels-photo-1040881.jpeg?auto=compress&cs=tinysrgb&w=400',
-      'Wizard': 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400',
-      'Rogue': 'https://images.pexels.com/photos/1212984/pexels-photo-1212984.jpeg?auto=compress&cs=tinysrgb&w=400',
-      'Cleric': 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-      'Ranger': 'https://images.pexels.com/photos/1300402/pexels-photo-1300402.jpeg?auto=compress&cs=tinysrgb&w=400',
-    };
-    
-    return classAvatars[character.class] || classAvatars['Fighter'];
   };
 
   const handleCharacterSelect = async (playerId: string, characterId: string | null) => {
@@ -395,7 +377,7 @@ export default function InviteFriendsScreen() {
                         disabled={!canSelectCharacter}
                       >
                         <Image 
-                          source={{ uri: getCharacterAvatar(playerCharacter) }} 
+                          source={getCharacterAvatarUrl(playerCharacter)} 
                           style={styles.characterAvatar}
                         />
                         <View style={styles.characterDetails}>
@@ -467,7 +449,7 @@ export default function InviteFriendsScreen() {
                   onPress={() => handleCharacterSelect(showCharacterSelector, character.id)}
                 >
                   <Image 
-                    source={{ uri: getCharacterAvatar(character) }} 
+                    source={getCharacterAvatarUrl(character)} 
                     style={styles.modalCharacterAvatar}
                   />
                   <View style={styles.characterOptionInfo}>

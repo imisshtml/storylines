@@ -216,7 +216,10 @@ export default function CharacterViewScreen() {
         {/* Character Portrait Section */}
         <View style={styles.portraitSection}>
           <View style={styles.avatarContainer}>
-            <Image source={{ uri: getCharacterAvatarUrl(character) }} style={styles.avatar} />
+            <Image 
+              source={getCharacterAvatarUrl(character)} 
+              style={styles.avatar}
+            />
             <TouchableOpacity
               style={styles.editAvatarButton}
               onPress={() => setIsEditingAvatar(true)}
