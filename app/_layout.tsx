@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { useAtom } from 'jotai';
 import { initializeAuthAtom } from '../src/atoms/authAtoms'
+import { initializeRealtimeAtom } from '../src/atoms/campaignAtoms';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -21,15 +22,18 @@ export default function RootLayout() {
   });
 
   const [, initializeAuth] = useAtom(initializeAuthAtom);
+  const [, initializeRealtime] = useAtom(initializeRealtimeAtom);
 
   useEffect(() => {
-    // Only initialize authentication, don't fetch campaigns here
+    // Initialize authentication and real-time subscriptions
     const initialize = async () => {
       await initializeAuth();
+      // Initialize real-time subscription after auth is ready
+      await initializeRealtime();
     };
     
     initialize();
-  }, [initializeAuth]);
+  }, [initializeAuth, initializeRealtime]);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
