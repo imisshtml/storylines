@@ -466,7 +466,8 @@ export default function CharacterViewScreen() {
               </View>
             </View>
           </View>
-        )}
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
