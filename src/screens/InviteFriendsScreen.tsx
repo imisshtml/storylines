@@ -22,7 +22,6 @@ export default function InviteFriendsScreen() {
   const [phoneNumbers, setPhoneNumbers] = useState('');
   const [smsAvailable, setSmsAvailable] = useState(false);
   const [showCharacterSelector, setShowCharacterSelector] = useState<string | null>(null);
-  const [playerCharacterAssignments, setPlayerCharacterAssignments] = useState<{ [playerId: string]: string }>({});
 
   useEffect(() => {
     if (!currentCampaign) {
@@ -95,9 +94,11 @@ export default function InviteFriendsScreen() {
   };
 
   const getPlayerCharacter = (playerId: string): Character | null => {
-    const characterId = playerCharacterAssignments[playerId];
-    if (!characterId) return null;
-    return characters.find(char => char.id === characterId) || null;
+    // Find character assigned to this campaign for this player
+    return characters.find(char => 
+      char.campaign_id === currentCampaign?.id && 
+      char.user_id === playerId
+    ) || null;
   };
 
   const getAvailableCharacters = (playerId: string): Character[] => {
@@ -108,7 +109,7 @@ export default function InviteFriendsScreen() {
     
     // Filter characters that are not assigned to any campaign or assigned to this campaign
     return characters.filter(char => 
-      !char.campaign_id || char.campaign_id === currentCampaign?.id
+      char.user_id === user.id && (!char.campaign_id || char.campaign_id === currentCampaign?.id)
     );
   };
 
@@ -116,39 +117,63 @@ export default function InviteFriendsScreen() {
     if (!user || !currentCampaign || playerId !== user.id) return;
 
     try {
+      // First, remove any existing character assignment for this player in this campaign
+      const existingCharacter = getPlayerCharacter(playerId);
+      if (existingCharacter) {
+        const { error: removeError } = await supabase
+          .from('characters')
+          .update({ campaign_id: null })
+          .eq('id', existingCharacter.id);
+
+        if (removeError) throw removeError;
+      }
+
+      let selectedCharacter: Character | null = null;
+
       if (characterId) {
-        // Assign character to campaign
-        const { error } = await supabase
+        // Assign new character to campaign
+        const { error: assignError } = await supabase
           .from('characters')
           .update({ campaign_id: currentCampaign.id })
-          .eq('id', characterId);
+          .eq('id', characterId)
+          .eq('user_id', user.id); // Extra security check
 
-        if (error) throw error;
+        if (assignError) throw assignError;
 
-        // Update local state
-        setPlayerCharacterAssignments(prev => ({
-          ...prev,
-          [playerId]: characterId
-        }));
-      } else {
-        // Remove character assignment
-        const currentCharacterId = playerCharacterAssignments[playerId];
-        if (currentCharacterId) {
-          const { error } = await supabase
-            .from('characters')
-            .update({ campaign_id: null })
-            .eq('id', currentCharacterId);
-
-          if (error) throw error;
-
-          // Update local state
-          setPlayerCharacterAssignments(prev => {
-            const newState = { ...prev };
-            delete newState[playerId];
-            return newState;
-          });
-        }
+        // Get the character details
+        selectedCharacter = characters.find(char => char.id === characterId) || null;
       }
+
+      // Update the campaign's players array with character information
+      const updatedPlayers = currentCampaign.players.map(player => {
+        if (player.id === playerId) {
+          return {
+            ...player,
+            character: selectedCharacter ? {
+              id: selectedCharacter.id,
+              name: selectedCharacter.name,
+              class: selectedCharacter.class,
+              race: selectedCharacter.race,
+              level: selectedCharacter.level,
+            } : null,
+          };
+        }
+        return player;
+      });
+
+      // Update the campaign in the database
+      const { error: campaignError } = await supabase
+        .from('campaigns')
+        .update({ players: updatedPlayers })
+        .eq('id', currentCampaign.id);
+
+      if (campaignError) throw campaignError;
+
+      // Update local campaign state
+      setCurrentCampaign({
+        ...currentCampaign,
+        players: updatedPlayers,
+      });
 
       // Refresh characters
       await fetchCharacters();
@@ -261,6 +286,9 @@ export default function InviteFriendsScreen() {
                       <Text style={styles.selectedCharacterText}>
                         {playerCharacter.name}
                       </Text>
+                      <Text style={styles.selectedCharacterDetails}>
+                        Lv{playerCharacter.level} {playerCharacter.race} {playerCharacter.class}
+                      </Text>
                       {canSelectCharacter && (
                         <ChevronDown size={16} color="#4CAF50" />
                       )}
@@ -326,7 +354,7 @@ export default function InviteFriendsScreen() {
                   </Text>
                 </TouchableOpacity>
               ))}
-              {showCharacterSelector && playerCharacterAssignments[showCharacterSelector] && (
+              {showCharacterSelector && getPlayerCharacter(showCharacterSelector) && (
                 <TouchableOpacity
                   style={styles.removeCharacterOption}
                   onPress={() => handleCharacterSelect(showCharacterSelector, null)}
@@ -530,12 +558,9 @@ const styles = StyleSheet.create({
     marginLeft: 32,
   },
   selectedCharacterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: 'rgba(76, 175, 80, 0.1)',
     borderRadius: 6,
-    padding: 8,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#4CAF50',
   },
@@ -543,6 +568,12 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontSize: 14,
     fontFamily: 'Inter-Bold',
+    marginBottom: 2,
+  },
+  selectedCharacterDetails: {
+    color: '#4CAF50',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
   },
   selectCharacterButton: {
     flexDirection: 'row',
