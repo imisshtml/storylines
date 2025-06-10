@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Play, Users, Settings, Menu, Crown, UserCheck, User, Sword } from 'lucide-react-native';
+import { Play, Users, Settings, Menu, Crown, UserCheck, User } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, ScrollView, Image } from 'react-native';
 import { useAtom } from 'jotai';
@@ -47,9 +47,8 @@ export default function HomeScreen() {
   };
 
   const handleCharacterPress = (character: Character) => {
-    // For now, just navigate to character creation to view/edit
-    // In the future, this could open a character sheet view
-    router.push('/creation');
+    // Navigate to character view screen
+    router.push('/character-view');
   };
 
   const toggleSidebar = () => {
@@ -84,6 +83,11 @@ export default function HomeScreen() {
     };
     
     return classAvatars[character.class] || classAvatars['Fighter'];
+  };
+
+  const getCharacterCampaignName = (character: Character) => {
+    // For now, return a placeholder since we don't have campaign assignment implemented
+    return character.campaign_id ? 'Adventure Campaign' : 'No Campaign Set';
   };
 
   // Helper function to check if user is the owner of a campaign
@@ -250,9 +254,9 @@ export default function HomeScreen() {
                       <Text style={styles.characterClass} numberOfLines={1}>
                         {character.race} {character.class}
                       </Text>
-                    </View>
-                    <View style={styles.characterIcon}>
-                      <Sword size={16} color="#4CAF50" />
+                      <Text style={styles.characterCampaign} numberOfLines={1}>
+                        {getCharacterCampaignName(character)}
+                      </Text>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -508,7 +512,6 @@ const styles = StyleSheet.create({
   },
   characterInfo: {
     alignItems: 'center',
-    marginBottom: 8,
   },
   characterName: {
     fontSize: 14,
@@ -522,9 +525,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#888',
     textAlign: 'center',
+    marginBottom: 4,
   },
-  characterIcon: {
-    alignItems: 'center',
+  characterCampaign: {
+    fontSize: 10,
+    fontFamily: 'Inter-Regular',
+    color: '#4CAF50',
+    textAlign: 'center',
   },
   noCharactersContainer: {
     backgroundColor: 'rgba(42, 42, 42, 0.8)',
