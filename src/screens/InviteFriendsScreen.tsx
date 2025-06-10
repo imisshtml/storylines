@@ -1,27 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator, TextInput, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator, TextInput, SafeAreaView, Modal, Image } from 'react-native';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
-import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send } from 'lucide-react-native';
+import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
+import { userAtom } from '../atoms/authAtoms';
+import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, X } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as SMS from 'expo-sms';
+import { supabase } from '../config/supabase';
+import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 
 export default function InviteFriendsScreen() {
-  const [currentCampaign] = useAtom(currentCampaignAtom);
+  const [currentCampaign, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [isLoading] = useAtom(campaignsLoadingAtom);
   const [error] = useAtom(campaignsErrorAtom);
   const [, upsertCampaign] = useAtom(upsertCampaignAtom);
+  const [user] = useAtom(userAtom);
+  const [characters] = useAtom(charactersAtom);
+  const [, fetchCharacters] = useAtom(fetchCharactersAtom);
   const [copied, setCopied] = useState(false);
   const [phoneNumbers, setPhoneNumbers] = useState('');
   const [smsAvailable, setSmsAvailable] = useState(false);
+  const [showCharacterSelector, setShowCharacterSelector] = useState<string | null>(null);
 
   useEffect(() => {
     if (!currentCampaign) {
       router.replace('/');
     }
     checkSmsAvailability();
-  }, [currentCampaign]);
+    if (user) {
+      fetchCharacters();
+    }
+  }, [currentCampaign, user, fetchCharacters]);
 
   const checkSmsAvailability = async () => {
     const isAvailable = await SMS.isAvailableAsync();
@@ -81,6 +92,183 @@ export default function InviteFriendsScreen() {
     } catch (error) {
       console.error('Error sending SMS:', error);
     }
+  };
+
+  const getPlayerCharacter = (playerId: string): Character | null => {
+    // Find character assigned to this campaign for this player
+    return characters.find(char => 
+      char.campaign_id === currentCampaign?.uid && 
+      char.user_id === playerId
+    ) || null;
+  };
+
+  const getAvailableCharacters = (playerId: string): Character[] => {
+    if (!user) return [];
+    
+    // Only show user's own characters if they are the player
+    if (playerId !== user.id) return [];
+    
+    // Filter characters that are not assigned to any campaign or assigned to this campaign
+    return characters.filter(char => 
+      char.user_id === user.id && (!char.campaign_id || char.campaign_id === currentCampaign?.uid)
+    );
+  };
+
+  const handleCharacterSelect = async (playerId: string, characterId: string | null) => {
+    if (!user || !currentCampaign || playerId !== user.id) {
+      console.error('Invalid user or campaign state:', {
+        hasUser: !!user,
+        hasCampaign: !!currentCampaign,
+        playerId,
+        userId: user?.id
+      });
+      return;
+    }
+
+    try {
+      // Use the authenticated user's ID instead of the player ID from campaign data
+      const userId = user.id;
+      console.log('Debug - IDs:', {
+        playerId,
+        userId,
+        characterId,
+        campaignId: currentCampaign.uid
+      });
+
+      // First, remove any existing character assignment for this player in this campaign
+      const existingCharacter = getPlayerCharacter(userId);
+      console.log('Debug - Existing character:', existingCharacter);
+
+      if (existingCharacter) {
+        console.log('Debug - Removing character:', {
+          characterId: existingCharacter.id,
+          userId,
+          campaignId: currentCampaign.uid
+        });
+
+        const { error: removeError } = await supabase
+          .from('characters')
+          .update({ campaign_id: null })
+          .eq('id', existingCharacter.id)
+          .eq('user_id', userId);
+
+        if (removeError) {
+          console.error('Error removing existing character:', removeError);
+          throw removeError;
+        }
+      }
+
+      let selectedCharacter: Character | null = null;
+
+      if (characterId) {
+        // Log available characters for debugging
+        console.log('Debug - Available characters:', characters.map(c => ({
+          id: c.id,
+          userId: c.user_id,
+          name: c.name
+        })));
+
+        // Validate that the character exists and belongs to the user
+        const characterToAssign = characters.find(char => 
+          char.id === characterId && char.user_id === userId
+        );
+
+        console.log('Debug - Character to assign:', characterToAssign);
+
+        if (!characterToAssign) {
+          console.error('Character not found or does not belong to user');
+          throw new Error('Character not found or access denied');
+        }
+
+        console.log('Debug - Assigning character:', {
+          characterId: characterToAssign.id,
+          userId,
+          campaignId: currentCampaign.uid
+        });
+
+        // Assign new character to campaign
+        const { error: assignError } = await supabase
+          .from('characters')
+          .update({ campaign_id: currentCampaign.uid })
+          .eq('id', characterToAssign.id)
+          .eq('user_id', userId);
+
+        if (assignError) {
+          console.error('Error assigning character:', assignError);
+          throw assignError;
+        }
+
+        selectedCharacter = characterToAssign;
+      }
+
+      // Log current campaign players before update
+      console.log('Debug - Current campaign players:', currentCampaign.players);
+
+      // Update the campaign's players array with character information
+      const updatedPlayers = currentCampaign.players.map(player => {
+        if (player.id === playerId) {
+          console.log('Debug - Updating player:', {
+            playerId: player.id,
+            characterInfo: selectedCharacter ? {
+              id: selectedCharacter.id,
+              name: selectedCharacter.name,
+              class: selectedCharacter.class,
+              race: selectedCharacter.race,
+              level: selectedCharacter.level,
+            } : null
+          });
+          return {
+            ...player,
+            character: selectedCharacter ? {
+              id: selectedCharacter.id,
+              name: selectedCharacter.name,
+              class: selectedCharacter.class,
+              race: selectedCharacter.race,
+              level: selectedCharacter.level,
+            } : null,
+          };
+        }
+        return player;
+      });
+
+      console.log('Debug - Updated players:', updatedPlayers);
+
+      // Update the campaign in the database
+      const { error: campaignError } = await supabase
+        .from('campaigns')
+        .update({ players: updatedPlayers })
+        .eq('id', currentCampaign.id);
+
+      if (campaignError) {
+        console.error('Error updating campaign:', campaignError);
+        throw campaignError;
+      }
+
+      // Update local campaign state
+      setCurrentCampaign({
+        ...currentCampaign,
+        players: updatedPlayers,
+      });
+
+      // Refresh characters
+      await fetchCharacters();
+      setShowCharacterSelector(null);
+
+      console.log('Character assignment completed successfully');
+    } catch (error) {
+      console.error('Error updating character assignment:', error);
+      // You might want to show an alert to the user here
+    }
+  };
+
+  // Check if all players have characters assigned
+  const allPlayersHaveCharacters = () => {
+    if (!currentCampaign || currentCampaign.players.length === 0) return false;
+    
+    return currentCampaign.players.every(player => {
+      const playerCharacter = getPlayerCharacter(player.id);
+      return playerCharacter !== null;
+    });
   };
 
   if (isLoading) {
@@ -161,33 +349,137 @@ export default function InviteFriendsScreen() {
         <Text style={styles.playersLabel}>
           Players ({currentCampaign.players.length})
         </Text>
+        <Text style={styles.realtimeIndicator}>
+          Updates automatically when players join
+        </Text>
         <ScrollView style={styles.playersList}>
-          {currentCampaign.players.map((player, index) => (
-            <View key={player.id} style={styles.playerItem}>
-              <Users size={20} color="#4CAF50" />
-              <Text style={styles.playerName}>{player.name || `Player ${index + 1}`}</Text>
-              {player.ready && (
-                <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
-              )}
-            </View>
-          ))}
+          {currentCampaign.players.map((player, index) => {
+            const playerCharacter = getPlayerCharacter(player.id);
+            const availableCharacters = getAvailableCharacters(player.id);
+            const canSelectCharacter = player.id === user?.id && availableCharacters.length > 0;
+            
+            return (
+              <View key={player.id} style={styles.playerItem}>
+                <View style={styles.playerRow}>
+                  <View style={styles.playerInfo}>
+                    <Users size={20} color="#4CAF50" />
+                    <Text style={styles.playerName}>{player.name || `Player ${index + 1}`}</Text>
+                    {player.ready && (
+                      <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
+                    )}
+                  </View>
+                  
+                  <View style={styles.characterInfo}>
+                    {playerCharacter ? (
+                      <TouchableOpacity
+                        style={styles.selectedCharacterContainer}
+                        onPress={() => canSelectCharacter ? setShowCharacterSelector(player.id) : undefined}
+                        disabled={!canSelectCharacter}
+                      >
+                        <Image 
+                          source={getCharacterAvatarUrl(playerCharacter)} 
+                          style={styles.characterAvatar}
+                        />
+                        <View style={styles.characterDetails}>
+                          <Text style={styles.selectedCharacterText}>
+                            {playerCharacter.name}
+                          </Text>
+                          <Text style={styles.selectedCharacterSubtext}>
+                            Lv{playerCharacter.level} {playerCharacter.race} {playerCharacter.class}
+                          </Text>
+                        </View>
+                        {canSelectCharacter && (
+                          <ChevronDown size={16} color="#4CAF50" style={styles.chevronIcon} />
+                        )}
+                      </TouchableOpacity>
+                    ) : canSelectCharacter ? (
+                      <TouchableOpacity
+                        style={styles.selectCharacterButton}
+                        onPress={() => setShowCharacterSelector(player.id)}
+                      >
+                        <Text style={styles.selectCharacterText}>Select Character</Text>
+                        <ChevronDown size={16} color="#888" />
+                      </TouchableOpacity>
+                    ) : (
+                      <Text style={styles.noCharacterText}>No Character</Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
         </ScrollView>
       </View>
 
       <TouchableOpacity
         style={[
           styles.startButton,
-          currentCampaign.players.length < 2 && styles.startButtonDisabled
+          !allPlayersHaveCharacters() && styles.startButtonDisabled
         ]}
         onPress={handleStartCampaign}
-        disabled={currentCampaign.players.length < 2}
+        disabled={!allPlayersHaveCharacters()}
       >
         <Text style={styles.startButtonText}>
-          {currentCampaign.players.length < 2
-            ? 'Waiting for Players...'
+          {!allPlayersHaveCharacters()
+            ? 'Waiting for Characters...'
             : 'Start Campaign'}
         </Text>
       </TouchableOpacity>
+
+      {/* Character Selection Modal */}
+      <Modal
+        visible={showCharacterSelector !== null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCharacterSelector(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Character</Text>
+              <TouchableOpacity onPress={() => setShowCharacterSelector(null)}>
+                <X size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              {showCharacterSelector && getAvailableCharacters(showCharacterSelector).map((character) => (
+                <TouchableOpacity
+                  key={character.id}
+                  style={styles.characterOption}
+                  onPress={() => handleCharacterSelect(showCharacterSelector, character.id)}
+                >
+                  <Image 
+                    source={getCharacterAvatarUrl(character)} 
+                    style={styles.modalCharacterAvatar}
+                  />
+                  <View style={styles.characterOptionInfo}>
+                    <Text style={styles.characterOptionName}>{character.name}</Text>
+                    <Text style={styles.characterOptionDetails}>
+                      Level {character.level} {character.race} {character.class}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+              {showCharacterSelector && getPlayerCharacter(showCharacterSelector) && (
+                <TouchableOpacity
+                  style={styles.removeCharacterOption}
+                  onPress={() => handleCharacterSelect(showCharacterSelector, null)}
+                >
+                  <Text style={styles.removeCharacterText}>Remove Character</Text>
+                </TouchableOpacity>
+              )}
+              {showCharacterSelector && getAvailableCharacters(showCharacterSelector).length === 0 && (
+                <View style={styles.noCharactersAvailable}>
+                  <Text style={styles.noCharactersText}>No characters available</Text>
+                  <Text style={styles.noCharactersSubtext}>
+                    Create a character first to assign to this campaign
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -341,29 +633,100 @@ const styles = StyleSheet.create({
   playersLabel: {
     fontSize: 16,
     color: '#fff',
-    marginBottom: 8,
+    marginBottom: 4,
     fontFamily: 'Inter-Bold',
+  },
+  realtimeIndicator: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 12,
+    fontStyle: 'italic',
   },
   playersList: {
     flex: 1,
   },
   playerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#2a2a2a',
     padding: 16,
     borderRadius: 8,
     marginBottom: 8,
   },
-  playerName: {
+  playerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  playerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
+  },
+  playerName: {
     color: '#fff',
     fontSize: 16,
     marginLeft: 12,
     fontFamily: 'Inter-Regular',
+    flex: 1,
   },
   readyIcon: {
     marginLeft: 8,
+  },
+  characterInfo: {
+    alignItems: 'flex-end',
+  },
+  selectedCharacterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 8,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  characterAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  characterDetails: {
+    alignItems: 'flex-end',
+  },
+  selectedCharacterText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  selectedCharacterSubtext: {
+    color: '#4CAF50',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    marginTop: 2,
+  },
+  chevronIcon: {
+    marginLeft: 8,
+  },
+  selectCharacterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#666',
+    gap: 4,
+  },
+  selectCharacterText: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  noCharacterText: {
+    color: '#666',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    fontStyle: 'italic',
   },
   startButton: {
     backgroundColor: '#4CAF50',
@@ -379,5 +742,90 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    width: '90%',
+    maxHeight: '70%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+  modalTitle: {
+    fontSize: 18,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  modalBody: {
+    padding: 20,
+  },
+  characterOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 8,
+  },
+  modalCharacterAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  characterOptionInfo: {
+    flex: 1,
+  },
+  characterOptionName: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  characterOptionDetails: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  removeCharacterOption: {
+    backgroundColor: '#dc3545',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  removeCharacterText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  noCharactersAvailable: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  noCharactersText: {
+    color: '#888',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
+  noCharactersSubtext: {
+    color: '#666',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
   },
 });

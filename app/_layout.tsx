@@ -3,8 +3,8 @@ import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { useAtom } from 'jotai';
-import { fetchCampaignsAtom } from '../src/atoms/campaignAtoms';
 import { initializeAuthAtom } from '../src/atoms/authAtoms'
+import { initializeRealtimeAtom } from '../src/atoms/campaignAtoms';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -21,18 +21,19 @@ export default function RootLayout() {
     'Inter-Bold': Inter_700Bold,
   });
 
-  const [, fetchCampaigns] = useAtom(fetchCampaignsAtom);
   const [, initializeAuth] = useAtom(initializeAuthAtom);
+  const [, initializeRealtime] = useAtom(initializeRealtimeAtom);
 
   useEffect(() => {
-    // Initialize authentication and fetch campaigns
+    // Initialize authentication and real-time subscriptions
     const initialize = async () => {
       await initializeAuth();
-      await fetchCampaigns();
+      // Initialize real-time subscription after auth is ready
+      await initializeRealtime();
     };
     
     initialize();
-  }, [initializeAuth, fetchCampaigns]);
+  }, [initializeAuth, initializeRealtime]);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
