@@ -13,7 +13,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import { ArrowLeft, ArrowRight, Save, User, Dices, Scroll, Package, Camera, Upload, ShieldUser, Dna, Brain, BookOpen, X } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Save, User, Dices, Scroll, Package, Camera, Upload, ShieldUser, Dna, Brain, BookOpen, X, Coins, ShoppingCart, Trash2 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import * as ImagePicker from 'expo-image-picker';
@@ -26,19 +26,34 @@ import {
   selectedSkillsAtom,
   selectedSpellsAtom,
   characterEquipmentAtom,
+  characterGoldAtom,
+  characterSilverAtom,
+  characterCopperAtom,
+  purchasedEquipmentAtom,
   racesAtom,
   classesAtom,
   spellsAtom,
+  equipmentAtom,
   fetchRacesAtom,
   fetchClassesAtom,
   fetchSpellsAtom,
+  fetchEquipmentAtom,
   saveCharacterAtom,
   resetCharacterCreationAtom,
+  setStartingWealthAtom,
+  purchaseEquipmentAtom,
+  removeEquipmentAtom,
+  canAffordEquipment,
+  getEquipmentCostInCopper,
+  convertFromCopper,
+  getStartingGold,
+  STARTING_WEALTH_BY_CLASS,
   type Race,
   type Class,
   type DnDSpell,
   type DnDAbilities,
   type DnDEquipment,
+  type Equipment,
 } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
 
@@ -70,22 +85,32 @@ export default function CreationScreen() {
   const [selectedSkills, setSelectedSkills] = useAtom(selectedSkillsAtom);
   const [selectedSpells, setSelectedSpells] = useAtom(selectedSpellsAtom);
   const [equipment, setEquipment] = useAtom(characterEquipmentAtom);
+  const [characterGold, setCharacterGold] = useAtom(characterGoldAtom);
+  const [characterSilver, setCharacterSilver] = useAtom(characterSilverAtom);
+  const [characterCopper, setCharacterCopper] = useAtom(characterCopperAtom);
+  const [purchasedEquipment, setPurchasedEquipment] = useAtom(purchasedEquipmentAtom);
   
   const [races] = useAtom(racesAtom);
   const [classes] = useAtom(classesAtom);
   const [spells] = useAtom(spellsAtom);
+  const [availableEquipment] = useAtom(equipmentAtom);
   
   const [, fetchRaces] = useAtom(fetchRacesAtom);
   const [, fetchClasses] = useAtom(fetchClassesAtom);
   const [, fetchSpells] = useAtom(fetchSpellsAtom);
+  const [, fetchEquipment] = useAtom(fetchEquipmentAtom);
   const [, saveCharacter] = useAtom(saveCharacterAtom);
   const [, resetCharacterCreation] = useAtom(resetCharacterCreationAtom);
+  const [, setStartingWealth] = useAtom(setStartingWealthAtom);
+  const [, purchaseEquipment] = useAtom(purchaseEquipmentAtom);
+  const [, removeEquipment] = useAtom(removeEquipmentAtom);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [showClassDetails, setShowClassDetails] = useState<Class | null>(null);
   const [showRaceDetails, setShowRaceDetails] = useState<Race | null>(null);
+  const [selectedEquipmentCategory, setSelectedEquipmentCategory] = useState<string>('all');
 
   useEffect(() => {
     const loadData = async () => {
@@ -95,6 +120,7 @@ export default function CreationScreen() {
           fetchRaces(),
           fetchClasses(),
           fetchSpells(),
+          fetchEquipment(),
         ]);
       } catch (error) {
         console.error('Error loading character creation data:', error);
@@ -104,7 +130,14 @@ export default function CreationScreen() {
     };
 
     loadData();
-  }, [fetchRaces, fetchClasses, fetchSpells]);
+  }, [fetchRaces, fetchClasses, fetchSpells, fetchEquipment]);
+
+  // Set starting wealth when class is selected
+  useEffect(() => {
+    if (selectedClass) {
+      setStartingWealth();
+    }
+  }, [selectedClass, setStartingWealth]);
 
   const handleBack = () => {
     if (currentStep > 0) {
@@ -122,7 +155,6 @@ export default function CreationScreen() {
 
   const pickImage = async () => {
     if (Platform.OS === 'web') {
-      // For web, we'll use a placeholder image picker
       Alert.alert(
         'Avatar Selection',
         'Choose an avatar option:',
@@ -130,7 +162,6 @@ export default function CreationScreen() {
           {
             text: 'Random Fantasy Portrait',
             onPress: () => {
-              // Use a random fantasy portrait from Pexels
               const portraits = [
                 'https://images.pexels.com/photos/1040881/pexels-photo-1040881.jpeg?auto=compress&cs=tinysrgb&w=400',
                 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400',
@@ -146,7 +177,6 @@ export default function CreationScreen() {
         ]
       );
     } else {
-      // For mobile platforms, use the image picker
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Sorry, we need camera roll permissions to select an avatar.');
@@ -209,6 +239,79 @@ export default function CreationScreen() {
     return baseScore;
   };
 
+  const formatCurrency = (gold: number, silver: number, copper: number) => {
+    const parts = [];
+    if (gold > 0) parts.push(`${gold} gp`);
+    if (silver > 0) parts.push(`${silver} sp`);
+    if (copper > 0) parts.push(`${copper} cp`);
+    return parts.join(', ') || '0 cp';
+  };
+
+  const formatEquipmentCost = (equipment: Equipment) => {
+    const { cost_quantity, cost_unit } = equipment;
+    return `${cost_quantity} ${cost_unit}`;
+  };
+
+  const getEquipmentCategories = () => {
+    const categories = ['all', ...new Set(availableEquipment.map(item => item.equipment_category))];
+    return categories;
+  };
+
+  const getFilteredEquipment = () => {
+    if (selectedEquipmentCategory === 'all') {
+      return availableEquipment;
+    }
+    return availableEquipment.filter(item => item.equipment_category === selectedEquipmentCategory);
+  };
+
+  const handlePurchaseEquipment = (equipment: Equipment) => {
+    try {
+      purchaseEquipment(equipment);
+    } catch (error) {
+      Alert.alert('Cannot Purchase', 'You do not have enough gold to purchase this item.');
+    }
+  };
+
+  const handleRemoveEquipment = (equipment: Equipment) => {
+    removeEquipment(equipment);
+  };
+
+  const calculateHitPoints = () => {
+    if (!selectedClass) return 8;
+    
+    const constitutionModifier = getAbilityModifier(getFinalAbilityScore('constitution'));
+    const baseHP = selectedClass.hit_die + constitutionModifier;
+    return Math.max(1, baseHP); // Minimum 1 HP
+  };
+
+  const calculateArmorClass = () => {
+    const dexModifier = getAbilityModifier(getFinalAbilityScore('dexterity'));
+    
+    // Find equipped armor
+    const equippedArmor = purchasedEquipment.find(item => 
+      item.equipment_category === 'armor' && item.armor_category !== 'shield'
+    );
+    
+    if (equippedArmor && equippedArmor.armor_class_base) {
+      let ac = equippedArmor.armor_class_base;
+      
+      // Add dex bonus based on armor type
+      if (equippedArmor.armor_class_dex_bonus) {
+        if (equippedArmor.armor_category === 'light') {
+          ac += dexModifier; // Full dex bonus
+        } else if (equippedArmor.armor_category === 'medium') {
+          ac += Math.min(2, dexModifier); // Max +2 dex bonus
+        }
+        // Heavy armor gets no dex bonus
+      }
+      
+      return ac;
+    }
+    
+    // No armor - base AC 10 + dex modifier
+    return 10 + dexModifier;
+  };
+
   const handleSaveCharacter = async () => {
     if (!user || !characterName || !selectedRace || !selectedClass) {
       Alert.alert('Error', 'Please complete all required fields');
@@ -217,6 +320,9 @@ export default function CreationScreen() {
 
     setIsSaving(true);
     try {
+      const hitPoints = calculateHitPoints();
+      const armorClass = calculateArmorClass();
+
       const characterData = {
         user_id: user.id,
         name: characterName,
@@ -228,6 +334,14 @@ export default function CreationScreen() {
         skills: selectedSkills,
         spells: selectedSpells,
         equipment,
+        current_hitpoints: hitPoints,
+        max_hitpoints: hitPoints,
+        temp_hitpoints: 0,
+        armor_class: armorClass,
+        conditions: [],
+        gold: characterGold,
+        silver: characterSilver,
+        copper: characterCopper,
         character_data: {
           race: selectedRace,
           class: selectedClass,
@@ -235,6 +349,7 @@ export default function CreationScreen() {
           skills: selectedSkills,
           spells: selectedSpells,
           equipment,
+          purchasedEquipment,
           avatar: avatarUri,
         },
       };
@@ -342,37 +457,56 @@ export default function CreationScreen() {
       <Text style={styles.stepTitle}>Choose Your Class</Text>
       <Text style={styles.subtitle}>Your class determines your abilities, skills, and role in the party</Text>
       <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
-        {classes.map((cls) => (
-          <TouchableOpacity
-            key={cls.index}
-            style={[
-              styles.classOptionItem,
-              selectedClass?.index === cls.index && styles.optionItemSelected,
-            ]}
-            onPress={() => setSelectedClass(cls)}
-          >
-            <View style={styles.classOptionContent}>
-              <Text style={[
-                styles.classOptionTitle,
-                selectedClass?.index === cls.index && styles.optionTextSelected,
-              ]}>
-                {cls.name}
-              </Text>
-              <Text style={[
-                styles.classOptionDescription,
-                selectedClass?.index === cls.index && styles.classOptionDescriptionSelected,
-              ]}>
-                Hit Die: d{cls.hit_die} • {cls.spellcasting ? 'Spellcaster' : 'Non-spellcaster'}
-              </Text>
-            </View>
+        {classes.map((cls) => {
+          const startingGold = getStartingGold(cls.name);
+          const wealthData = STARTING_WEALTH_BY_CLASS[cls.name];
+          
+          return (
             <TouchableOpacity
-              style={styles.detailsButton}
-              onPress={() => setShowClassDetails(cls)}
+              key={cls.index}
+              style={[
+                styles.classOptionItem,
+                selectedClass?.index === cls.index && styles.optionItemSelected,
+              ]}
+              onPress={() => setSelectedClass(cls)}
             >
-              <BookOpen size={20} color={selectedClass?.index === cls.index ? '#fff' : '#4CAF50'} />
+              <View style={styles.classOptionContent}>
+                <View style={styles.classOptionHeader}>
+                  <Text style={[
+                    styles.classOptionTitle,
+                    selectedClass?.index === cls.index && styles.optionTextSelected,
+                  ]}>
+                    {cls.name}
+                  </Text>
+                  <View style={styles.goldBadge}>
+                    <Coins size={16} color="#FFD700" />
+                    <Text style={styles.goldText}>{startingGold} gp</Text>
+                  </View>
+                </View>
+                <Text style={[
+                  styles.classOptionDescription,
+                  selectedClass?.index === cls.index && styles.classOptionDescriptionSelected,
+                ]}>
+                  Hit Die: d{cls.hit_die} • {cls.spellcasting ? 'Spellcaster' : 'Non-spellcaster'}
+                </Text>
+                {wealthData && (
+                  <Text style={[
+                    styles.classWealthInfo,
+                    selectedClass?.index === cls.index && styles.classWealthInfoSelected,
+                  ]}>
+                    Starting Wealth: {wealthData.dice} × {wealthData.multiplier} gp
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity
+                style={styles.detailsButton}
+                onPress={() => setShowClassDetails(cls)}
+              >
+                <BookOpen size={20} color={selectedClass?.index === cls.index ? '#fff' : '#4CAF50'} />
+              </TouchableOpacity>
             </TouchableOpacity>
-          </TouchableOpacity>
-        ))}
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -628,17 +762,115 @@ export default function CreationScreen() {
 
   const renderEquipment = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Starting Equipment</Text>
-      <Text style={styles.subtitle}>Your class provides basic equipment to begin your adventure</Text>
-      <View style={styles.equipmentPreview}>
-        <Text style={styles.equipmentText}>• Leather Armor (AC 11 + Dex modifier)</Text>
-        <Text style={styles.equipmentText}>• Simple Weapon (1d6 damage)</Text>
-        <Text style={styles.equipmentText}>• Adventuring Pack (rope, rations, etc.)</Text>
-        <Text style={styles.equipmentText}>• 50 Gold Pieces</Text>
-        {selectedClass?.spellcasting && (
-          <Text style={styles.equipmentText}>• Spellcasting Focus</Text>
-        )}
+      <Text style={styles.stepTitle}>Purchase Equipment</Text>
+      <Text style={styles.subtitle}>Use your starting gold to buy equipment for your adventure</Text>
+      
+      {/* Currency Display */}
+      <View style={styles.currencyContainer}>
+        <View style={styles.currencyDisplay}>
+          <Coins size={20} color="#FFD700" />
+          <Text style={styles.currencyText}>
+            {formatCurrency(characterGold, characterSilver, characterCopper)}
+          </Text>
+        </View>
       </View>
+
+      {/* Category Filter */}
+      <View style={styles.categoryFilter}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {getEquipmentCategories().map((category) => (
+            <TouchableOpacity
+              key={category}
+              style={[
+                styles.categoryButton,
+                selectedEquipmentCategory === category && styles.categoryButtonSelected,
+              ]}
+              onPress={() => setSelectedEquipmentCategory(category)}
+            >
+              <Text style={[
+                styles.categoryButtonText,
+                selectedEquipmentCategory === category && styles.categoryButtonTextSelected,
+              ]}>
+                {category === 'all' ? 'All' : category.charAt(0).toUpperCase() + category.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Equipment List */}
+      <ScrollView style={styles.equipmentList} showsVerticalScrollIndicator={false}>
+        {getFilteredEquipment().map((item) => {
+          const canAfford = canAffordEquipment(item, characterGold, characterSilver, characterCopper);
+          const isPurchased = purchasedEquipment.some(purchased => purchased.id === item.id);
+          
+          return (
+            <View key={item.id} style={[
+              styles.equipmentItem,
+              !canAfford && !isPurchased && styles.equipmentItemDisabled,
+              isPurchased && styles.equipmentItemPurchased,
+            ]}>
+              <View style={styles.equipmentInfo}>
+                <Text style={[
+                  styles.equipmentName,
+                  !canAfford && !isPurchased && styles.equipmentNameDisabled,
+                  isPurchased && styles.equipmentNamePurchased,
+                ]}>
+                  {item.name}
+                </Text>
+                <Text style={[
+                  styles.equipmentCategory,
+                  !canAfford && !isPurchased && styles.equipmentCategoryDisabled,
+                  isPurchased && styles.equipmentCategoryPurchased,
+                ]}>
+                  {item.equipment_category} • {item.weight} lb
+                </Text>
+                <Text style={[
+                  styles.equipmentCost,
+                  !canAfford && !isPurchased && styles.equipmentCostDisabled,
+                  isPurchased && styles.equipmentCostPurchased,
+                ]}>
+                  {formatEquipmentCost(item)}
+                </Text>
+              </View>
+              
+              {isPurchased ? (
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => handleRemoveEquipment(item)}
+                >
+                  <Trash2 size={20} color="#f44336" />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.purchaseButton,
+                    !canAfford && styles.purchaseButtonDisabled,
+                  ]}
+                  onPress={() => handlePurchaseEquipment(item)}
+                  disabled={!canAfford}
+                >
+                  <ShoppingCart size={20} color={canAfford ? '#4CAF50' : '#666'} />
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {/* Purchased Equipment Summary */}
+      {purchasedEquipment.length > 0 && (
+        <View style={styles.purchasedSummary}>
+          <Text style={styles.purchasedTitle}>Purchased Equipment ({purchasedEquipment.length})</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {purchasedEquipment.map((item) => (
+              <View key={item.id} style={styles.purchasedItem}>
+                <Text style={styles.purchasedItemName}>{item.name}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
     </View>
   );
 
@@ -673,6 +905,16 @@ export default function CreationScreen() {
       </View>
 
       <View style={styles.reviewSection}>
+        <Text style={styles.reviewLabel}>Hit Points:</Text>
+        <Text style={styles.reviewValue}>{calculateHitPoints()}</Text>
+      </View>
+
+      <View style={styles.reviewSection}>
+        <Text style={styles.reviewLabel}>Armor Class:</Text>
+        <Text style={styles.reviewValue}>{calculateArmorClass()}</Text>
+      </View>
+
+      <View style={styles.reviewSection}>
         <Text style={styles.reviewLabel}>Abilities:</Text>
         <Text style={styles.reviewValue}>
           STR {getFinalAbilityScore('strength')}, DEX {getFinalAbilityScore('dexterity')}, CON {getFinalAbilityScore('constitution')}, INT {getFinalAbilityScore('intelligence')}, WIS {getFinalAbilityScore('wisdom')}, CHA {getFinalAbilityScore('charisma')}
@@ -698,12 +940,20 @@ export default function CreationScreen() {
       )}
 
       <View style={styles.reviewSection}>
-        <Text style={styles.reviewLabel}>Equipment:</Text>
+        <Text style={styles.reviewLabel}>Currency:</Text>
         <Text style={styles.reviewValue}>
-          Leather Armor, Simple Weapon, Adventuring Pack, 50 Gold Pieces
-          {selectedClass?.spellcasting && ', Spellcasting Focus'}
+          {formatCurrency(characterGold, characterSilver, characterCopper)}
         </Text>
       </View>
+
+      {purchasedEquipment.length > 0 && (
+        <View style={styles.reviewSection}>
+          <Text style={styles.reviewLabel}>Equipment:</Text>
+          <Text style={styles.reviewValue}>
+            {purchasedEquipment.map(item => item.name).join(', ')}
+          </Text>
+        </View>
+      )}
 
       <TouchableOpacity
         style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
@@ -744,7 +994,7 @@ export default function CreationScreen() {
       case 3: return getRemainingPoints() >= 0; // Must not exceed point limit
       case 4: return true; // Skills are optional
       case 5: return true; // Spells are optional
-      case 6: return true; // Equipment is automatic
+      case 6: return true; // Equipment is optional
       case 7: return true; // Review step
       default: return false;
     }
@@ -805,6 +1055,18 @@ export default function CreationScreen() {
             <ScrollView style={styles.modalBody}>
               <Text style={styles.modalSectionTitle}>Hit Die</Text>
               <Text style={styles.modalText}>d{showClassDetails?.hit_die}</Text>
+              
+              {showClassDetails && (
+                <>
+                  <Text style={styles.modalSectionTitle}>Starting Wealth</Text>
+                  <Text style={styles.modalText}>
+                    {STARTING_WEALTH_BY_CLASS[showClassDetails.name]?.dice} × {STARTING_WEALTH_BY_CLASS[showClassDetails.name]?.multiplier} gp
+                  </Text>
+                  <Text style={styles.modalText}>
+                    Maximum: {getStartingGold(showClassDetails.name)} gp
+                  </Text>
+                </>
+              )}
               
               <Text style={styles.modalSectionTitle}>Proficiencies</Text>
               {showClassDetails?.proficiencies.map((prof, index) => (
@@ -1091,18 +1353,47 @@ const styles = StyleSheet.create({
   classOptionContent: {
     flex: 1,
   },
+  classOptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   classOptionTitle: {
     color: '#fff',
     fontSize: 18,
     fontFamily: 'Inter-Bold',
-    marginBottom: 4,
+    flex: 1,
+  },
+  goldBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  goldText: {
+    color: '#FFD700',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
   },
   classOptionDescription: {
     color: '#888',
     fontSize: 14,
     fontFamily: 'Inter-Regular',
+    marginBottom: 4,
   },
   classOptionDescriptionSelected: {
+    color: '#fff',
+  },
+  classWealthInfo: {
+    color: '#4CAF50',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+  },
+  classWealthInfoSelected: {
     color: '#fff',
   },
   raceOptionItem: {
@@ -1314,16 +1605,149 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     marginTop: 4,
   },
-  equipmentPreview: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
+  currencyContainer: {
+    marginBottom: 16,
   },
-  equipmentText: {
+  currencyDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 16,
+    gap: 8,
+  },
+  currencyText: {
+    color: '#FFD700',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+  },
+  categoryFilter: {
+    marginBottom: 16,
+  },
+  categoryButton: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+  categoryButtonSelected: {
+    backgroundColor: '#4CAF50',
+  },
+  categoryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  categoryButtonTextSelected: {
+    fontFamily: 'Inter-Bold',
+  },
+  equipmentList: {
+    maxHeight: 300,
+    marginBottom: 16,
+  },
+  equipmentItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  equipmentItemDisabled: {
+    backgroundColor: '#1a1a1a',
+    opacity: 0.6,
+  },
+  equipmentItemPurchased: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  equipmentInfo: {
+    flex: 1,
+  },
+  equipmentName: {
     color: '#fff',
     fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 2,
+  },
+  equipmentNameDisabled: {
+    color: '#666',
+  },
+  equipmentNamePurchased: {
+    color: '#4CAF50',
+  },
+  equipmentCategory: {
+    color: '#888',
+    fontSize: 14,
     fontFamily: 'Inter-Regular',
+    marginBottom: 2,
+  },
+  equipmentCategoryDisabled: {
+    color: '#555',
+  },
+  equipmentCategoryPurchased: {
+    color: '#4CAF50',
+  },
+  equipmentCost: {
+    color: '#FFD700',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  equipmentCostDisabled: {
+    color: '#666',
+  },
+  equipmentCostPurchased: {
+    color: '#4CAF50',
+  },
+  purchaseButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  purchaseButtonDisabled: {
+    backgroundColor: '#1a1a1a',
+    borderColor: '#666',
+  },
+  removeButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f44336',
+  },
+  purchasedSummary: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+  },
+  purchasedTitle: {
+    color: '#4CAF50',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
     marginBottom: 8,
+  },
+  purchasedItem: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+  },
+  purchasedItemName: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
   },
   reviewAvatarContainer: {
     alignItems: 'center',

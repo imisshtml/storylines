@@ -1,19 +1,29 @@
 import { router } from 'expo-router';
-import { Play, Users, Settings, Menu, Crown, UserCheck } from 'lucide-react-native';
-import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ImageBackground } from 'react-native';
+import { Play, Users, Settings, Menu, Crown, UserCheck, User, Star } from 'lucide-react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, ScrollView, Image } from 'react-native';
 import { useAtom } from 'jotai';
 import { campaignsAtom, currentCampaignAtom } from '../atoms/campaignAtoms';
+import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import SidebarMenu from '../components/SidebarMenu';
 import JoinCampaignModal from '../components/JoinCampaignModal';
 
 export default function HomeScreen() {
   const [campaigns] = useAtom(campaignsAtom);
+  const [characters] = useAtom(charactersAtom);
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
+  const [, fetchCharacters] = useAtom(fetchCharactersAtom);
   const [user] = useAtom(userAtom);
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
+
+  // Fetch characters when component mounts or user changes
+  useEffect(() => {
+    if (user) {
+      fetchCharacters();
+    }
+  }, [user, fetchCharacters]);
 
   const handleCampaignPress = (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
@@ -36,17 +46,52 @@ export default function HomeScreen() {
     }
   };
 
+  const handleCharacterPress = (character: Character) => {
+    // Navigate to character view screen
+    router.push('/character-view');
+  };
+
   const toggleSidebar = () => {
     setIsSidebarVisible(!isSidebarVisible);
   };
 
   const handleTitlePress = () => {
     // Only navigate to dev screen in development mode
-    router.push('/dev');
+    if (__DEV__) {
+      router.push('/dev');
+    }
   };
 
   const handleJoinCampaign = () => {
     setIsJoinModalVisible(true);
+  };
+
+  const getCharacterAvatar = (character: Character) => {
+    // Try to get avatar from character_data, fallback to a default fantasy portrait
+    const avatar = character.character_data?.avatar;
+    if (avatar) {
+      return avatar;
+    }
+    
+    // Use different default avatars based on class
+    const classAvatars: { [key: string]: string } = {
+      'Fighter': 'https://images.pexels.com/photos/1040881/pexels-photo-1040881.jpeg?auto=compress&cs=tinysrgb&w=400',
+      'Wizard': 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400',
+      'Rogue': 'https://images.pexels.com/photos/1212984/pexels-photo-1212984.jpeg?auto=compress&cs=tinysrgb&w=400',
+      'Cleric': 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
+      'Ranger': 'https://images.pexels.com/photos/1300402/pexels-photo-1300402.jpeg?auto=compress&cs=tinysrgb&w=400',
+    };
+    
+    return classAvatars[character.class] || classAvatars['Fighter'];
+  };
+
+  const getCharacterCampaignName = (character: Character) => {
+    if (character.campaign_id) {
+      // Find the campaign by campaign_id (which should match campaign.uid)
+      const campaign = campaigns.find(c => c.uid === character.campaign_id);
+      return campaign ? campaign.name : 'Unknown Campaign';
+    }
+    return 'No Campaign Set';
   };
 
   // Helper function to check if user is the owner of a campaign
@@ -58,6 +103,16 @@ export default function HomeScreen() {
   const getUserRole = (campaign: any) => {
     if (isOwner(campaign)) return 'Owner';
     return 'Player';
+  };
+
+  // Check if user is currently in any active campaigns
+  const isInActiveCampaign = () => {
+    return campaigns.some(campaign => 
+      campaign.status !== 'creation' && (
+        isOwner(campaign) || 
+        campaign.players.some((player: any) => player.id === user?.id)
+      )
+    );
   };
 
   return (
@@ -89,87 +144,151 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.campaignsContainer}>
-          <Text style={styles.sectionTitle}>My Campaigns</Text>
-          {campaigns.map(campaign => (
-            <View key={campaign.id} style={styles.campaignCard}>
-              <View style={styles.campaignHeader}>
-                <View style={styles.campaignTitleRow}>
-                  <Text style={styles.campaignTitle}>{campaign.name}</Text>
-                  <View style={styles.roleContainer}>
-                    {isOwner(campaign) ? (
-                      <Crown size={16} color="#FFD700" />
-                    ) : (
-                      <UserCheck size={16} color="#4CAF50" />
-                    )}
-                    <Text style={[
-                      styles.roleText,
-                      isOwner(campaign) ? styles.ownerText : styles.playerText
-                    ]}>
-                      {getUserRole(campaign)}
-                    </Text>
+        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.campaignsContainer}>
+            <Text style={styles.sectionTitle}>My Campaigns</Text>
+            {campaigns.map(campaign => (
+              <View key={campaign.id} style={styles.campaignCard}>
+                <View style={styles.campaignHeader}>
+                  <View style={styles.campaignTitleRow}>
+                    <Text style={styles.campaignTitle}>{campaign.name}</Text>
+                    <View style={styles.roleContainer}>
+                      {isOwner(campaign) ? (
+                        <Crown size={16} color="#FFD700" />
+                      ) : (
+                        <UserCheck size={16} color="#4CAF50" />
+                      )}
+                      <Text style={[
+                        styles.roleText,
+                        isOwner(campaign) ? styles.ownerText : styles.playerText
+                      ]}>
+                        {getUserRole(campaign)}
+                      </Text>
+                    </View>
                   </View>
+                  {campaign.status === 'creation' && isOwner(campaign) && (
+                    <TouchableOpacity
+                      style={styles.settingsButton}
+                      onPress={() => handleSettingsPress(campaign.id)}
+                    >
+                      <Settings size={20} color="#888" />
+                    </TouchableOpacity>
+                  )}
                 </View>
-                {campaign.status === 'creation' && isOwner(campaign) && (
-                  <TouchableOpacity
-                    style={styles.settingsButton}
-                    onPress={() => handleSettingsPress(campaign.id)}
-                  >
-                    <Settings size={20} color="#888" />
-                  </TouchableOpacity>
-                )}
+                <Text style={styles.campaignDetails}>
+                  {campaign.status === 'creation'
+                    ? 'In Creation'
+                    : `Players: ${campaign.players.length} • ${campaign.status === 'waiting' ? 'Waiting' : 'In Progress'}`
+                  }
+                </Text>
+                <TouchableOpacity
+                  style={styles.continueButton}
+                  onPress={() => handleCampaignPress(campaign.id)}
+                >
+                  {campaign.status === 'creation' ? (
+                    <>
+                      <Users size={20} color="#fff" />
+                      <Text style={styles.buttonText}>
+                        {isOwner(campaign) ? 'Invite Friends' : 'Waiting for Start'}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Play size={20} color="#fff" />
+                      <Text style={styles.buttonText}>Continue Story</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
               </View>
-              <Text style={styles.campaignDetails}>
-                {campaign.status === 'creation'
-                  ? 'In Creation'
-                  : `Players: ${campaign.players.length} • ${campaign.status === 'waiting' ? 'Waiting' : 'In Progress'}`
-                }
-              </Text>
-              <TouchableOpacity
-                style={styles.continueButton}
-                onPress={() => handleCampaignPress(campaign.id)}
-              >
-                {campaign.status === 'creation' ? (
-                  <>
-                    <Users size={20} color="#fff" />
-                    <Text style={styles.buttonText}>
-                      {isOwner(campaign) ? 'Invite Friends' : 'Waiting for Start'}
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <Play size={20} color="#fff" />
-                    <Text style={styles.buttonText}>Continue Story</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          ))}
+            ))}
 
-          {campaigns.length === 0 && (
-            <Text style={styles.noCampaigns}>No active campaigns</Text>
-          )}
-        </View>
+            {campaigns.length === 0 && (
+              <View style={styles.noCampaignsContainer}>
+                <Text style={styles.noCampaigns}>No active campaigns</Text>
+                <Text style={styles.noCampaignsSubtext}>
+                  Create a new campaign or join an existing one to start your adventure!
+                </Text>
+              </View>
+            )}
 
-        <TouchableOpacity
-          style={styles.createButton}
-          onPress={() => router.push('/create')}
-        >
-          <Text style={styles.buttonText}>Create Campaign</Text>
-        </TouchableOpacity>
+            {/* Show campaign action buttons only if user is not in an active campaign */}
+            {!isInActiveCampaign() && (
+              <View style={styles.campaignActionButtons}>
+                <TouchableOpacity
+                  style={styles.createButton}
+                  onPress={() => router.push('/create')}
+                >
+                  <Text style={styles.buttonText}>Create Campaign</Text>
+                </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.joinButton}
-          onPress={handleJoinCampaign}
-        >
-          <Users size={20} color="#fff" />
-          <Text style={styles.buttonText}>Join via Code</Text>
-        </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.joinButton}
+                  onPress={handleJoinCampaign}
+                >
+                  <Users size={20} color="#fff" />
+                  <Text style={styles.buttonText}>Join via Code</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.charactersContainer}>
+            <Text style={styles.sectionTitle}>My Characters</Text>
+            {characters.length > 0 ? (
+              <View style={styles.charactersGrid}>
+                {characters.map(character => (
+                  <TouchableOpacity
+                    key={character.id}
+                    style={styles.characterCard}
+                    onPress={() => handleCharacterPress(character)}
+                  >
+                    <View style={styles.characterAvatarContainer}>
+                      <Image
+                        source={{ uri: getCharacterAvatar(character) }}
+                        style={styles.characterAvatar}
+                      />
+                      <View style={styles.characterLevelBadge}>
+                        <Star size={12} color="#fff" />
+                        <Text style={styles.characterLevel}>{character.level}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.characterInfo}>
+                      <Text style={styles.characterName} numberOfLines={1}>
+                        {character.name}
+                      </Text>
+                      <Text style={styles.characterClass} numberOfLines={1}>
+                        {character.race} {character.class}
+                      </Text>
+                      <Text style={styles.characterCampaign} numberOfLines={1}>
+                        {getCharacterCampaignName(character)}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.noCharactersContainer}>
+                <User size={48} color="#666" />
+                <Text style={styles.noCharacters}>No characters created yet</Text>
+                <Text style={styles.noCharactersSubtext}>
+                  Create your first character to begin your adventures!
+                </Text>
+                <TouchableOpacity
+                  style={styles.createCharacterButton}
+                  onPress={() => router.push('/creation')}
+                >
+                  <Text style={styles.createCharacterButtonText}>Create Character</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </ScrollView>
       </View>
 
       <SidebarMenu
         isVisible={isSidebarVisible}
         onClose={() => setIsSidebarVisible(false)}
+        onJoinCampaign={handleJoinCampaign}
       />
 
       <JoinCampaignModal
@@ -190,13 +309,14 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginVertical: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    paddingTop: 60,
   },
   menuButton: {
     width: 40,
@@ -219,10 +339,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
-  devIndicator: {
-    fontSize: 16,
-    color: '#4CAF50',
-  },
   welcomeText: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
@@ -232,53 +348,45 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-  campaignsContainer: {
+  scrollContainer: {
     flex: 1,
-    marginVertical: 20,
+    paddingHorizontal: 20,
+  },
+  campaignsContainer: {
+    marginBottom: 30,
+  },
+  charactersContainer: {
+    marginBottom: 30,
   },
   sectionTitle: {
     fontSize: 20,
     fontFamily: 'Inter-Bold',
     color: '#fff',
-    marginBottom: 10,
+    marginBottom: 16,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
+  noCampaignsContainer: {
+    backgroundColor: 'rgba(42, 42, 42, 0.8)',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   noCampaigns: {
     color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
     textAlign: 'center',
-    marginTop: 20,
+    marginBottom: 8,
+  },
+  noCampaignsSubtext: {
+    color: '#888',
+    fontSize: 14,
     fontFamily: 'Inter-Regular',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  createButton: {
-    backgroundColor: 'rgba(76, 175, 80, 0.9)',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  joinButton: {
-    backgroundColor: 'rgba(33, 150, 243, 0.9)',
-    padding: 15,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   campaignCard: {
     backgroundColor: 'rgba(42, 42, 42, 0.8)',
@@ -357,6 +465,144 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 2,
     elevation: 3,
+  },
+  campaignActionButtons: {
+    gap: 12,
+  },
+  charactersGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  characterCard: {
+    backgroundColor: 'rgba(42, 42, 42, 0.8)',
+    borderRadius: 12,
+    padding: 12,
+    width: '48%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  characterAvatarContainer: {
+    position: 'relative',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  characterAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
+  characterLevelBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: 8,
+    backgroundColor: '#4CAF50',
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    borderWidth: 2,
+    borderColor: '#2a2a2a',
+    minWidth: 28,
+    justifyContent: 'center',
+  },
+  characterLevel: {
+    color: '#fff',
+    fontSize: 10,
+    fontFamily: 'Inter-Bold',
+  },
+  characterInfo: {
+    alignItems: 'center',
+  },
+  characterName: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  characterClass: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  characterCampaign: {
+    fontSize: 10,
+    fontFamily: 'Inter-Regular',
+    color: '#4CAF50',
+    textAlign: 'center',
+  },
+  noCharactersContainer: {
+    backgroundColor: 'rgba(42, 42, 42, 0.8)',
+    borderRadius: 12,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  noCharacters: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  noCharactersSubtext: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  createCharacterButton: {
+    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  createCharacterButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  createButton: {
+    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  joinButton: {
+    backgroundColor: 'rgba(33, 150, 243, 0.9)',
+    padding: 15,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   buttonText: {
     color: 'white',

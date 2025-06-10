@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image } from 'react-native';
-import { LogOut, X, User, Settings, Info, UserPlus } from 'lucide-react-native';
+import { LogOut, X, User, Settings, Info, UserPlus, Plus, Users } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
@@ -11,9 +11,10 @@ const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.8;
 interface SidebarMenuProps {
   isVisible: boolean;
   onClose: () => void;
+  onJoinCampaign?: () => void;
 }
 
-export default function SidebarMenu({ isVisible, onClose }: SidebarMenuProps) {
+export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: SidebarMenuProps) {
   const [user] = useAtom(userAtom);
   const [, signOut] = useAtom(signOutAtom);
   const [imageError, setImageError] = React.useState(false);
@@ -65,15 +66,30 @@ export default function SidebarMenu({ isVisible, onClose }: SidebarMenuProps) {
     return name.charAt(0).toUpperCase();
   };
 
+  const handleCreateCampaign = () => {
+    onClose();
+    router.push('/create');
+  };
+
+  const handleJoinCampaign = () => {
+    onClose();
+    if (onJoinCampaign) {
+      onJoinCampaign();
+    }
+  };
+
   const menuItems = [
     {
-      icon: <User size={24} color="#fff" />,
-      title: 'Profile',
-      subtitle: 'Manage your account',
-      onPress: () => {
-        onClose();
-        router.push('/profile');
-      },
+      icon: <Plus size={24} color="#fff" />,
+      title: 'Create Campaign',
+      subtitle: 'Start a new adventure',
+      onPress: handleCreateCampaign,
+    },
+    {
+      icon: <Users size={24} color="#fff" />,
+      title: 'Join via Code',
+      subtitle: 'Join an existing campaign',
+      onPress: handleJoinCampaign,
     },
     {
       icon: <UserPlus size={24} color="#fff" />,
@@ -82,6 +98,15 @@ export default function SidebarMenu({ isVisible, onClose }: SidebarMenuProps) {
       onPress: () => {
         onClose();
         router.push('/creation');
+      },
+    },
+    {
+      icon: <User size={24} color="#fff" />,
+      title: 'Profile',
+      subtitle: 'Manage your account',
+      onPress: () => {
+        onClose();
+        router.push('/profile');
       },
     },
     {
