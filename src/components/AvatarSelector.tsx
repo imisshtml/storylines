@@ -15,7 +15,7 @@ import { X, Upload, Sparkles } from 'lucide-react-native';
 import { DEFAULT_AVATARS, type DefaultAvatar } from '../data/defaultAvatars';
 import { pickAndUploadAvatar, type AvatarUploadResult } from '../utils/avatarStorage';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const AVATAR_SIZE = (SCREEN_WIDTH - 80) / 4; // 4 avatars per row with padding
 
 interface AvatarSelectorProps {
@@ -104,7 +104,7 @@ export default function AvatarSelector({
             >
               {isUploading ? (
                 <>
-                  <ActivityIndicator size="small\" color="#fff" />
+                  <ActivityIndicator size="small" color="#fff" />
                   <Text style={styles.uploadButtonText}>
                     {uploadProgress || 'Uploading...'}
                   </Text>
@@ -125,7 +125,11 @@ export default function AvatarSelector({
           </View>
 
           {/* Avatar Grid */}
-          <ScrollView style={styles.avatarGrid} showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            style={styles.avatarGrid} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.avatarGridContent}
+          >
             <View style={styles.avatarRow}>
               {DEFAULT_AVATARS.map((avatar) => (
                 <TouchableOpacity
@@ -165,14 +169,17 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
   },
   modalContent: {
     backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
-    paddingBottom: 20,
+    borderRadius: 20,
+    width: '95%',
+    height: SCREEN_HEIGHT * 0.85, // 85% of screen height
+    maxHeight: 700,
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
@@ -219,7 +226,7 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     padding: 20,
-    paddingBottom: 10,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
@@ -236,7 +243,10 @@ const styles = StyleSheet.create({
   },
   avatarGrid: {
     flex: 1,
+  },
+  avatarGridContent: {
     padding: 20,
+    paddingBottom: 40, // Extra padding at bottom for better scrolling
   },
   avatarRow: {
     flexDirection: 'row',
@@ -279,9 +289,10 @@ const styles = StyleSheet.create({
   },
   infoSection: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: '#333',
+    backgroundColor: '#1a1a1a',
   },
   infoText: {
     fontSize: 14,
