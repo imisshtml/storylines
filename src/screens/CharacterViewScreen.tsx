@@ -11,7 +11,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { ArrowLeft, Camera, LocationEdit as Edit3, Scroll, X, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, Camera, LocationEdit as Edit3, Scroll, X, Trash2, ChevronUp, ChevronDown } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAtom } from 'jotai';
 import {
@@ -40,6 +40,8 @@ export default function CharacterViewScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [expandedSpells, setExpandedSpells] = useState<Set<string>>(new Set());
+  const [selectedSpellLevel, setSelectedSpellLevel] = useState<number>(0);
 
   useEffect(() => {
     if (characters.length > 0 && characterId) {
@@ -56,17 +58,22 @@ export default function CharacterViewScreen() {
   }, [fetchCharacters]);
 
   useEffect(() => {
-    if (isEditingSpells) {
+    if (isEditingSpells && character) {
       loadAvailableSpells();
+      // Load character's current spells
+      setSelectedSpells(character.spells || []);
     }
-  }, [isEditingSpells]);
+  }, [isEditingSpells, character]);
 
   const loadAvailableSpells = async () => {
     try {
+      // Get maximum spell level available for character
+      const maxSpellLevel = getMaxSpellLevel();
+      
       const { data: spells, error } = await supabase
         .from('spells')
         .select('*')
-        .lte('level', 1)
+        .lte('level', maxSpellLevel)
         .order('level')
         .order('name');
 
@@ -224,6 +231,84 @@ export default function CharacterViewScreen() {
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const toggleSpellExpanded = (spellIndex: string) => {
+    const newExpandedSpells = new Set(expandedSpells);
+    if (newExpandedSpells.has(spellIndex)) {
+      newExpandedSpells.delete(spellIndex);
+    } else {
+      newExpandedSpells.add(spellIndex);
+    }
+    setExpandedSpells(newExpandedSpells);
+  };
+
+  // Get maximum spell level available for character
+  const getMaxSpellLevel = () => {
+    if (!character) return 1;
+    const characterLevel = character.level || 1;
+    
+    // Maximum spell level based on character level (simplified D&D 5e progression)
+    if (characterLevel >= 17) return 9;
+    if (characterLevel >= 15) return 8;
+    if (characterLevel >= 13) return 7;
+    if (characterLevel >= 11) return 6;
+    if (characterLevel >= 9) return 5;
+    if (characterLevel >= 7) return 4;
+    if (characterLevel >= 5) return 3;
+    if (characterLevel >= 3) return 2;
+    return 1;
+  };
+
+  // Get available spell levels for dropdown
+  const getAvailableSpellLevels = () => {
+    const maxLevel = getMaxSpellLevel();
+    const levels = [{ value: 0, label: 'Cantrips' }];
+    
+    for (let i = 1; i <= maxLevel; i++) {
+      levels.push({ value: i, label: `${i}${i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th'} Level` });
+    }
+    
+    return levels;
+  };
+
+  // Get spellcasting info for the character's class
+  const getSpellcastingInfo = () => {
+    const classData = character?.character_data?.class;
+    if (!classData?.spellcasting) return null;
+    
+    // Basic spellcasting info for level 1 characters (can be enhanced for higher levels)
+    const spellcastingInfo = {
+      cantripsKnown: 0,
+      spellsKnown: 0,
+    };
+
+    // Set cantrips and spells known based on class
+    switch (classData.index) {
+      case 'bard':
+        spellcastingInfo.cantripsKnown = 2;
+        spellcastingInfo.spellsKnown = 4;
+        break;
+      case 'cleric':
+      case 'druid':
+        spellcastingInfo.cantripsKnown = 3;
+        spellcastingInfo.spellsKnown = 2;
+        break;
+      case 'sorcerer':
+      case 'warlock':
+        spellcastingInfo.cantripsKnown = 4;
+        spellcastingInfo.spellsKnown = 2;
+        break;
+      case 'wizard':
+        spellcastingInfo.cantripsKnown = 3;
+        spellcastingInfo.spellsKnown = 6;
+        break;
+      default:
+        spellcastingInfo.cantripsKnown = 2;
+        spellcastingInfo.spellsKnown = 2;
+    }
+
+    return spellcastingInfo;
   };
 
   if (!character) {
@@ -456,40 +541,152 @@ export default function CharacterViewScreen() {
                   <X size={24} color="#fff" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={styles.modalBody}>
-                <Text style={styles.modalSubtitle}>
-                  Selected: {selectedSpells.length} spells
-                </Text>
-                {availableSpells.map((spell) => (
-                  <TouchableOpacity
-                    key={spell.index}
-                    style={[
-                      styles.spellOptionItem,
-                      selectedSpells.some(s => s.index === spell.index) && styles.spellOptionSelected,
-                    ]}
-                    onPress={() => {
-                      if (selectedSpells.some(s => s.index === spell.index)) {
-                        setSelectedSpells(prev => prev.filter(s => s.index !== spell.index));
-                      } else {
-                        setSelectedSpells(prev => [...prev, spell]);
-                      }
-                    }}
-                  >
-                    <Text style={[
-                      styles.spellOptionName,
-                      selectedSpells.some(s => s.index === spell.index) && styles.spellOptionNameSelected,
-                    ]}>
-                      {spell.name}
-                    </Text>
-                    <Text style={[
-                      styles.spellOptionDetails,
-                      selectedSpells.some(s => s.index === spell.index) && styles.spellOptionDetailsSelected,
-                    ]}>
-                      {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`} • Casting Time: {spell.casting_time} {spell.concentration && ' (c)'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              <View style={styles.modalBody}>
+                <Text style={styles.modalSubtitle}>Choose your spells</Text>
+                
+                {/* Spell Level Dropdown */}
+                {(() => {
+                  const spellLevels = getAvailableSpellLevels();
+                  const currentSpells = availableSpells.filter(spell => spell.level === selectedSpellLevel);
+                  const selectedCurrentLevelSpells = selectedSpells.filter(spell => spell.level === selectedSpellLevel);
+                  
+                  return (
+                    <>
+                      <View style={styles.dropdownContainer}>
+                        <Text style={styles.dropdownLabel}>Spell Level:</Text>
+                        <View style={styles.dropdown}>
+                          <ScrollView 
+                            horizontal 
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.dropdownContent}
+                          >
+                            {spellLevels.map((level) => (
+                              <TouchableOpacity
+                                key={level.value}
+                                style={[
+                                  styles.dropdownItem,
+                                  selectedSpellLevel === level.value && styles.dropdownItemActive,
+                                ]}
+                                onPress={() => setSelectedSpellLevel(level.value)}
+                              >
+                                <Text style={[
+                                  styles.dropdownItemText,
+                                  selectedSpellLevel === level.value && styles.dropdownItemTextActive,
+                                ]}>
+                                  {level.label}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </ScrollView>
+                        </View>
+                      </View>
+
+                      {/* Spell List */}
+                      <ScrollView style={styles.spellScrollView} showsVerticalScrollIndicator={false}>
+                        <View style={styles.spellSection}>
+                          <Text style={styles.spellSectionTitle}>
+                            {selectedSpellLevel === 0 ? 'Cantrips' : `Level ${selectedSpellLevel} Spells`}
+                            <Text style={styles.spellCount}>
+                              {' '}({selectedCurrentLevelSpells.length}/{(() => {
+                                const spellcastingInfo = getSpellcastingInfo();
+                                return selectedSpellLevel === 0 
+                                  ? spellcastingInfo?.cantripsKnown || 0
+                                  : spellcastingInfo?.spellsKnown || 0;
+                              })()})
+                            </Text>
+                          </Text>
+                          {currentSpells.length > 0 ? currentSpells.map((spell) => {
+                            const isSelected = selectedSpells.some(s => s.index === spell.index);
+                            const spellcastingInfo = getSpellcastingInfo();
+                            const currentLevelSelected = selectedSpells.filter(s => s.level === spell.level);
+                            const maxAllowed = spell.level === 0 
+                              ? spellcastingInfo?.cantripsKnown || 0
+                              : spellcastingInfo?.spellsKnown || 0;
+                            const isAtLimit = !isSelected && currentLevelSelected.length >= maxAllowed;
+                            
+                            return (
+                              <TouchableOpacity
+                                key={spell.index}
+                                style={[
+                                  styles.spellCard,
+                                  isSelected && styles.selectedSpell,
+                                  isAtLimit && styles.disabledSpell,
+                                ]}
+                                onPress={() => {
+                                const isSelected = selectedSpells.some(s => s.index === spell.index);
+                                const spellcastingInfo = getSpellcastingInfo();
+                                
+                                if (isSelected) {
+                                  // Always allow deselection
+                                  setSelectedSpells(prev => prev.filter(s => s.index !== spell.index));
+                                } else {
+                                  // Check limits before adding
+                                  const currentLevelSelected = selectedSpells.filter(s => s.level === spell.level);
+                                  const maxAllowed = spell.level === 0 
+                                    ? spellcastingInfo?.cantripsKnown || 0
+                                    : spellcastingInfo?.spellsKnown || 0;
+                                  
+                                  if (currentLevelSelected.length < maxAllowed) {
+                                    setSelectedSpells(prev => [...prev, spell]);
+                                  } else {
+                                    Alert.alert(
+                                      'Spell Limit Reached',
+                                      `You can only select ${maxAllowed} ${spell.level === 0 ? 'cantrips' : 'spells'} for this level.`
+                                    );
+                                  }
+                                }
+                              }}
+                            >
+                              <View style={styles.spellHeader}>
+                                <View style={styles.spellHeaderLeft}>
+                                  <Text style={styles.spellCardName}>{spell.name}</Text>
+                                  <Text style={styles.spellCardSchool}>Casting Time: {spell.casting_time} {spell.concentration && ' (c)'}</Text>
+                                </View>
+                                <TouchableOpacity
+                                  style={styles.chevronButton}
+                                  onPress={(e) => {
+                                    e.stopPropagation();
+                                    toggleSpellExpanded(spell.index);
+                                  }}
+                                >
+                                  {expandedSpells.has(spell.index) ? (
+                                    <ChevronUp size={20} color="#666666" />
+                                  ) : (
+                                    <ChevronDown size={20} color="#666666" />
+                                  )}
+                                </TouchableOpacity>
+                              </View>
+                              {expandedSpells.has(spell.index) && (
+                                <View style={styles.spellDetails}>
+                                  <Text style={styles.spellProperty}>School: {spell.school || ''}</Text>
+                                  <Text style={styles.spellProperty}>Range: {spell.range || 'Unknown'}</Text>
+                                  <Text style={styles.spellProperty}>Duration: {spell.duration || 'Unknown'}</Text>
+                                  {spell.concentration && (
+                                    <Text style={styles.spellProperty}>Concentration</Text>
+                                  )}
+                                  {spell.description && spell.description.map((desc, i) => (
+                                    <Text key={i} style={styles.spellDescription}>{desc}</Text>
+                                  ))}
+                                </View>
+                              )}
+                            </TouchableOpacity>
+                            );
+                          }) : (
+                            <View style={styles.noSpellsContainer}>
+                              <Text style={styles.noSpellsText}>
+                                No spells available for this level
+                              </Text>
+                              <Text style={styles.noSpellsSubtext}>
+                                Total spells loaded: {availableSpells.length}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </ScrollView>
+                    </>
+                  );
+                })()}
+              </View>
               <View style={styles.modalFooter}>
                 <TouchableOpacity
                   style={styles.saveSpellsButton}
@@ -788,6 +985,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     marginBottom: 12,
   },
+  noSpellsSubtext: {
+    color: '#666',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+  },
   addSpellsButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -825,7 +1028,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
     borderRadius: 16,
     width: '90%',
-    maxHeight: '80%',
+    maxHeight: '90%',
     overflow: 'hidden',
   },
   modalHeader: {
@@ -843,6 +1046,7 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     padding: 20,
+    height: 500,
   },
   modalSubtitle: {
     fontSize: 14,
@@ -965,5 +1169,118 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
+  },
+  dropdownContainer: {
+    marginBottom: 20,
+  },
+  dropdownLabel: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
+  dropdown: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 4,
+  },
+  dropdownContent: {
+    paddingHorizontal: 4,
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    marginHorizontal: 2,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  dropdownItemActive: {
+    backgroundColor: '#4CAF50',
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: '#888',
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+  },
+  dropdownItemTextActive: {
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  spellScrollView: {
+    height: 350,
+  },
+  spellSection: {
+    marginBottom: 24,
+  },
+  spellSectionTitle: {
+    fontSize: 18,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 12,
+  },
+  spellCount: {
+    fontSize: 14,
+    color: '#888',
+    fontFamily: 'Inter-Regular',
+  },
+  spellCard: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedSpell: {
+    borderColor: '#4CAF50',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+  },
+  disabledSpell: {
+    opacity: 0.5,
+    backgroundColor: '#1a1a1a',
+  },
+  spellHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  spellHeaderLeft: {
+    flex: 1,
+  },
+  spellCardName: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  spellCardSchool: {
+    fontSize: 14,
+    color: '#888',
+    fontFamily: 'Inter-Regular',
+  },
+  chevronButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  spellDetails: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#3a3a3a',
+  },
+  spellProperty: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 6,
+  },
+  spellDescription: {
+    fontSize: 14,
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 8,
+    lineHeight: 20,
   },
 });
