@@ -287,10 +287,11 @@ export default function InviteFriendsScreen() {
     }
   };
 
-  // Check if all players have characters assigned
+  // Check if all players have characters assigned - FIXED VERSION
   const allPlayersHaveCharacters = useMemo(() => {
     if (!currentCampaign || currentCampaign.players.length === 0) return false;
 
+    // Check that every player has a character assigned to this campaign
     return currentCampaign.players.every(player => {
       const playerCharacter = getPlayerCharacter(player.id);
       return playerCharacter !== null;
@@ -306,7 +307,7 @@ export default function InviteFriendsScreen() {
   const minimumPlayers = 2;
   const hasEnoughPlayers = currentCampaign ? currentCampaign.players.length >= minimumPlayers : false;
 
-  // Determine button state and text
+  // Determine button state and text - FIXED VERSION
   const getButtonState = () => {
     if (!currentCampaign) return { disabled: true, text: 'Loading...', canStart: false };
 
@@ -343,7 +344,7 @@ export default function InviteFriendsScreen() {
       if (!allPlayersHaveCharacters) {
         return { 
           disabled: true, 
-          text: 'Waiting for DM to Start',
+          text: 'Waiting for Characters...',
           canStart: false 
         };
       }
@@ -583,7 +584,6 @@ const styles = StyleSheet.create({
     height: 52,
     borderBottomWidth: 1,
     borderBottomColor: '#2a2a2a',
-    backgroundColor: '#121212',
   },
   backButton: {
     width: 40,
