@@ -52,7 +52,6 @@ export default function InviteFriendsScreen() {
     if (!currentCampaign) return;
 
     try {
-      console.log('Fetching characters for campaign:', currentCampaign.uid);
       const { data, error } = await supabase
         .from('characters')
         .select('*')
@@ -63,7 +62,6 @@ export default function InviteFriendsScreen() {
         return;
       }
 
-      console.log('Campaign characters found:', data?.length || 0, data);
       setCampaignCharacters(data || []);
     } catch (error) {
       console.error('Error fetching campaign characters:', error);
@@ -152,7 +150,6 @@ export default function InviteFriendsScreen() {
   const handleStartCampaign = async () => {
     if (!currentCampaign) return;
     try {
-      console.log('Starting campaign...');
       await upsertCampaign({
         ...currentCampaign,
         status: 'waiting',
@@ -185,7 +182,6 @@ export default function InviteFriendsScreen() {
 
   const getPlayerCharacter = useCallback((playerId: string): Character | null => {
     const character = campaignCharacters.find(char => char.user_id === playerId);
-    console.log(`Character for player ${playerId}:`, character ? character.name : 'None');
     return character || null;
   }, [campaignCharacters]);
 
@@ -257,7 +253,6 @@ export default function InviteFriendsScreen() {
         }
 
         selectedCharacter = characterToAssign;
-        console.log('Character assigned:', selectedCharacter.name, 'to campaign:', currentCampaign.uid);
       }
 
       // Update the campaign's players array with character information
@@ -303,10 +298,9 @@ export default function InviteFriendsScreen() {
     }
   };
 
-  // Check if all players have characters assigned - FIXED VERSION
+  // Check if all players have characters assigned
   const allPlayersHaveCharacters = useMemo(() => {
     if (!currentCampaign || currentCampaign.players.length === 0) {
-      console.log('No campaign or no players');
       return false;
     }
 
@@ -314,21 +308,15 @@ export default function InviteFriendsScreen() {
     const result = currentCampaign.players.every(player => {
       const playerCharacter = getPlayerCharacter(player.id);
       const hasCharacter = playerCharacter !== null;
-      console.log(`Player ${player.name} (${player.id}) has character:`, hasCharacter);
       return hasCharacter;
     });
 
-    console.log('All players have characters:', result);
-    console.log('Campaign players:', currentCampaign.players.length);
-    console.log('Campaign characters:', campaignCharacters.length);
-    
     return result;
   }, [currentCampaign, getPlayerCharacter, campaignCharacters]);
 
   // Check if current user is the campaign owner
   const isOwner = useMemo(() => {
     const result = user && currentCampaign && currentCampaign.owner === user.id;
-    console.log('Is owner:', result, 'User ID:', user?.id, 'Campaign owner:', currentCampaign?.owner);
     return result;
   }, [user, currentCampaign]);
 
@@ -336,17 +324,9 @@ export default function InviteFriendsScreen() {
   const minimumPlayers = 2;
   const hasEnoughPlayers = currentCampaign ? currentCampaign.players.length >= minimumPlayers : false;
 
-  // Determine button state and text - FIXED VERSION
+  // Determine button state and text
   const getButtonState = () => {
     if (!currentCampaign) return { disabled: true, text: 'Loading...', canStart: false };
-
-    console.log('Button state check:', {
-      isOwner,
-      hasEnoughPlayers,
-      allPlayersHaveCharacters,
-      playerCount: currentCampaign.players.length,
-      minimumPlayers
-    });
 
     if (isOwner) {
       // Owner can start if there are enough players and all have characters
@@ -536,14 +516,6 @@ export default function InviteFriendsScreen() {
             );
           })}
         </ScrollView>
-      </View>
-
-      {/* Debug Information - Remove this in production */}
-      <View style={styles.debugContainer}>
-        <Text style={styles.debugText}>
-          Debug: Owner={isOwner ? 'Yes' : 'No'}, Players={currentCampaign.players.length}/{minimumPlayers}, 
-          Characters={allPlayersHaveCharacters ? 'All' : 'Missing'}, CanStart={buttonState.canStart ? 'Yes' : 'No'}
-        </Text>
       </View>
 
       <TouchableOpacity
@@ -869,17 +841,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     fontStyle: 'italic',
-  },
-  debugContainer: {
-    backgroundColor: '#333',
-    padding: 8,
-    margin: 20,
-    borderRadius: 4,
-  },
-  debugText: {
-    color: '#fff',
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
   },
   startButton: {
     backgroundColor: '#4CAF50',
