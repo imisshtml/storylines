@@ -42,7 +42,7 @@ export const fetchCampaignsAtom = atom(
       set(campaignsErrorAtom, null);
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No authenticated user');
+      if (!user) return; //throw new Error('No authenticated user');
 
       // First, get campaigns where user is the owner
       const { data: ownedCampaigns, error: ownedError } = await supabase
