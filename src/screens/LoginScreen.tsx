@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { LogIn, UserPlus, Eye, EyeOff, Phone, Zap } from 'lucide-react-native';
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, ActivityIndicator, Image } from 'react-native';
 import { useAtom } from 'jotai';
 import { signInAtom, signUpAtom, authLoadingAtom, authErrorAtom } from '../atoms/authAtoms';
 
@@ -89,9 +89,7 @@ export default function LoginScreen() {
             onPress={handleTitlePress}
             disabled={!__DEV__}
           >
-            <Text style={styles.logo}>
-              Storylines
-            </Text>
+            <Image source={require('../../assets/images/storylines_logo.png')} style={styles.logo} resizeMode='contain' />
           </TouchableOpacity>
 
           <View style={styles.form}>
@@ -277,6 +275,10 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
+  logoImg: {
+    width: 300,
+    height: 250
+  }
   devIndicator: {
     fontSize: 16,
     color: '#4CAF50',
