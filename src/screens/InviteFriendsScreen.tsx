@@ -1,5 +1,17 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator, TextInput, SafeAreaView, Modal, Image } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Share,
+  ScrollView,
+  ActivityIndicator,
+  TextInput,
+  SafeAreaView,
+  Modal,
+  Image,
+} from 'react-native';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
@@ -36,12 +48,36 @@ export default function InviteFriendsScreen() {
     }
   }, [currentCampaign, user, fetchCharacters]);
 
+  const fetchCampaignCharacters = useCallback(async () => {
+    if (!currentCampaign) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('characters')
+        .select('*')
+        .eq('campaign_id', currentCampaign.uid);
+
+      if (error) {
+        console.error('Error fetching campaign characters:', error);
+        return;
+      }
+
+      setCampaignCharacters(data || []);
+    } catch (error) {
+      console.error('Error fetching campaign characters:', error);
+    }
+  }, [currentCampaign]);
+
   // Set up real-time subscription for campaign and character updates
   useEffect(() => {
     if (!currentCampaign || !user) return;
 
     // Create a unique channel name with timestamp to avoid conflicts
     const channelName = `campaign-${currentCampaign.id}-${Date.now()}`;
+
+    // Remove any existing channel with the same name first
+    supabase.removeAllChannels();
+
     const subscription = supabase
       .channel(channelName)
       .on(
@@ -92,32 +128,13 @@ export default function InviteFriendsScreen() {
         }
       };
       cleanup();
+      supabase.removeChannel(subscription);
     };
-  }, [currentCampaign?.id, currentCampaign?.uid, user?.id]);
+  }, [currentCampaign?.id, currentCampaign?.uid, user?.id, fetchCharacters, setCurrentCampaign, fetchCampaignCharacters]);
 
   const checkSmsAvailability = async () => {
     const isAvailable = await SMS.isAvailableAsync();
     setSmsAvailable(isAvailable);
-  };
-
-  const fetchCampaignCharacters = async () => {
-    if (!currentCampaign) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('characters')
-        .select('*')
-        .eq('campaign_id', currentCampaign.uid);
-
-      if (error) {
-        console.error('Error fetching campaign characters:', error);
-        return;
-      }
-
-      setCampaignCharacters(data || []);
-    } catch (error) {
-      console.error('Error fetching campaign characters:', error);
-    }
   };
 
   // Use refs to store latest functions for subscription callbacks
@@ -186,9 +203,8 @@ export default function InviteFriendsScreen() {
   };
 
   const getPlayerCharacter = useCallback((playerId: string): Character | null => {
-    return campaignCharacters.find(char =>
-      char.user_id === playerId
-    ) || null;
+    const character = campaignCharacters.find(char => char.user_id === playerId);
+    return character || null;
   }, [campaignCharacters]);
 
   const getAvailableCharacters = (playerId: string): Character[] => {
@@ -306,13 +322,80 @@ export default function InviteFriendsScreen() {
 
   // Check if all players have characters assigned
   const allPlayersHaveCharacters = useMemo(() => {
-    if (!currentCampaign || currentCampaign.players.length === 0) return false;
+    if (!currentCampaign || currentCampaign.players.length === 0) {
+      return false;
+    }
 
-    return currentCampaign.players.every(player => {
+    // Check that every player has a character assigned to this campaign
+    const result = currentCampaign.players.every(player => {
       const playerCharacter = getPlayerCharacter(player.id);
-      return playerCharacter !== null;
+      const hasCharacter = playerCharacter !== null;
+      return hasCharacter;
     });
-  }, [currentCampaign, getPlayerCharacter]);
+
+    return result;
+  }, [currentCampaign, getPlayerCharacter, campaignCharacters]);
+
+  // Check if current user is the campaign owner
+  const isOwner = useMemo(() => {
+    const result = user && currentCampaign && currentCampaign.owner === user.id;
+    return result;
+  }, [user, currentCampaign]);
+
+  // Determine minimum players required (assuming 2 is minimum)
+  const minimumPlayers = 2;
+  const hasEnoughPlayers = currentCampaign ? currentCampaign.players.length >= minimumPlayers : false;
+
+  // Determine button state and text
+  const getButtonState = () => {
+    if (!currentCampaign) return { disabled: true, text: 'Loading...', canStart: false };
+
+    if (isOwner) {
+      // Owner can start if there are enough players and all have characters
+      if (!hasEnoughPlayers) {
+        return {
+          disabled: true,
+          text: `Waiting for Players (${currentCampaign.players.length}/${minimumPlayers})`,
+          canStart: false
+        };
+      }
+      if (!allPlayersHaveCharacters) {
+        return {
+          disabled: true,
+          text: 'Waiting for Characters...',
+          canStart: false
+        };
+      }
+      return {
+        disabled: false,
+        text: 'Start Campaign',
+        canStart: true
+      };
+    } else {
+      // Non-owners see waiting messages
+      if (!hasEnoughPlayers) {
+        return {
+          disabled: true,
+          text: `Waiting for Players (${currentCampaign.players.length}/${minimumPlayers})`,
+          canStart: false
+        };
+      }
+      if (!allPlayersHaveCharacters) {
+        return {
+          disabled: true,
+          text: 'Waiting for Characters...',
+          canStart: false
+        };
+      }
+      return {
+        disabled: true,
+        text: 'Waiting for DM to Start',
+        canStart: false
+      };
+    }
+  };
+
+  const buttonState = getButtonState();
 
   if (isLoading) {
     return (
@@ -390,7 +473,7 @@ export default function InviteFriendsScreen() {
 
       <View style={styles.playersContainer}>
         <Text style={styles.playersLabel}>
-          Players ({currentCampaign.players.length})
+          Players ({currentCampaign.players.length}/{minimumPlayers} minimum)
         </Text>
         <Text style={styles.realtimeIndicator}>
           Updates automatically when players join
@@ -409,6 +492,9 @@ export default function InviteFriendsScreen() {
                     <Text style={styles.playerName}>{player.name || `Player ${index + 1}`}</Text>
                     {player.ready && (
                       <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
+                    )}
+                    {player.id === currentCampaign.owner && (
+                      <Text style={styles.ownerBadge}>DM</Text>
                     )}
                   </View>
 
@@ -457,15 +543,13 @@ export default function InviteFriendsScreen() {
       <TouchableOpacity
         style={[
           styles.startButton,
-          !allPlayersHaveCharacters && styles.startButtonDisabled
+          buttonState.disabled && styles.startButtonDisabled
         ]}
-        onPress={handleStartCampaign}
-        disabled={!allPlayersHaveCharacters}
+        onPress={buttonState.canStart ? handleStartCampaign : undefined}
+        disabled={buttonState.disabled}
       >
         <Text style={styles.startButtonText}>
-          {!allPlayersHaveCharacters
-            ? 'Waiting for Characters...'
-            : 'Start Campaign'}
+          {buttonState.text}
         </Text>
       </TouchableOpacity>
 
@@ -539,7 +623,6 @@ const styles = StyleSheet.create({
     height: 52,
     borderBottomWidth: 1,
     borderBottomColor: '#2a2a2a',
-    backgroundColor: '#121212',
   },
   backButton: {
     width: 40,
@@ -713,6 +796,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   readyIcon: {
+    marginLeft: 8,
+  },
+  ownerBadge: {
+    backgroundColor: '#FFD700',
+    color: '#1a1a1a',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     marginLeft: 8,
   },
   characterInfo: {
