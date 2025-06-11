@@ -32,6 +32,9 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "web": {
+      "output": "server"
     }
   }
 }
