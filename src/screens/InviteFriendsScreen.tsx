@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -72,11 +72,12 @@ export default function InviteFriendsScreen() {
   useEffect(() => {
     if (!currentCampaign || !user) return;
 
-    const channelName = `campaign-${currentCampaign.id}`;
-    
+    // Create a unique channel name with timestamp to avoid conflicts
+    const channelName = `campaign-${currentCampaign.id}-${Date.now()}`;
+
     // Remove any existing channel with the same name first
     supabase.removeAllChannels();
-    
+
     const subscription = supabase
       .channel(channelName)
       .on(
@@ -108,14 +109,25 @@ export default function InviteFriendsScreen() {
             (newCharacter && newCharacter.campaign_id === currentCampaign.uid) ||
             (oldCharacter && oldCharacter.campaign_id === currentCampaign.uid)
           ) {
-            fetchCharacters();
-            fetchCampaignCharacters();
+            fetchCharactersRef.current();
+            fetchCampaignCharactersRef.current();
           }
         }
       )
       .subscribe();
 
     return () => {
+      // Proper cleanup: unsubscribe and remove the channel
+      const cleanup = async () => {
+        try {
+          await subscription.unsubscribe();
+          // Remove the channel from Supabase's internal state
+          supabase.removeChannel(subscription);
+        } catch (error) {
+          console.error('Error during subscription cleanup:', error);
+        }
+      };
+      cleanup();
       supabase.removeChannel(subscription);
     };
   }, [currentCampaign?.id, currentCampaign?.uid, user?.id, fetchCharacters, setCurrentCampaign, fetchCampaignCharacters]);
@@ -124,6 +136,16 @@ export default function InviteFriendsScreen() {
     const isAvailable = await SMS.isAvailableAsync();
     setSmsAvailable(isAvailable);
   };
+
+  // Use refs to store latest functions for subscription callbacks
+  const fetchCharactersRef = useRef(fetchCharacters);
+  const fetchCampaignCharactersRef = useRef(fetchCampaignCharacters);
+
+  // Update refs when functions change
+  useEffect(() => {
+    fetchCharactersRef.current = fetchCharacters;
+    fetchCampaignCharactersRef.current = fetchCampaignCharacters;
+  }, [fetchCharacters, fetchCampaignCharacters]);
 
   const handleBack = () => {
     router.push('/');
@@ -331,44 +353,44 @@ export default function InviteFriendsScreen() {
     if (isOwner) {
       // Owner can start if there are enough players and all have characters
       if (!hasEnoughPlayers) {
-        return { 
-          disabled: true, 
+        return {
+          disabled: true,
           text: `Waiting for Players (${currentCampaign.players.length}/${minimumPlayers})`,
-          canStart: false 
+          canStart: false
         };
       }
       if (!allPlayersHaveCharacters) {
-        return { 
-          disabled: true, 
+        return {
+          disabled: true,
           text: 'Waiting for Characters...',
-          canStart: false 
+          canStart: false
         };
       }
-      return { 
-        disabled: false, 
+      return {
+        disabled: false,
         text: 'Start Campaign',
-        canStart: true 
+        canStart: true
       };
     } else {
       // Non-owners see waiting messages
       if (!hasEnoughPlayers) {
-        return { 
-          disabled: true, 
+        return {
+          disabled: true,
           text: `Waiting for Players (${currentCampaign.players.length}/${minimumPlayers})`,
-          canStart: false 
+          canStart: false
         };
       }
       if (!allPlayersHaveCharacters) {
-        return { 
-          disabled: true, 
+        return {
+          disabled: true,
           text: 'Waiting for Characters...',
-          canStart: false 
+          canStart: false
         };
       }
-      return { 
-        disabled: true, 
+      return {
+        disabled: true,
         text: 'Waiting for DM to Start',
-        canStart: false 
+        canStart: false
       };
     }
   };
