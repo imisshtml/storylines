@@ -89,7 +89,7 @@ export default function LoginScreen() {
             onPress={handleTitlePress}
             disabled={!__DEV__}
           >
-            <Image source={require('../../assets/images/storylines_logo.png')} style={styles.logoImg} resizeMode='contain' />
+            <Image source={require('../../assets/images/sl_logo_small.png')} style={styles.logoImg} resizeMode='contain' />
           </TouchableOpacity>
 
           <View style={styles.form}>
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
+    paddingTop: '20%'
   },
   content: {
     padding: 20,
@@ -277,7 +277,8 @@ const styles = StyleSheet.create({
   },
   logoImg: {
     width: 250,
-    height: 250,
+    height: 150,
+    marginBottom: 20,
     alignSelf: 'center',
   },
   devIndicator: {
