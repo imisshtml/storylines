@@ -278,7 +278,8 @@ const styles = StyleSheet.create({
   },
   logoImg: {
     width: 300,
-    height: 250
+    height: 250,
+    alignSelf: 'center',
   },
   devIndicator: {
     fontSize: 16,
