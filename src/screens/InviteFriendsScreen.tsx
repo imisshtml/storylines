@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, ScrollView, ActivityIndicator, TextInput, SafeAreaView, Modal, Image } from 'react-native';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
@@ -40,8 +40,10 @@ export default function InviteFriendsScreen() {
   useEffect(() => {
     if (!currentCampaign || !user) return;
 
+    // Create a unique channel name with timestamp to avoid conflicts
+    const channelName = `campaign-${currentCampaign.id}-${Date.now()}`;
     const subscription = supabase
-      .channel(`campaign-${currentCampaign.id}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -71,17 +73,27 @@ export default function InviteFriendsScreen() {
             (newCharacter && newCharacter.campaign_id === currentCampaign.uid) ||
             (oldCharacter && oldCharacter.campaign_id === currentCampaign.uid)
           ) {
-            fetchCharacters();
-            fetchCampaignCharacters();
+            fetchCharactersRef.current();
+            fetchCampaignCharactersRef.current();
           }
         }
       )
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      // Proper cleanup: unsubscribe and remove the channel
+      const cleanup = async () => {
+        try {
+          await subscription.unsubscribe();
+          // Remove the channel from Supabase's internal state
+          supabase.removeChannel(subscription);
+        } catch (error) {
+          console.error('Error during subscription cleanup:', error);
+        }
+      };
+      cleanup();
     };
-  }, [currentCampaign?.id, currentCampaign?.uid, user?.id, fetchCharacters, setCurrentCampaign]);
+  }, [currentCampaign?.id, currentCampaign?.uid, user?.id]);
 
   const checkSmsAvailability = async () => {
     const isAvailable = await SMS.isAvailableAsync();
@@ -107,6 +119,16 @@ export default function InviteFriendsScreen() {
       console.error('Error fetching campaign characters:', error);
     }
   };
+
+  // Use refs to store latest functions for subscription callbacks
+  const fetchCharactersRef = useRef(fetchCharacters);
+  const fetchCampaignCharactersRef = useRef(fetchCampaignCharacters);
+
+  // Update refs when functions change
+  useEffect(() => {
+    fetchCharactersRef.current = fetchCharacters;
+    fetchCampaignCharactersRef.current = fetchCampaignCharacters;
+  }, [fetchCharacters, fetchCampaignCharacters]);
 
   const handleBack = () => {
     router.push('/');
