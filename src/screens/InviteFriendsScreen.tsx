@@ -16,7 +16,7 @@ import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
-import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, X } from 'lucide-react-native';
+import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, X, Plus } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as SMS from 'expo-sms';
@@ -213,9 +213,10 @@ export default function InviteFriendsScreen() {
     // Only show user's own characters if they are the player
     if (playerId !== user.id) return [];
 
-    // Filter characters that are not assigned to any campaign or assigned to this campaign
+    // Filter characters that are not assigned to any campaign (campaign_id is null)
+    // This ensures each character can only be in one campaign at a time
     return characters.filter(char =>
-      char.user_id === user.id && (!char.campaign_id || char.campaign_id === currentCampaign?.uid)
+      char.user_id === user.id && !char.campaign_id
     );
   };
 
@@ -318,6 +319,21 @@ export default function InviteFriendsScreen() {
     } catch (error) {
       console.error('Error updating character assignment:', error);
     }
+  };
+
+  const handleCreateCharacter = () => {
+    // Close the character selector modal first
+    setShowCharacterSelector(null);
+    
+    // Store the current campaign in a way that the creation flow can access it
+    // We'll use router params to pass the campaign info
+    router.push({
+      pathname: '/creation',
+      params: {
+        returnToCampaign: currentCampaign?.id || '',
+        campaignUid: currentCampaign?.uid || '',
+      }
+    });
   };
 
   // Check if all players have characters assigned
@@ -482,7 +498,7 @@ export default function InviteFriendsScreen() {
           {currentCampaign.players.map((player, index) => {
             const playerCharacter = getPlayerCharacter(player.id);
             const availableCharacters = getAvailableCharacters(player.id);
-            const canSelectCharacter = player.id === user?.id && availableCharacters.length > 0;
+            const canSelectCharacter = player.id === user?.id;
 
             return (
               <View key={player.id} style={styles.playerItem}>
@@ -569,6 +585,23 @@ export default function InviteFriendsScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalBody}>
+              {/* Create Character Button */}
+              <TouchableOpacity
+                style={styles.createCharacterOption}
+                onPress={handleCreateCharacter}
+              >
+                <View style={styles.createCharacterIcon}>
+                  <Plus size={24} color="#4CAF50" />
+                </View>
+                <View style={styles.characterOptionInfo}>
+                  <Text style={styles.createCharacterText}>Create New Character</Text>
+                  <Text style={styles.createCharacterSubtext}>
+                    Build a new character for this campaign
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Available Characters */}
               {showCharacterSelector && getAvailableCharacters(showCharacterSelector).map((character) => (
                 <TouchableOpacity
                   key={character.id}
@@ -587,6 +620,8 @@ export default function InviteFriendsScreen() {
                   </View>
                 </TouchableOpacity>
               ))}
+
+              {/* Remove Character Option */}
               {showCharacterSelector && getPlayerCharacter(showCharacterSelector) && (
                 <TouchableOpacity
                   style={styles.removeCharacterOption}
@@ -595,11 +630,13 @@ export default function InviteFriendsScreen() {
                   <Text style={styles.removeCharacterText}>Remove Character</Text>
                 </TouchableOpacity>
               )}
-              {showCharacterSelector && getAvailableCharacters(showCharacterSelector).length === 0 && (
+
+              {/* No Characters Available Message */}
+              {showCharacterSelector && getAvailableCharacters(showCharacterSelector).length === 0 && !getPlayerCharacter(showCharacterSelector) && (
                 <View style={styles.noCharactersAvailable}>
-                  <Text style={styles.noCharactersText}>No characters available</Text>
+                  <Text style={styles.noCharactersText}>No available characters</Text>
                   <Text style={styles.noCharactersSubtext}>
-                    Create a character first to assign to this campaign
+                    All your characters are assigned to other campaigns. Create a new character or remove one from another campaign first.
                   </Text>
                 </View>
               )}
@@ -908,6 +945,37 @@ const styles = StyleSheet.create({
   modalBody: {
     padding: 20,
   },
+  createCharacterOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    borderStyle: 'dashed',
+  },
+  createCharacterIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  createCharacterText: {
+    color: '#4CAF50',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  createCharacterSubtext: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
   characterOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -963,5 +1031,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
+    lineHeight: 20,
   },
 });
