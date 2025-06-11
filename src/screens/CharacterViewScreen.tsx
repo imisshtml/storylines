@@ -8,7 +8,6 @@ import {
   SafeAreaView,
   Image,
   Modal,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { ArrowLeft, Camera, LocationEdit as Edit3, Scroll, X, Trash2, ChevronUp, ChevronDown } from 'lucide-react-native';
@@ -25,6 +24,7 @@ import { userAtom } from '../atoms/authAtoms';
 import { supabase } from '../config/supabase';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 import AvatarSelector from '../components/AvatarSelector';
+import { useCustomAlert } from '../components/CustomAlert';
 
 export default function CharacterViewScreen() {
   const { characterId } = useLocalSearchParams<{ characterId: string }>();
@@ -32,6 +32,7 @@ export default function CharacterViewScreen() {
   const [characters] = useAtom(charactersAtom);
   const [campaigns] = useAtom(campaignsAtom);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
+  const { showAlert, AlertComponent } = useCustomAlert();
   const [character, setCharacter] = useState<Character | null>(null);
   const [isEditingAvatar, setIsEditingAvatar] = useState(false);
   const [isEditingSpells, setIsEditingSpells] = useState(false);
@@ -115,7 +116,7 @@ export default function CharacterViewScreen() {
       await fetchCharacters();
     } catch (error) {
       console.error('Error updating avatar:', error);
-      Alert.alert('Error', 'Failed to update avatar. Please try again.');
+      showAlert('Error', 'Failed to update avatar. Please try again.', undefined, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -153,7 +154,7 @@ export default function CharacterViewScreen() {
       setIsEditingSpells(false);
     } catch (error) {
       console.error('Error updating spells:', error);
-      Alert.alert('Error', 'Failed to update spells. Please try again.');
+      showAlert('Error', 'Failed to update spells. Please try again.', undefined, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -215,7 +216,7 @@ export default function CharacterViewScreen() {
       // Refresh the characters list
       await fetchCharacters();
       
-      Alert.alert(
+      showAlert(
         'Character Deleted',
         `${character.name} has been deleted successfully.`,
         [
@@ -223,11 +224,12 @@ export default function CharacterViewScreen() {
             text: 'OK',
             onPress: () => router.back(),
           },
-        ]
+        ],
+        'success'
       );
     } catch (error) {
       console.error('Error deleting character:', error);
-      Alert.alert('Error', 'Failed to delete character. Please try again.');
+      showAlert('Error', 'Failed to delete character. Please try again.', undefined, 'error');
     } finally {
       setIsDeleting(false);
     }
@@ -629,9 +631,11 @@ export default function CharacterViewScreen() {
                                   if (currentLevelSelected.length < maxAllowed) {
                                     setSelectedSpells(prev => [...prev, spell]);
                                   } else {
-                                    Alert.alert(
+                                    showAlert(
                                       'Spell Limit Reached',
-                                      `You can only select ${maxAllowed} ${spell.level === 0 ? 'cantrips' : 'spells'} for this level.`
+                                      `You can only select ${maxAllowed} ${spell.level === 0 ? 'cantrips' : 'spells'} for this level.`,
+                                      undefined,
+                                      'warning'
                                     );
                                   }
                                 }
@@ -746,6 +750,8 @@ export default function CharacterViewScreen() {
           </View>
         </View>
       </Modal>
+      
+      <AlertComponent />
     </SafeAreaView>
   );
 }
