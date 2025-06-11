@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Send, Chrome as Home, User as User2, X, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Send, Home, User as User2, X, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
@@ -74,13 +74,23 @@ export default function StoryScreen() {
       realtimeUnsubscribeRef.current = unsubscribe;
     });
 
+    // Mark campaign as read when entering
+    if (currentCampaign.latest_message_id) {
+      updateCampaignReadStatus({
+        campaignUid: currentCampaign.uid,
+        messageId: currentCampaign.latest_message_id,
+      }).catch(error => {
+        console.error('Error marking campaign as read on entry:', error);
+      });
+    }
+
     // Cleanup function
     return () => {
       if (realtimeUnsubscribeRef.current) {
         realtimeUnsubscribeRef.current();
       }
     };
-  }, [currentCampaign, fetchCampaignHistory, initializeRealtimeSubscription, clearCampaignHistory]);
+  }, [currentCampaign, fetchCampaignHistory, initializeRealtimeSubscription, clearCampaignHistory, updateCampaignReadStatus]);
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages are added
