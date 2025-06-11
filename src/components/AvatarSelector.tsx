@@ -8,12 +8,12 @@ import {
   Image,
   Modal,
   ActivityIndicator,
-  Alert,
   Dimensions,
 } from 'react-native';
 import { X, Upload, Sparkles } from 'lucide-react-native';
 import { DEFAULT_AVATARS, type DefaultAvatar } from '../data/defaultAvatars';
 import { pickAndUploadAvatar, type AvatarUploadResult } from '../utils/avatarStorage';
+import { useCustomAlert } from './CustomAlert';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const AVATAR_SIZE = (SCREEN_WIDTH - 80) / 4; // 4 avatars per row with padding
