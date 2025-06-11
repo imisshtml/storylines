@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
-import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, X } from 'lucide-react-native';
+import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, X, Plus } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as SMS from 'expo-sms';
@@ -72,11 +72,12 @@ export default function InviteFriendsScreen() {
   useEffect(() => {
     if (!currentCampaign || !user) return;
 
-    const channelName = `campaign-${currentCampaign.id}`;
-    
+    // Create a unique channel name with timestamp to avoid conflicts
+    const channelName = `campaign-${currentCampaign.id}-${Date.now()}`;
+
     // Remove any existing channel with the same name first
     supabase.removeAllChannels();
-    
+
     const subscription = supabase
       .channel(channelName)
       .on(
@@ -108,14 +109,25 @@ export default function InviteFriendsScreen() {
             (newCharacter && newCharacter.campaign_id === currentCampaign.uid) ||
             (oldCharacter && oldCharacter.campaign_id === currentCampaign.uid)
           ) {
-            fetchCharacters();
-            fetchCampaignCharacters();
+            fetchCharactersRef.current();
+            fetchCampaignCharactersRef.current();
           }
         }
       )
       .subscribe();
 
     return () => {
+      // Proper cleanup: unsubscribe and remove the channel
+      const cleanup = async () => {
+        try {
+          await subscription.unsubscribe();
+          // Remove the channel from Supabase's internal state
+          supabase.removeChannel(subscription);
+        } catch (error) {
+          console.error('Error during subscription cleanup:', error);
+        }
+      };
+      cleanup();
       supabase.removeChannel(subscription);
     };
   }, [currentCampaign?.id, currentCampaign?.uid, user?.id, fetchCharacters, setCurrentCampaign, fetchCampaignCharacters]);
@@ -124,6 +136,16 @@ export default function InviteFriendsScreen() {
     const isAvailable = await SMS.isAvailableAsync();
     setSmsAvailable(isAvailable);
   };
+
+  // Use refs to store latest functions for subscription callbacks
+  const fetchCharactersRef = useRef(fetchCharacters);
+  const fetchCampaignCharactersRef = useRef(fetchCampaignCharacters);
+
+  // Update refs when functions change
+  useEffect(() => {
+    fetchCharactersRef.current = fetchCharacters;
+    fetchCampaignCharactersRef.current = fetchCampaignCharacters;
+  }, [fetchCharacters, fetchCampaignCharacters]);
 
   const handleBack = () => {
     router.push('/');
@@ -191,9 +213,10 @@ export default function InviteFriendsScreen() {
     // Only show user's own characters if they are the player
     if (playerId !== user.id) return [];
 
-    // Filter characters that are not assigned to any campaign or assigned to this campaign
+    // Filter characters that are not assigned to any campaign (campaign_id is null)
+    // This ensures each character can only be in one campaign at a time
     return characters.filter(char =>
-      char.user_id === user.id && (!char.campaign_id || char.campaign_id === currentCampaign?.uid)
+      char.user_id === user.id && !char.campaign_id
     );
   };
 
@@ -298,6 +321,21 @@ export default function InviteFriendsScreen() {
     }
   };
 
+  const handleCreateCharacter = () => {
+    // Close the character selector modal first
+    setShowCharacterSelector(null);
+    
+    // Store the current campaign in a way that the creation flow can access it
+    // We'll use router params to pass the campaign info
+    router.push({
+      pathname: '/creation',
+      params: {
+        returnToCampaign: currentCampaign?.id || '',
+        campaignUid: currentCampaign?.uid || '',
+      }
+    });
+  };
+
   // Check if all players have characters assigned
   const allPlayersHaveCharacters = useMemo(() => {
     if (!currentCampaign || currentCampaign.players.length === 0) {
@@ -331,44 +369,44 @@ export default function InviteFriendsScreen() {
     if (isOwner) {
       // Owner can start if there are enough players and all have characters
       if (!hasEnoughPlayers) {
-        return { 
-          disabled: true, 
+        return {
+          disabled: true,
           text: `Waiting for Players (${currentCampaign.players.length}/${minimumPlayers})`,
-          canStart: false 
+          canStart: false
         };
       }
       if (!allPlayersHaveCharacters) {
-        return { 
-          disabled: true, 
+        return {
+          disabled: true,
           text: 'Waiting for Characters...',
-          canStart: false 
+          canStart: false
         };
       }
-      return { 
-        disabled: false, 
+      return {
+        disabled: false,
         text: 'Start Campaign',
-        canStart: true 
+        canStart: true
       };
     } else {
       // Non-owners see waiting messages
       if (!hasEnoughPlayers) {
-        return { 
-          disabled: true, 
+        return {
+          disabled: true,
           text: `Waiting for Players (${currentCampaign.players.length}/${minimumPlayers})`,
-          canStart: false 
+          canStart: false
         };
       }
       if (!allPlayersHaveCharacters) {
-        return { 
-          disabled: true, 
+        return {
+          disabled: true,
           text: 'Waiting for Characters...',
-          canStart: false 
+          canStart: false
         };
       }
-      return { 
-        disabled: true, 
+      return {
+        disabled: true,
         text: 'Waiting for DM to Start',
-        canStart: false 
+        canStart: false
       };
     }
   };
@@ -460,7 +498,7 @@ export default function InviteFriendsScreen() {
           {currentCampaign.players.map((player, index) => {
             const playerCharacter = getPlayerCharacter(player.id);
             const availableCharacters = getAvailableCharacters(player.id);
-            const canSelectCharacter = player.id === user?.id && availableCharacters.length > 0;
+            const canSelectCharacter = player.id === user?.id;
 
             return (
               <View key={player.id} style={styles.playerItem}>
@@ -547,6 +585,23 @@ export default function InviteFriendsScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalBody}>
+              {/* Create Character Button */}
+              <TouchableOpacity
+                style={styles.createCharacterOption}
+                onPress={handleCreateCharacter}
+              >
+                <View style={styles.createCharacterIcon}>
+                  <Plus size={24} color="#4CAF50" />
+                </View>
+                <View style={styles.characterOptionInfo}>
+                  <Text style={styles.createCharacterText}>Create New Character</Text>
+                  <Text style={styles.createCharacterSubtext}>
+                    Build a new character for this campaign
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Available Characters */}
               {showCharacterSelector && getAvailableCharacters(showCharacterSelector).map((character) => (
                 <TouchableOpacity
                   key={character.id}
@@ -565,6 +620,8 @@ export default function InviteFriendsScreen() {
                   </View>
                 </TouchableOpacity>
               ))}
+
+              {/* Remove Character Option */}
               {showCharacterSelector && getPlayerCharacter(showCharacterSelector) && (
                 <TouchableOpacity
                   style={styles.removeCharacterOption}
@@ -573,11 +630,13 @@ export default function InviteFriendsScreen() {
                   <Text style={styles.removeCharacterText}>Remove Character</Text>
                 </TouchableOpacity>
               )}
-              {showCharacterSelector && getAvailableCharacters(showCharacterSelector).length === 0 && (
+
+              {/* No Characters Available Message */}
+              {showCharacterSelector && getAvailableCharacters(showCharacterSelector).length === 0 && !getPlayerCharacter(showCharacterSelector) && (
                 <View style={styles.noCharactersAvailable}>
-                  <Text style={styles.noCharactersText}>No characters available</Text>
+                  <Text style={styles.noCharactersText}>No available characters</Text>
                   <Text style={styles.noCharactersSubtext}>
-                    Create a character first to assign to this campaign
+                    All your characters are assigned to other campaigns. Create a new character or remove one from another campaign first.
                   </Text>
                 </View>
               )}
@@ -886,6 +945,37 @@ const styles = StyleSheet.create({
   modalBody: {
     padding: 20,
   },
+  createCharacterOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    borderStyle: 'dashed',
+  },
+  createCharacterIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  createCharacterText: {
+    color: '#4CAF50',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  createCharacterSubtext: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
   characterOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -941,5 +1031,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
+    lineHeight: 20,
   },
 });
