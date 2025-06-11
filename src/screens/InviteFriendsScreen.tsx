@@ -79,7 +79,7 @@ export default function InviteFriendsScreen() {
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      supabase.removeChannel(subscription);
     };
   }, [currentCampaign?.id, currentCampaign?.uid, user?.id, fetchCharacters, setCurrentCampaign]);
 
@@ -292,6 +292,66 @@ export default function InviteFriendsScreen() {
     });
   }, [currentCampaign, getPlayerCharacter]);
 
+  // Check if current user is the campaign owner
+  const isOwner = useMemo(() => {
+    return user && currentCampaign && currentCampaign.owner === user.id;
+  }, [user, currentCampaign]);
+
+  // Determine minimum players required (assuming 2 is minimum)
+  const minimumPlayers = 2;
+  const hasEnoughPlayers = currentCampaign ? currentCampaign.players.length >= minimumPlayers : false;
+
+  // Determine button state and text
+  const getButtonState = () => {
+    if (!currentCampaign) return { disabled: true, text: 'Loading...', canStart: false };
+
+    if (isOwner) {
+      // Owner can start if there are enough players and all have characters
+      if (!hasEnoughPlayers) {
+        return { 
+          disabled: true, 
+          text: `Waiting for Players (${currentCampaign.players.length}/${minimumPlayers})`,
+          canStart: false 
+        };
+      }
+      if (!allPlayersHaveCharacters) {
+        return { 
+          disabled: true, 
+          text: 'Waiting for Characters...',
+          canStart: false 
+        };
+      }
+      return { 
+        disabled: false, 
+        text: 'Start Campaign',
+        canStart: true 
+      };
+    } else {
+      // Non-owners see waiting messages
+      if (!hasEnoughPlayers) {
+        return { 
+          disabled: true, 
+          text: `Waiting for Players (${currentCampaign.players.length}/${minimumPlayers})`,
+          canStart: false 
+        };
+      }
+      if (!allPlayersHaveCharacters) {
+        return { 
+          disabled: true, 
+          text: 'Waiting for DM to Start',
+          canStart: false 
+        };
+      }
+      return { 
+        disabled: true, 
+        text: 'Waiting for DM to Start',
+        canStart: false 
+      };
+    }
+  };
+
+  const buttonState = getButtonState();
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -368,7 +428,7 @@ export default function InviteFriendsScreen() {
 
       <View style={styles.playersContainer}>
         <Text style={styles.playersLabel}>
-          Players ({currentCampaign.players.length})
+          Players ({currentCampaign.players.length}/{minimumPlayers} minimum)
         </Text>
         <Text style={styles.realtimeIndicator}>
           Updates automatically when players join
@@ -387,6 +447,9 @@ export default function InviteFriendsScreen() {
                     <Text style={styles.playerName}>{player.name || `Player ${index + 1}`}</Text>
                     {player.ready && (
                       <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
+                    )}
+                    {player.id === currentCampaign.owner && (
+                      <Text style={styles.ownerBadge}>DM</Text>
                     )}
                   </View>
 
@@ -435,15 +498,13 @@ export default function InviteFriendsScreen() {
       <TouchableOpacity
         style={[
           styles.startButton,
-          !allPlayersHaveCharacters && styles.startButtonDisabled
+          buttonState.disabled && styles.startButtonDisabled
         ]}
-        onPress={handleStartCampaign}
-        disabled={!allPlayersHaveCharacters}
+        onPress={buttonState.canStart ? handleStartCampaign : undefined}
+        disabled={buttonState.disabled}
       >
         <Text style={styles.startButtonText}>
-          {!allPlayersHaveCharacters
-            ? 'Waiting for Characters...'
-            : 'Start Campaign'}
+          {buttonState.text}
         </Text>
       </TouchableOpacity>
 
@@ -691,6 +752,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   readyIcon: {
+    marginLeft: 8,
+  },
+  ownerBadge: {
+    backgroundColor: '#FFD700',
+    color: '#1a1a1a',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     marginLeft: 8,
   },
   characterInfo: {
