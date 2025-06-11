@@ -36,12 +36,37 @@ export default function InviteFriendsScreen() {
     }
   }, [currentCampaign, user, fetchCharacters]);
 
+  const fetchCampaignCharacters = useCallback(async () => {
+    if (!currentCampaign) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('characters')
+        .select('*')
+        .eq('campaign_id', currentCampaign.uid);
+
+      if (error) {
+        console.error('Error fetching campaign characters:', error);
+        return;
+      }
+
+      setCampaignCharacters(data || []);
+    } catch (error) {
+      console.error('Error fetching campaign characters:', error);
+    }
+  }, [currentCampaign]);
+
   // Set up real-time subscription for campaign and character updates
   useEffect(() => {
     if (!currentCampaign || !user) return;
 
+    const channelName = `campaign-${currentCampaign.id}`;
+    
+    // Remove any existing channel with the same name first
+    supabase.removeAllChannels();
+    
     const subscription = supabase
-      .channel(`campaign-${currentCampaign.id}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -81,31 +106,11 @@ export default function InviteFriendsScreen() {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [currentCampaign?.id, currentCampaign?.uid, user?.id, fetchCharacters, setCurrentCampaign]);
+  }, [currentCampaign?.id, currentCampaign?.uid, user?.id, fetchCharacters, setCurrentCampaign, fetchCampaignCharacters]);
 
   const checkSmsAvailability = async () => {
     const isAvailable = await SMS.isAvailableAsync();
     setSmsAvailable(isAvailable);
-  };
-
-  const fetchCampaignCharacters = async () => {
-    if (!currentCampaign) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('characters')
-        .select('*')
-        .eq('campaign_id', currentCampaign.uid);
-
-      if (error) {
-        console.error('Error fetching campaign characters:', error);
-        return;
-      }
-
-      setCampaignCharacters(data || []);
-    } catch (error) {
-      console.error('Error fetching campaign characters:', error);
-    }
   };
 
   const handleBack = () => {
