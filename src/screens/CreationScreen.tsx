@@ -291,23 +291,23 @@ export default function CreationScreen() {
 
   const getFilteredEquipment = () => {
     let filtered = availableEquipment;
-    
+
     // Apply category filter
     if (equipmentFilter !== 'all') {
       filtered = filtered.filter(item => item.equipment_category === equipmentFilter);
     }
-    
+
     // Apply search filter
     if (equipmentSearch.trim()) {
       const searchTerm = equipmentSearch.toLowerCase().trim();
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         item.name.toLowerCase().includes(searchTerm) ||
-        (item.description && item.description.some(desc => 
+        (item.description && item.description.some(desc =>
           desc.toLowerCase().includes(searchTerm)
         ))
       );
     }
-    
+
     return filtered;
   };
 
@@ -362,7 +362,7 @@ export default function CreationScreen() {
   // Get spellcasting info for the selected class
   const getSpellcastingInfo = () => {
     if (!selectedClass?.spellcasting) return null;
-    
+
     // Basic spellcasting info for level 1 characters
     const spellcastingInfo = {
       cantripsKnown: 0,
@@ -449,7 +449,7 @@ export default function CreationScreen() {
       };
 
       await saveCharacter(characterData);
-      
+
       showAlert(
         'Success!',
         'Your character has been created successfully.',
@@ -519,8 +519,8 @@ export default function CreationScreen() {
 
       <View style={styles.avatarSection}>
         <Text style={styles.avatarLabel}>Character Portrait</Text>
-        <TouchableOpacity 
-          style={styles.avatarContainer} 
+        <TouchableOpacity
+          style={styles.avatarContainer}
           onPress={() => setShowAvatarSelector(true)}
           disabled={isUploadingAvatar}
         >
@@ -538,15 +538,15 @@ export default function CreationScreen() {
             </View>
           )}
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.uploadButton, isUploadingAvatar && styles.uploadButtonDisabled]} 
+        <TouchableOpacity
+          style={[styles.uploadButton, isUploadingAvatar && styles.uploadButtonDisabled]}
           onPress={() => setShowAvatarSelector(true)}
           disabled={isUploadingAvatar}
         >
           <User size={16} color="#4CAF50" />
           <Text style={styles.uploadButtonText}>
-            {isUploadingAvatar 
-              ? (uploadProgress || 'Uploading...') 
+            {isUploadingAvatar
+              ? (uploadProgress || 'Uploading...')
               : (getCurrentAvatar() ? 'Change Avatar' : 'Select Avatar')
             }
           </Text>
@@ -799,7 +799,7 @@ export default function CreationScreen() {
             const abilityName = skillsStat[normalizedSkillName as keyof typeof skillsStat];
             const skillBonus = getSkillBonus(skill);
             const skillDescription = skillsDesc[normalizedSkillName as keyof typeof skillsDesc];
-            
+
             return (
               <TouchableOpacity
                 key={skill}
@@ -867,7 +867,7 @@ export default function CreationScreen() {
     const currentSpells = selectedSpellLevel === 'cantrips' ? cantrips : level1Spells;
     const currentSelectedSpells = selectedSpellLevel === 'cantrips' ? selectedCantrips : selectedLevel1Spells;
     const remainingCount = selectedSpellLevel === 'cantrips' ? cantripsRemaining : spellsRemaining;
-    const maxSpells = selectedSpellLevel === 'cantrips' 
+    const maxSpells = selectedSpellLevel === 'cantrips'
       ? (spellcastingInfo?.cantripsKnown || 0)
       : (spellcastingInfo?.spellsKnown || 0);
 
@@ -875,7 +875,7 @@ export default function CreationScreen() {
       <View style={styles.stepContent}>
         <Text style={styles.stepTitle}>Choose Spells</Text>
         <Text style={styles.subtitle}>Select your starting spells</Text>
-        
+
         {/* Spell Level Tabs */}
         <View style={styles.spellTabs}>
           <TouchableOpacity
@@ -929,8 +929,8 @@ export default function CreationScreen() {
                     setSelectedSpells([...selectedSpells, spell]);
                   }
                 }}
-                disabled={!selectedSpells.some(s => s.index === spell.index) && 
-                        currentSelectedSpells.length >= maxSpells}
+                disabled={!selectedSpells.some(s => s.index === spell.index) &&
+                  currentSelectedSpells.length >= maxSpells}
               >
                 <View style={styles.spellHeader}>
                   <View style={styles.spellHeaderLeft}>
@@ -1000,9 +1000,9 @@ export default function CreationScreen() {
 
       {/* Equipment Categories */}
       <View style={styles.filterTabsContainer}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
           style={styles.filterTabs}
           contentContainerStyle={styles.filterTabsContent}
         >
@@ -1034,7 +1034,7 @@ export default function CreationScreen() {
           const isPurchased = purchasedCount > 0;
           const baseQuantity = item.quantity || 1;
           const totalQuantity = purchasedCount * baseQuantity;
-          
+
           return (
             <View key={item.id} style={[
               styles.equipmentItem,
@@ -1124,7 +1124,7 @@ export default function CreationScreen() {
               return groupedEquipment.map((group) => {
                 const baseQuantity = group.item.quantity || 1;
                 const totalQuantity = group.quantity * baseQuantity;
-                
+
                 return (
                   <View key={group.item.id} style={styles.purchasedItem}>
                     <Text style={styles.purchasedItemName} numberOfLines={1}>
@@ -1144,7 +1144,7 @@ export default function CreationScreen() {
   const renderReview = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Character Review</Text>
-      
+
       {getCurrentAvatar() && (
         <View style={styles.reviewAvatarContainer}>
           <Image source={getCurrentAvatar()} style={styles.reviewAvatar} />
@@ -1233,9 +1233,9 @@ export default function CreationScreen() {
                 const baseQuantity = group.item.quantity || 1;
                 const totalQuantity = group.quantity * baseQuantity;
                 const nameWithBase = baseQuantity > 1 ? `${group.item.name}` : group.item.name;
-                
-                return totalQuantity > 1 
-                  ? `${nameWithBase} ×${totalQuantity}` 
+
+                return totalQuantity > 1
+                  ? `${nameWithBase} ×${totalQuantity}`
                   : nameWithBase;
               }).join(', ');
             })()}
@@ -1289,16 +1289,16 @@ export default function CreationScreen() {
       case 5: {
         // If class doesn't have spellcasting, allow proceeding
         if (!selectedClass?.spellcasting) return true;
-        
+
         const spellcastingInfo = getSpellcastingInfo();
         if (!spellcastingInfo) return true;
-        
+
         const selectedCantrips = selectedSpells.filter(spell => spell.level === 0);
         const selectedLevel1Spells = selectedSpells.filter(spell => spell.level === 1);
-        
+
         // Must select all required cantrips and 1st level spells
-        return selectedCantrips.length === spellcastingInfo.cantripsKnown && 
-               selectedLevel1Spells.length === spellcastingInfo.spellsKnown;
+        return selectedCantrips.length === spellcastingInfo.cantripsKnown &&
+          selectedLevel1Spells.length === spellcastingInfo.spellsKnown;
       }
       case 6: return true; // Equipment is optional
       case 7: return true; // Review step
@@ -1416,7 +1416,7 @@ export default function CreationScreen() {
               <Text style={styles.modalText}>
                 {showClassDetails?.index && classDesc[showClassDetails.index as keyof typeof classDesc] || 'No description available'}
               </Text>
-              
+
               <Text style={styles.modalSectionTitle}>Hit Die</Text>
               <Text style={styles.modalText}>d{showClassDetails?.hit_die}</Text>
 
@@ -1475,7 +1475,7 @@ export default function CreationScreen() {
               <Text style={styles.modalText}>
                 {showRaceDetails?.index && raceDesc[showRaceDetails.index as keyof typeof raceDesc] || 'No description available'}
               </Text>
-              
+
               <Text style={styles.modalSectionTitle}>Size & Speed</Text>
               <Text style={styles.modalText}>Size: {showRaceDetails?.size}</Text>
               <Text style={styles.modalText}>Speed: {showRaceDetails?.speed} feet</Text>
@@ -1496,7 +1496,7 @@ export default function CreationScreen() {
               {showRaceDetails?.traits.map((trait, index) => (
                 <Text key={index} style={styles.modalText}>• {trait.name}</Text>
               ))}
-              
+
               {false && showRaceDetails?.subraces && showRaceDetails.subraces.length > 0 && (
                 <>
                   <Text style={styles.modalSectionTitle}>Subraces</Text>
@@ -1526,7 +1526,7 @@ export default function CreationScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-            <Text style={styles.modalSectionTitle}>Upload Custom</Text>
+              <Text style={styles.modalSectionTitle}>Upload Custom</Text>
               <TouchableOpacity
                 style={styles.uploadAvatarButton}
                 onPress={pickImage}
@@ -1556,7 +1556,7 @@ export default function CreationScreen() {
           </View>
         </View>
       </Modal>
-      
+
       <AlertComponent />
     </SafeAreaView>
   );
