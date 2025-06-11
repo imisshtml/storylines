@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
   logoImg: {
     width: 300,
     height: 250
-  }
+  },
   devIndicator: {
     fontSize: 16,
     color: '#4CAF50',
