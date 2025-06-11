@@ -322,6 +322,9 @@ export default function InviteFriendsScreen() {
   };
 
   const handleCreateCharacter = () => {
+    // Close the character selector modal first
+    setShowCharacterSelector(null);
+    
     // Store the current campaign in a way that the creation flow can access it
     // We'll use router params to pass the campaign info
     router.push({
