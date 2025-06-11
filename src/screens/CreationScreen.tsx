@@ -8,7 +8,6 @@ import {
   TextInput,
   SafeAreaView,
   ActivityIndicator,
-  Alert,
   Image,
   Platform,
   Modal,
@@ -58,6 +57,7 @@ import { userAtom } from '../atoms/authAtoms';
 import { pickAndUploadAvatar, getRandomFantasyPortrait, getDefaultAvatar } from '../utils/avatarStorage';
 import { raceDesc, classDesc, skillsDesc, skillsStat } from '../data/characterData';
 import { DEFAULT_AVATARS, getAvatarById } from '../data/defaultAvatars';
+import { useCustomAlert } from '../components/CustomAlert';
 
 const CREATION_STEPS = [
   { id: 0, title: 'Info', icon: User },
@@ -80,6 +80,7 @@ const POINT_BUY_TOTAL = 27;
 export default function CreationScreen() {
   const [user] = useAtom(userAtom);
   const [currentStep, setCurrentStep] = useAtom(characterCreationStepAtom);
+  const { showAlert, AlertComponent } = useCustomAlert();
   const [characterName, setCharacterName] = useAtom(characterNameAtom);
   const [selectedRace, setSelectedRace] = useAtom(selectedRaceAtom);
   const [selectedClass, setSelectedClass] = useAtom(selectedClassAtom);
@@ -182,12 +183,12 @@ export default function CreationScreen() {
         if (result.success && result.url) {
           setAvatarUri(result.url);
         } else {
-          Alert.alert('Upload Failed', result.error || 'Failed to upload avatar');
+          showAlert('Upload Failed', result.error || 'Failed to upload avatar', undefined, 'error');
         }
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to select avatar');
+      showAlert('Error', 'Failed to select avatar', undefined, 'error');
     } finally {
       setIsUploadingAvatar(false);
       setShowAvatarSelector(false);
@@ -314,7 +315,7 @@ export default function CreationScreen() {
     try {
       purchaseEquipment(item);
     } catch (error) {
-      Alert.alert('Cannot Purchase', 'You cannot afford this item.');
+      showAlert('Cannot Purchase', 'You cannot afford this item.', undefined, 'warning');
     }
   };
 
@@ -407,7 +408,7 @@ export default function CreationScreen() {
 
   const handleSaveCharacter = async () => {
     if (!user || !characterName || !selectedRace || !selectedClass) {
-      Alert.alert('Error', 'Please complete all required fields');
+      showAlert('Error', 'Please complete all required fields', undefined, 'error');
       return;
     }
 
@@ -449,7 +450,7 @@ export default function CreationScreen() {
 
       await saveCharacter(characterData);
       
-      Alert.alert(
+      showAlert(
         'Success!',
         'Your character has been created successfully.',
         [
@@ -462,11 +463,12 @@ export default function CreationScreen() {
               router.back();
             },
           },
-        ]
+        ],
+        'success'
       );
     } catch (error) {
       console.error('Error saving character:', error);
-      Alert.alert('Error', 'Failed to save character. Please try again.');
+      showAlert('Error', 'Failed to save character. Please try again.', undefined, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -1554,6 +1556,8 @@ export default function CreationScreen() {
           </View>
         </View>
       </Modal>
+      
+      <AlertComponent />
     </SafeAreaView>
   );
 }
