@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    alignItems: 'center',
+    //alignItems: 'center',
   },
   logo: {
     fontSize: 32,
