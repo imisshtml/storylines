@@ -13,7 +13,7 @@ import { X, Users } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { supabase } from '../config/supabase';
 import { userAtom } from '../atoms/authAtoms';
-import { fetchCampaignsAtom } from '../atoms/campaignAtoms';
+import { fetchCampaignsAtom, currentCampaignAtom } from '../atoms/campaignAtoms';
 import { router } from 'expo-router';
 
 interface JoinCampaignModalProps {
@@ -27,6 +27,7 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
   const [error, setError] = useState<string | null>(null);
   const [user] = useAtom(userAtom);
   const [, fetchCampaigns] = useAtom(fetchCampaignsAtom);
+  const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
 
   const validateCode = (code: string): boolean => {
     // Must be exactly 6 characters and alphanumeric
@@ -114,15 +115,21 @@ export default function JoinCampaignModal({ isVisible, onClose }: JoinCampaignMo
 
       console.log('Successfully joined campaign');
 
+      // Set the current campaign so the invite screen knows which campaign to show
+      setCurrentCampaign({
+        ...campaign,
+        players: updatedPlayers,
+      });
+
       // Refresh campaigns list
       await fetchCampaigns();
 
-      // Close modal and navigate
+      // Close modal and navigate to invite friends screen
       onClose();
       setInviteCode('');
 
-      // Navigate to character creation or campaign view
-      router.push('/creation');
+      // Navigate to invite friends screen instead of character creation
+      router.push('/invite');
 
     } catch (err) {
       console.error('Join campaign exception:', err);
