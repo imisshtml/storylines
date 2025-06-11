@@ -244,16 +244,16 @@ export default function HomeScreen() {
                 )
                 .map(campaign => (
                 <View key={campaign.id} style={styles.campaignCard}>
+                  {/* Notification dot positioned absolutely in top-right corner */}
+                  {campaign.has_unread && (
+                    <View style={styles.notificationDot}>
+                      <Circle size={8} color="#4CAF50" fill="#4CAF50" />
+                    </View>
+                  )}
+                  
                   <View style={styles.campaignHeader}>
                     <View style={styles.campaignTitleRow}>
-                      <View style={styles.campaignTitleContainer}>
-                        <Text style={styles.campaignTitle}>{campaign.name}</Text>
-                        {campaign.has_unread && (
-                          <View style={styles.notificationDot}>
-                            <Circle size={8} color="#4CAF50" fill="#4CAF50" />
-                          </View>
-                        )}
-                      </View>
+                      <Text style={styles.campaignTitle}>{campaign.name}</Text>
                       <View style={styles.roleContainer}>
                         {isOwner(campaign) ? (
                           <Crown size={16} color="#FFD700" />
@@ -456,6 +456,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    position: 'relative', // Enable absolute positioning for notification dot
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#4CAF50',
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 3,
+    elevation: 3,
+    zIndex: 1,
   },
   campaignHeader: {
     flexDirection: 'row',
@@ -470,11 +486,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginRight: 8,
   },
-  campaignTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
   campaignTitle: {
     fontFamily: 'Inter-Bold',
     fontSize: 18,
@@ -483,18 +494,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
     flex: 1,
-  },
-  notificationDot: {
-    marginLeft: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#4CAF50',
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 3,
-    elevation: 3,
+    paddingRight: 24, // Add padding to prevent overlap with notification dot
   },
   roleContainer: {
     flexDirection: 'row',

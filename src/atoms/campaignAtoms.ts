@@ -66,13 +66,14 @@ const hasUnreadMessages = (
 ): boolean => {
   const readStatus = readStatuses[campaignUid];
 
-  // If no read status exists, and there are messages, it's unread
-  if (!readStatus && latestMessageId) {
-    return true;
-  }
-
   // If there's no latest message, there's nothing to read
   if (!latestMessageId) {
+    return false;
+  }
+
+  // If no read status exists, don't show unread until user has visited the campaign
+  // This prevents showing unread for campaigns that haven't been visited yet
+  if (!readStatus) {
     return false;
   }
 

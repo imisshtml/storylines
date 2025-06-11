@@ -56,15 +56,45 @@ export const updateCampaignReadStatusAtom = atom(
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      // First, check if a record already exists
+      const { data: existingRecord } = await supabase
         .from('campaign_read_status')
-        .upsert({
-          user_id: user.id,
-          campaign_uid: campaignUid,
-          last_read_message_id: messageId,
-        })
-        .select()
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('campaign_uid', campaignUid)
         .single();
+
+      let data, error;
+
+      if (existingRecord) {
+        // Update existing record
+        const result = await supabase
+          .from('campaign_read_status')
+          .update({
+            last_read_message_id: messageId,
+          })
+          .eq('user_id', user.id)
+          .eq('campaign_uid', campaignUid)
+          .select()
+          .single();
+        
+        data = result.data;
+        error = result.error;
+      } else {
+        // Insert new record
+        const result = await supabase
+          .from('campaign_read_status')
+          .insert({
+            user_id: user.id,
+            campaign_uid: campaignUid,
+            last_read_message_id: messageId,
+          })
+          .select()
+          .single();
+        
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) throw error;
 
@@ -112,14 +142,15 @@ export const hasUnreadMessagesAtom = atom(
     const readStatuses = get(campaignReadStatusAtom);
     const readStatus = readStatuses[campaignUid];
 
-    // If no read status exists, and there are messages, it's unread
-    if (!readStatus && latestMessageId) {
-      return true;
-    }
-
     // If there's no latest message, there's nothing to read
     if (!latestMessageId) {
       return false;
+    }
+
+    // If no read status exists, but there are messages, only show unread if we've established a baseline
+    // This prevents showing unread for campaigns that haven't been visited yet
+    if (!readStatus) {
+      return false; // Don't show unread until user has visited the campaign at least once
     }
 
     // If the latest message ID is greater than the last read message ID, it's unread
