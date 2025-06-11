@@ -115,6 +115,7 @@ export default function CreationScreen() {
   const [showClassDetails, setShowClassDetails] = useState<Class | null>(null);
   const [showRaceDetails, setShowRaceDetails] = useState<Race | null>(null);
   const [equipmentFilter, setEquipmentFilter] = useState<string>('all');
+  const [equipmentSearch, setEquipmentSearch] = useState<string>('');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [expandedSpells, setExpandedSpells] = useState<Set<string>>(new Set());
@@ -282,15 +283,31 @@ export default function CreationScreen() {
   };
 
   const getEquipmentCategories = () => {
-    const categories = ['all', ...new Set(availableEquipment.map(item => item.category))];
+    //const categories = ['all', ...new Set(availableEquipment.map(item => item.equipment_category))];
+    const categories = ['all', 'Armor', 'Weapon', 'Adventuring Gear', 'Tools', 'Mounts and Vehicles']
     return categories.filter(Boolean);
   };
 
   const getFilteredEquipment = () => {
-    if (equipmentFilter === 'all') {
-      return availableEquipment;
+    let filtered = availableEquipment;
+    
+    // Apply category filter
+    if (equipmentFilter !== 'all') {
+      filtered = filtered.filter(item => item.equipment_category === equipmentFilter);
     }
-    return availableEquipment.filter(item => item.category === equipmentFilter);
+    
+    // Apply search filter
+    if (equipmentSearch.trim()) {
+      const searchTerm = equipmentSearch.toLowerCase().trim();
+      filtered = filtered.filter(item => 
+        item.name.toLowerCase().includes(searchTerm) ||
+        (item.description && item.description.some(desc => 
+          desc.toLowerCase().includes(searchTerm)
+        ))
+      );
+    }
+    
+    return filtered;
   };
 
   const handlePurchaseEquipment = (item: Equipment) => {
@@ -409,7 +426,7 @@ export default function CreationScreen() {
         abilities,
         skills: selectedSkills,
         spells: selectedSpells,
-        equipment,
+        equipment: purchasedEquipment, // Use the purchased equipment, not starting equipment
         current_hitpoints: hitPoints,
         max_hitpoints: hitPoints,
         temp_hitpoints: 0,
@@ -424,7 +441,7 @@ export default function CreationScreen() {
           abilities,
           skills: selectedSkills,
           spells: selectedSpells,
-          equipment,
+          equipment: purchasedEquipment, // Use purchased equipment here too
           purchasedEquipment,
           avatar: getCurrentAvatarReference(),
         },
@@ -968,32 +985,53 @@ export default function CreationScreen() {
         </View>
       </View>
 
+      {/* Search Equipment */}
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          value={equipmentSearch}
+          onChangeText={setEquipmentSearch}
+          placeholder="Search equipment..."
+          placeholderTextColor="#666"
+        />
+      </View>
+
       {/* Equipment Categories */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryFilter}>
-        {getEquipmentCategories().map((category) => (
-          <TouchableOpacity
-            key={category}
-            style={[
-              styles.categoryButton,
-              equipmentFilter === category && styles.categoryButtonActive,
-            ]}
-            onPress={() => setEquipmentFilter(category)}
-          >
-            <Text style={[
-              styles.categoryButtonText,
-              equipmentFilter === category && styles.categoryButtonTextActive,
-            ]}>
-              {category === 'all' ? 'All' : category.replace(/^\w/, c => c.toUpperCase())}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <View style={styles.filterTabsContainer}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          style={styles.filterTabs}
+          contentContainerStyle={styles.filterTabsContent}
+        >
+          {getEquipmentCategories().map((category) => (
+            <TouchableOpacity
+              key={category}
+              style={[
+                styles.filterTab,
+                equipmentFilter === category && styles.filterTabActive,
+              ]}
+              onPress={() => setEquipmentFilter(category)}
+            >
+              <Text style={[
+                styles.filterTabText,
+                equipmentFilter === category && styles.filterTabTextActive,
+              ]}>
+                {category === 'all' ? 'All' : category.replace(/^\w/, (c: string) => c.toUpperCase())}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       {/* Equipment List */}
       <ScrollView style={styles.equipmentList} showsVerticalScrollIndicator={false}>
         {getFilteredEquipment().map((item) => {
           const canAfford = canAffordEquipment(item, characterGold, characterSilver, characterCopper);
-          const isPurchased = purchasedEquipment.some(purchased => purchased.id === item.id);
+          const purchasedCount = purchasedEquipment.filter(purchased => purchased.id === item.id).length;
+          const isPurchased = purchasedCount > 0;
+          const baseQuantity = item.quantity || 1;
+          const totalQuantity = purchasedCount * baseQuantity;
           
           return (
             <View key={item.id} style={[
@@ -1002,19 +1040,26 @@ export default function CreationScreen() {
               isPurchased && styles.equipmentItemPurchased,
             ]}>
               <View style={styles.equipmentInfo}>
-                <Text style={[
-                  styles.equipmentName,
-                  !canAfford && !isPurchased && styles.equipmentNameDisabled,
-                  isPurchased && styles.equipmentNamePurchased,
-                ]}>
-                  {item.name}
-                </Text>
+                <View style={styles.equipmentNameRow}>
+                  <Text style={[
+                    styles.equipmentName,
+                    !canAfford && !isPurchased && styles.equipmentNameDisabled,
+                    isPurchased && styles.equipmentNamePurchased,
+                  ]}>
+                    {item.name}{baseQuantity > 1 ? ` (${baseQuantity})` : ''}
+                  </Text>
+                  {isPurchased && (
+                    <View style={styles.quantityBadge}>
+                      <Text style={styles.quantityText}>×{totalQuantity}</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={[
                   styles.equipmentDetails,
                   !canAfford && !isPurchased && styles.equipmentDetailsDisabled,
                   isPurchased && styles.equipmentDetailsPurchased,
                 ]}>
-                  {item.category} • {item.weight} lb • {formatEquipmentCost(item)}
+                  {item.equipment_category} • {item.weight} lb • {formatEquipmentCost(item)}
                 </Text>
                 {item.description && item.description.length > 0 && (
                   <Text style={[
@@ -1028,25 +1073,29 @@ export default function CreationScreen() {
               </View>
               
               <View style={styles.equipmentActions}>
-                {isPurchased ? (
+                {isPurchased && (
                   <TouchableOpacity
-                    style={styles.removeButton}
+                    style={styles.decreaseButton}
                     onPress={() => handleRemoveEquipment(item)}
                   >
-                    <Trash2 size={20} color="#f44336" />
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={[
-                      styles.purchaseButton,
-                      !canAfford && styles.purchaseButtonDisabled,
-                    ]}
-                    onPress={() => handlePurchaseEquipment(item)}
-                    disabled={!canAfford}
-                  >
-                    <ShoppingCart size={20} color={canAfford ? '#4CAF50' : '#666'} />
+                    <Text style={styles.decreaseButtonText}>−</Text>
                   </TouchableOpacity>
                 )}
+                <TouchableOpacity
+                  style={[
+                    styles.purchaseButton,
+                    isPurchased && styles.makeSmaller,
+                    !canAfford && styles.purchaseButtonDisabled,
+                  ]}
+                  onPress={() => handlePurchaseEquipment(item)}
+                  disabled={!canAfford}
+                >
+                  {isPurchased ? (
+                    <Text style={[styles.increaseButtonText, !canAfford && styles.notAfford]}>+</Text>
+                  ) : (
+                    <ShoppingCart size={20} color={canAfford ? '#4CAF50' : '#666'} />
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
           );
@@ -1056,14 +1105,34 @@ export default function CreationScreen() {
       {/* Purchased Equipment Summary */}
       {purchasedEquipment.length > 0 && (
         <View style={styles.purchasedSummary}>
-          <Text style={styles.purchasedTitle}>Purchased Equipment ({purchasedEquipment.length})</Text>
+          <Text style={styles.purchasedTitle}>Purchased Equipment ({purchasedEquipment.length} items)</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.purchasedList}>
-            {purchasedEquipment.map((item) => (
-              <View key={item.id} style={styles.purchasedItem}>
-                <Text style={styles.purchasedItemName} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.purchasedItemCost}>{formatEquipmentCost(item)}</Text>
-              </View>
-            ))}
+            {(() => {
+              // Group equipment by ID and count quantities
+              const groupedEquipment = purchasedEquipment.reduce((acc, item) => {
+                const existingGroup = acc.find(group => group.item.id === item.id);
+                if (existingGroup) {
+                  existingGroup.quantity += 1;
+                } else {
+                  acc.push({ item, quantity: 1 });
+                }
+                return acc;
+              }, [] as { item: Equipment; quantity: number }[]);
+
+              return groupedEquipment.map((group) => {
+                const baseQuantity = group.item.quantity || 1;
+                const totalQuantity = group.quantity * baseQuantity;
+                
+                return (
+                  <View key={group.item.id} style={styles.purchasedItem}>
+                    <Text style={styles.purchasedItemName} numberOfLines={1}>
+                      {group.item.name} {totalQuantity > 1 ? `×${totalQuantity}` : ''}
+                    </Text>
+                    <Text style={styles.purchasedItemCost}>{formatEquipmentCost(group.item)}</Text>
+                  </View>
+                );
+              });
+            })()}
           </ScrollView>
         </View>
       )}
@@ -1146,7 +1215,28 @@ export default function CreationScreen() {
         <View style={styles.reviewSection}>
           <Text style={styles.reviewLabel}>Equipment:</Text>
           <Text style={styles.reviewValue}>
-            {purchasedEquipment.map(item => item.name).join(', ')}
+            {(() => {
+              // Group equipment by ID and count quantities
+              const groupedEquipment = purchasedEquipment.reduce((acc, item) => {
+                const existingGroup = acc.find(group => group.item.id === item.id);
+                if (existingGroup) {
+                  existingGroup.quantity += 1;
+                } else {
+                  acc.push({ item, quantity: 1 });
+                }
+                return acc;
+              }, [] as { item: Equipment; quantity: number }[]);
+
+              return groupedEquipment.map(group => {
+                const baseQuantity = group.item.quantity || 1;
+                const totalQuantity = group.quantity * baseQuantity;
+                const nameWithBase = baseQuantity > 1 ? `${group.item.name}` : group.item.name;
+                
+                return totalQuantity > 1 
+                  ? `${nameWithBase} ×${totalQuantity}` 
+                  : nameWithBase;
+              }).join(', ');
+            })()}
           </Text>
         </View>
       )}
@@ -1194,7 +1284,20 @@ export default function CreationScreen() {
         const maxChoices = skillChoices?.choose || 0;
         return maxChoices === 0 || selectedSkills.length === maxChoices;
       }
-      case 5: return true; // Spells are optional
+      case 5: {
+        // If class doesn't have spellcasting, allow proceeding
+        if (!selectedClass?.spellcasting) return true;
+        
+        const spellcastingInfo = getSpellcastingInfo();
+        if (!spellcastingInfo) return true;
+        
+        const selectedCantrips = selectedSpells.filter(spell => spell.level === 0);
+        const selectedLevel1Spells = selectedSpells.filter(spell => spell.level === 1);
+        
+        // Must select all required cantrips and 1st level spells
+        return selectedCantrips.length === spellcastingInfo.cantripsKnown && 
+               selectedLevel1Spells.length === spellcastingInfo.spellsKnown;
+      }
       case 6: return true; // Equipment is optional
       case 7: return true; // Review step
       default: return false;
@@ -2376,4 +2479,97 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Bold',
   },
+  searchContainer: {
+    marginBottom: 16,
+  },
+  searchInput: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+  },
+  filterTabsContainer: {
+    marginBottom: 16,
+  },
+  filterTabs: {
+    flexGrow: 0,
+  },
+  filterTabsContent: {
+    paddingHorizontal: 4,
+  },
+  filterTab: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+  },
+  filterTabActive: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  filterTabText: {
+    color: '#888',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  filterTabTextActive: {
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  equipmentNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  quantityBadge: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  quantityText: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+  },
+  decreaseButton: {
+    width: 32,
+    height: 32,
+    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f44336',
+    marginRight: 8,
+  },
+  decreaseButtonText: {
+    color: '#f44336',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    lineHeight: 18,
+  },
+  increaseButtonText: {
+    color: '#4CAF50',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    lineHeight: 18,
+  },
+  makeSmaller: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  notAfford: {
+    color: '#666',
+  }
 });

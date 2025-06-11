@@ -113,9 +113,10 @@ export default function HomeScreen() {
   // Check if user is currently in any active campaigns
   const isInActiveCampaign = () => {
     return campaigns.some(campaign => 
+      // Only check campaigns that the user should legitimately have access to
       (
         isOwner(campaign) || 
-        campaign.players.some((player: any) => player.id === user?.id)
+        (campaign.players && campaign.players.some((player: any) => player.id === user?.id))
       )
     );
   };
@@ -210,7 +211,13 @@ export default function HomeScreen() {
           <View style={styles.campaignsContainer}>
             <Text style={styles.sectionTitle}>My Campaigns</Text>
             <ScrollView style={styles.campaignsScrollView} showsVerticalScrollIndicator={false}>
-              {campaigns.map(campaign => (
+              {campaigns
+                .filter(campaign => 
+                  // Double-check: only show campaigns where user is owner or player
+                  isOwner(campaign) || 
+                  (campaign.players && campaign.players.some((player: any) => player.id === user?.id))
+                )
+                .map(campaign => (
                 <View key={campaign.id} style={styles.campaignCard}>
                   <View style={styles.campaignHeader}>
                     <View style={styles.campaignTitleRow}>

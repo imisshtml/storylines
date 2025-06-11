@@ -9,10 +9,9 @@ import {
   Image,
   Modal,
   Alert,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
-import { ArrowLeft, Camera, Upload, LocationEdit as Edit3, Scroll, X } from 'lucide-react-native';
+import { ArrowLeft, Camera, LocationEdit as Edit3, Scroll, X, Trash2 } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAtom } from 'jotai';
 import {
@@ -39,6 +38,8 @@ export default function CharacterViewScreen() {
   const [selectedSpells, setSelectedSpells] = useState<DnDSpell[]>([]);
   const [availableSpells, setAvailableSpells] = useState<DnDSpell[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (characters.length > 0 && characterId) {
@@ -187,6 +188,44 @@ export default function CharacterViewScreen() {
     return classData?.spellcasting || false;
   };
 
+  const handleDeleteCharacter = async () => {
+    if (!character || !user) return;
+
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('characters')
+        .delete()
+        .eq('id', character.id)
+        .eq('user_id', user.id); // Extra safety check
+
+      if (error) {
+        throw error;
+      }
+
+      setShowDeleteConfirmation(false);
+      
+      // Refresh the characters list
+      await fetchCharacters();
+      
+      Alert.alert(
+        'Character Deleted',
+        `${character.name} has been deleted successfully.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => router.back(),
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error deleting character:', error);
+      Alert.alert('Error', 'Failed to delete character. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (!character) {
     return (
       <SafeAreaView style={styles.container}>
@@ -210,6 +249,12 @@ export default function CharacterViewScreen() {
           <ArrowLeft color="#fff" size={24} />
         </TouchableOpacity>
         <Text style={styles.title}>{character.name}</Text>
+        <TouchableOpacity 
+          onPress={() => setShowDeleteConfirmation(true)} 
+          style={styles.deleteButton}
+        >
+          <Trash2 color="#ff4444" size={20} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -237,6 +282,26 @@ export default function CharacterViewScreen() {
             Level {character.level} {character.race} {character.class}
           </Text>
           <Text style={styles.campaignName}>{getCampaignName()}</Text>
+        </View>
+
+        {/* Combat Stats */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Combat Stats</Text>
+          <View style={styles.combatStatsGrid}>
+            <View style={styles.combatStatCard}>
+              <Text style={styles.combatStatLabel}>Hit Points</Text>
+              <Text style={styles.combatStatValue}>
+                {character.current_hitpoints}/{character.max_hitpoints}
+              </Text>
+              {character.temp_hitpoints > 0 && (
+                <Text style={styles.tempHpText}>+{character.temp_hitpoints} temp</Text>
+              )}
+            </View>
+            <View style={styles.combatStatCard}>
+              <Text style={styles.combatStatLabel}>Armor Class</Text>
+              <Text style={styles.combatStatValue}>{character.armor_class}</Text>
+            </View>
+          </View>
         </View>
 
         {/* Ability Scores */}
@@ -296,7 +361,7 @@ export default function CharacterViewScreen() {
                     <Text style={styles.spellName}>
                       {spell.name} ({spell.level === 0 ? 'c' : spell.level})
                     </Text>
-                    <Text style={styles.spellSchool}>{spell.school?.name || 'Unknown'}</Text>
+                    <Text style={styles.spellSchool}>Casting Time: {spell.casting_time} {spell.concentration && ' (c)'}</Text>
                   </View>
                 ))}
               </View>
@@ -319,12 +384,47 @@ export default function CharacterViewScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Equipment</Text>
           <View style={styles.equipmentList}>
-            <Text style={styles.equipmentItem}>• Leather Armor (AC 11 + Dex modifier)</Text>
-            <Text style={styles.equipmentItem}>• Simple Weapon (1d6 damage)</Text>
-            <Text style={styles.equipmentItem}>• Adventuring Pack</Text>
-            <Text style={styles.equipmentItem}>• 50 Gold Pieces</Text>
-            {hasSpellcasting() && (
-              <Text style={styles.equipmentItem}>• Spellcasting Focus</Text>
+            {(() => {
+              // Get equipment from character_data.purchasedEquipment or character.equipment
+              const purchasedEquipment = character.character_data?.purchasedEquipment || [];
+              
+              if (purchasedEquipment.length === 0) {
+                return (
+                  <Text style={styles.equipmentItem}>• No equipment</Text>
+                );
+              }
+
+              // Group equipment by ID and count quantities
+              const groupedEquipment = purchasedEquipment.reduce((acc: any[], item: any) => {
+                const existingGroup = acc.find(group => group.item.id === item.id);
+                if (existingGroup) {
+                  existingGroup.quantity += 1;
+                } else {
+                  acc.push({ item, quantity: 1 });
+                }
+                return acc;
+              }, []);
+
+              return groupedEquipment.map((group, index) => {
+                const baseQuantity = group.item.quantity || 1;
+                const totalQuantity = group.quantity * baseQuantity;
+                const displayName = totalQuantity > 1 
+                  ? `${group.item.name} ×${totalQuantity}`
+                  : group.item.name;
+                
+                return (
+                  <Text key={index} style={styles.equipmentItem}>
+                    • {displayName}
+                  </Text>
+                );
+              });
+            })()}
+            
+            {/* Currency */}
+            {(character.gold > 0 || character.silver > 0 || character.copper > 0) && (
+              <Text style={styles.equipmentItem}>
+                • Currency: {character.gold > 0 && `${character.gold} gp`}{character.silver > 0 && ` ${character.silver} sp`}{character.copper > 0 && ` ${character.copper} cp`}
+              </Text>
             )}
           </View>
         </View>
@@ -385,7 +485,7 @@ export default function CharacterViewScreen() {
                       styles.spellOptionDetails,
                       selectedSpells.some(s => s.index === spell.index) && styles.spellOptionDetailsSelected,
                     ]}>
-                      {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`} • {spell.school}
+                      {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`} • Casting Time: {spell.casting_time} {spell.concentration && ' (c)'}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -405,6 +505,50 @@ export default function CharacterViewScreen() {
           </View>
         </Modal>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={showDeleteConfirmation}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowDeleteConfirmation(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteModalContent}>
+            <View style={styles.deleteModalHeader}>
+              <Trash2 size={24} color="#ff4444" />
+              <Text style={styles.deleteModalTitle}>Delete Character</Text>
+            </View>
+            <Text style={styles.deleteModalMessage}>
+              Are you sure you want to delete <Text style={styles.characterNameHighlight}>{character?.name}</Text>? 
+              {'\n\n'}This action cannot be undone.
+            </Text>
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowDeleteConfirmation(false)}
+                disabled={isDeleting}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteConfirmButton, isDeleting && styles.deleteConfirmButtonDisabled]}
+                onPress={handleDeleteCharacter}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Trash2 size={16} color="#fff" />
+                    <Text style={styles.deleteConfirmButtonText}>Delete</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -435,7 +579,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     flex: 1,
     textAlign: 'center',
-    marginRight: 40,
   },
   content: {
     flex: 1,
@@ -521,6 +664,36 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontFamily: 'Inter-Bold',
     marginBottom: 12,
+  },
+  combatStatsGrid: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  combatStatCard: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    flex: 1,
+  },
+  combatStatLabel: {
+    fontSize: 12,
+    color: '#888',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  combatStatValue: {
+    fontSize: 20,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    textAlign: 'center',
+  },
+  tempHpText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Regular',
+    marginTop: 2,
   },
   editButton: {
     flexDirection: 'row',
@@ -715,6 +888,80 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveSpellsButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  deleteButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteModalContent: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    width: '85%',
+    padding: 0,
+    overflow: 'hidden',
+  },
+  deleteModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+  deleteModalTitle: {
+    fontSize: 18,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  deleteModalMessage: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+    lineHeight: 22,
+    padding: 20,
+  },
+  characterNameHighlight: {
+    color: '#4CAF50',
+    fontFamily: 'Inter-Bold',
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#2a2a2a',
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  deleteConfirmButton: {
+    flex: 1,
+    backgroundColor: '#ff4444',
+    borderRadius: 8,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  deleteConfirmButtonDisabled: {
+    backgroundColor: '#cc3333',
+  },
+  deleteConfirmButtonText: {
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
