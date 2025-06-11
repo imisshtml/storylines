@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   logoImg: {
-    width: 300,
+    width: 250,
     height: 250,
     alignSelf: 'center',
   },
