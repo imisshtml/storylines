@@ -70,7 +70,7 @@ export default function HomeScreen() {
 
   const getCharacterAvatar = (character: Character) => {
     // Try to get avatar from character_data
-    const avatarUrl = character.character_data?.avatar || character?.avatar;
+    const avatarUrl = character.character_data?.avatar;
     
     if (avatarUrl && typeof avatarUrl === 'string') {
       // Check if it's a default avatar reference
@@ -113,9 +113,10 @@ export default function HomeScreen() {
   // Check if user is currently in any active campaigns
   const isInActiveCampaign = () => {
     return campaigns.some(campaign => 
-      campaign.status !== 'creation' && (
+      // Only check campaigns that the user should legitimately have access to
+      (
         isOwner(campaign) || 
-        campaign.players.some((player: any) => player.id === user?.id)
+        (campaign.players && campaign.players.some((player: any) => player.id === user?.id))
       )
     );
   };
@@ -149,145 +150,159 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-          <View style={styles.campaignsContainer}>
-            <Text style={styles.sectionTitle}>My Campaigns</Text>
-            {campaigns.map(campaign => (
-              <View key={campaign.id} style={styles.campaignCard}>
-                <View style={styles.campaignHeader}>
-                  <View style={styles.campaignTitleRow}>
-                    <Text style={styles.campaignTitle}>{campaign.name}</Text>
-                    <View style={styles.roleContainer}>
-                      {isOwner(campaign) ? (
-                        <Crown size={16} color="#FFD700" />
-                      ) : (
-                        <UserCheck size={16} color="#4CAF50" />
-                      )}
-                      <Text style={[
-                        styles.roleText,
-                        isOwner(campaign) ? styles.ownerText : styles.playerText
-                      ]}>
-                        {getUserRole(campaign)}
-                      </Text>
-                    </View>
-                  </View>
-                  {campaign.status === 'creation' && isOwner(campaign) && (
-                    <TouchableOpacity
-                      style={styles.settingsButton}
-                      onPress={() => handleSettingsPress(campaign.id)}
-                    >
-                      <Settings size={20} color="#888" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <Text style={styles.campaignDetails}>
-                  {campaign.status === 'creation'
-                    ? 'In Creation'
-                    : `Players: ${campaign.players.length} • ${campaign.status === 'waiting' ? 'Waiting' : 'In Progress'}`
-                  }
-                </Text>
-                <TouchableOpacity
-                  style={styles.continueButton}
-                  onPress={() => handleCampaignPress(campaign.id)}
-                >
-                  {campaign.status === 'creation' ? (
-                    <>
-                      <Users size={20} color="#fff" />
-                      <Text style={styles.buttonText}>
-                        {isOwner(campaign) ? 'Invite Friends' : 'Waiting for Start'}
-                      </Text>
-                    </>
-                  ) : (
-                    <>
-                      <Play size={20} color="#fff" />
-                      <Text style={styles.buttonText}>Continue Story</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-            ))}
-
-            {campaigns.length === 0 && (
-              <View style={styles.noCampaignsContainer}>
-                <Text style={styles.noCampaigns}>No active campaigns</Text>
-                <Text style={styles.noCampaignsSubtext}>
-                  Create a new campaign or join an existing one to start your adventure!
-                </Text>
-              </View>
-            )}
-
-            {/* Show campaign action buttons only if user is not in an active campaign */}
-            {!isInActiveCampaign() && (
-              <View style={styles.campaignActionButtons}>
-                <TouchableOpacity
-                  style={styles.createButton}
-                  onPress={() => router.push('/create')}
-                >
-                  <Text style={styles.buttonText}>Create Campaign</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.joinButton}
-                  onPress={handleJoinCampaign}
-                >
-                  <Users size={20} color="#fff" />
-                  <Text style={styles.buttonText}>Join via Code</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-
+        <View style={styles.contentContainer}>
           <View style={styles.charactersContainer}>
             <Text style={styles.sectionTitle}>My Characters</Text>
-            {characters.length > 0 ? (
-              <View style={styles.charactersGrid}>
-                {characters.map(character => (
+            <ScrollView 
+              style={styles.charactersScrollView} 
+              horizontal={true}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.charactersScrollContent}
+            >
+              {characters.length > 0 ? (
+                <View style={styles.charactersGrid}>
+                  {characters.map(character => (
+                    <TouchableOpacity
+                      key={character.id}
+                      style={styles.characterCard}
+                      onPress={() => handleCharacterPress(character)}
+                    >
+                      <View style={styles.characterAvatarContainer}>
+                        <Image
+                          source={getCharacterAvatar(character)}
+                          style={styles.characterAvatar}
+                        />
+                        <View style={styles.characterLevelBadge}>
+                          <Star size={12} color="#fff" />
+                          <Text style={styles.characterLevel}>{character.level}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.characterInfo}>
+                        <Text style={styles.characterName} numberOfLines={1}>
+                          {character.name}
+                        </Text>
+                        <Text style={styles.characterClass} numberOfLines={1}>
+                          {character.race} {character.class}
+                        </Text>
+                        <Text style={styles.characterCampaign} numberOfLines={1}>
+                          {getCharacterCampaignName(character)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.noCharactersContainer}>
+                  <User size={48} color="#666" />
+                  <Text style={styles.noCharacters}>No characters created yet</Text>
+                  <Text style={styles.noCharactersSubtext}>
+                    Create your first character to begin your adventures!
+                  </Text>
                   <TouchableOpacity
-                    key={character.id}
-                    style={styles.characterCard}
-                    onPress={() => handleCharacterPress(character)}
+                    style={styles.createCharacterButton}
+                    onPress={() => router.push('/creation')}
                   >
-                    <View style={styles.characterAvatarContainer}>
-                      <Image
-                        source={getCharacterAvatar(character)}
-                        style={styles.characterAvatar}
-                      />
-                      <View style={styles.characterLevelBadge}>
-                        <Star size={12} color="#fff" />
-                        <Text style={styles.characterLevel}>{character.level}</Text>
+                    <Text style={styles.createCharacterButtonText}>Create Character</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+          <View style={styles.campaignsContainer}>
+            <Text style={styles.sectionTitle}>My Campaigns</Text>
+            <ScrollView style={styles.campaignsScrollView} showsVerticalScrollIndicator={false}>
+              {campaigns
+                .filter(campaign => 
+                  // Double-check: only show campaigns where user is owner or player
+                  isOwner(campaign) || 
+                  (campaign.players && campaign.players.some((player: any) => player.id === user?.id))
+                )
+                .map(campaign => (
+                <View key={campaign.id} style={styles.campaignCard}>
+                  <View style={styles.campaignHeader}>
+                    <View style={styles.campaignTitleRow}>
+                      <Text style={styles.campaignTitle}>{campaign.name}</Text>
+                      <View style={styles.roleContainer}>
+                        {isOwner(campaign) ? (
+                          <Crown size={16} color="#FFD700" />
+                        ) : (
+                          <UserCheck size={16} color="#4CAF50" />
+                        )}
+                        <Text style={[
+                          styles.roleText,
+                          isOwner(campaign) ? styles.ownerText : styles.playerText
+                        ]}>
+                          {getUserRole(campaign)}
+                        </Text>
                       </View>
                     </View>
-                    <View style={styles.characterInfo}>
-                      <Text style={styles.characterName} numberOfLines={1}>
-                        {character.name}
-                      </Text>
-                      <Text style={styles.characterClass} numberOfLines={1}>
-                        {character.race} {character.class}
-                      </Text>
-                      <Text style={styles.characterCampaign} numberOfLines={1}>
-                        {getCharacterCampaignName(character)}
-                      </Text>
-                    </View>
+                    {campaign.status === 'creation' && isOwner(campaign) && (
+                      <TouchableOpacity
+                        style={styles.settingsButton}
+                        onPress={() => handleSettingsPress(campaign.id)}
+                      >
+                        <Settings size={20} color="#888" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <Text style={styles.campaignDetails}>
+                    {campaign.status === 'creation'
+                      ? 'In Creation'
+                      : `Players: ${campaign.players.length} • ${campaign.status === 'waiting' ? 'Waiting' : 'In Progress'}`
+                    }
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.continueButton}
+                    onPress={() => handleCampaignPress(campaign.id)}
+                  >
+                    {campaign.status === 'creation' ? (
+                      <>
+                        <Users size={20} color="#fff" />
+                        <Text style={styles.buttonText}>
+                          {isOwner(campaign) ? 'Invite Friends' : 'Waiting for Start'}
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Play size={20} color="#fff" />
+                        <Text style={styles.buttonText}>Continue Story</Text>
+                      </>
+                    )}
                   </TouchableOpacity>
-                ))}
-              </View>
-            ) : (
-              <View style={styles.noCharactersContainer}>
-                <User size={48} color="#666" />
-                <Text style={styles.noCharacters}>No characters created yet</Text>
-                <Text style={styles.noCharactersSubtext}>
-                  Create your first character to begin your adventures!
-                </Text>
-                <TouchableOpacity
-                  style={styles.createCharacterButton}
-                  onPress={() => router.push('/creation')}
-                >
-                  <Text style={styles.createCharacterButtonText}>Create Character</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+                </View>
+              ))}
+
+              {campaigns.length === 0 && (
+                <View style={styles.noCampaignsContainer}>
+                  <Text style={styles.noCampaigns}>No active campaigns</Text>
+                  <Text style={styles.noCampaignsSubtext}>
+                    Create a new campaign or join an existing one to start your adventure!
+                  </Text>
+                </View>
+              )}
+
+              {/* Show campaign action buttons only if user is not in an active campaign */}
+              {!isInActiveCampaign() && (
+                <View style={styles.campaignActionButtons}>
+                  <TouchableOpacity
+                    style={styles.createButton}
+                    onPress={() => router.push('/create')}
+                  >
+                    <Text style={styles.buttonText}>Create Campaign</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.joinButton}
+                    onPress={handleJoinCampaign}
+                  >
+                    <Users size={20} color="#fff" />
+                    <Text style={styles.buttonText}>Join via Code</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </ScrollView>
           </View>
-        </ScrollView>
+        </View>
       </View>
 
       <SidebarMenu
@@ -330,6 +345,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 20,
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
   },
   titleContainer: {
     flex: 1,
@@ -353,15 +371,18 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-  scrollContainer: {
+  contentContainer: {
     flex: 1,
     paddingHorizontal: 20,
   },
   campaignsContainer: {
-    marginBottom: 30,
+    flex: 0.75,
+    marginBottom: 20,
   },
   charactersContainer: {
-    marginBottom: 30,
+    flex: 0.25,
+    paddingBottom: 5,
+    marginBottom:10,
   },
   sectionTitle: {
     fontSize: 20,
@@ -476,14 +497,13 @@ const styles = StyleSheet.create({
   },
   charactersGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 12,
   },
   characterCard: {
     backgroundColor: 'rgba(42, 42, 42, 0.8)',
     borderRadius: 12,
     padding: 12,
-    width: '48%',
+    width: 120,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -616,5 +636,14 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  campaignsScrollView: {
+    flex: 1,
+  },
+  charactersScrollView: {
+    flex: 1,
+  },
+  charactersScrollContent: {
+    paddingHorizontal: 20,
   },
 });

@@ -162,23 +162,52 @@ export const initializeRealtimeAtom = atom(
           table: 'campaigns'
         },
         async (payload) => {
-          // Fetch fresh data to ensure we have the complete state
-          const { data: campaigns } = await supabase
-            .from('campaigns')
-            .select('*')
-            .order('created_at', { ascending: false });
+          // Re-fetch campaigns using the same filtering logic as fetchCampaignsAtom
+          try {
+            // Get campaigns where user is the owner
+            const { data: ownedCampaigns, error: ownedError } = await supabase
+              .from('campaigns')
+              .select('*')
+              .eq('owner', user.id)
+              .order('created_at', { ascending: false });
 
-          if (campaigns) {
-            set(campaignsAtom, campaigns);
+            if (ownedError) throw ownedError;
+
+            // Get all campaigns and filter client-side for ones where user is a player
+            const { data: allCampaigns, error: allError } = await supabase
+              .from('campaigns')
+              .select('*');
+
+            if (allError) throw allError;
+
+            // Filter campaigns where user is a player (but not owner to avoid duplicates)
+            const playerCampaigns = allCampaigns?.filter(campaign => {
+              // Skip if user is already the owner (already included in ownedCampaigns)
+              if (campaign.owner === user.id) return false;
+
+              // Check if user is in the players array
+              const players = campaign.players || [];
+              return players.some((player: Player) => player.id === user.id);
+            }) || [];
+
+            // Combine owned and player campaigns
+            const userCampaigns = [...(ownedCampaigns || []), ...playerCampaigns];
+
+            // Sort by created_at descending
+            userCampaigns.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+
+            set(campaignsAtom, userCampaigns);
 
             // Update current campaign if it was modified
             const currentCampaign = get(currentCampaignAtom);
             if (currentCampaign) {
-              const updatedCampaign = campaigns.find(c => c.id === currentCampaign.id);
+              const updatedCampaign = userCampaigns.find(c => c.id === currentCampaign.id);
               if (updatedCampaign) {
                 set(currentCampaignAtom, updatedCampaign);
               }
             }
+          } catch (error) {
+            console.error('Real-time campaign update error:', error);
           }
         }
       )
