@@ -89,7 +89,7 @@ export default function LoginScreen() {
             onPress={handleTitlePress}
             disabled={!__DEV__}
           >
-            <Image source={require('../../assets/images/storylines_logo.png')} style={styles.logo} resizeMode='contain' />
+            <Image source={require('../../assets/images/storylines_logo.png')} style={styles.logoImg} resizeMode='contain' />
           </TouchableOpacity>
 
           <View style={styles.form}>
