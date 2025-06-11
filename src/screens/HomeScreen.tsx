@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Play, Users, Settings, Menu, Crown, UserCheck, User, Star } from 'lucide-react-native';
+import { Play, Users, Settings, Menu, Crown, UserCheck, Star } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, ScrollView, Image } from 'react-native';
 import { useAtom } from 'jotai';
@@ -138,9 +138,7 @@ export default function HomeScreen() {
               onPress={handleTitlePress}
               disabled={!__DEV__}
             >
-              <Text style={styles.logo}>
-                Storylines
-              </Text>
+              <Image source={require('../../assets/images/sl_logo_small.png')} style={styles.logoImg} resizeMode='contain' />
             </TouchableOpacity>
             {user && (
               <Text style={styles.welcomeText}>
@@ -153,47 +151,47 @@ export default function HomeScreen() {
         <View style={styles.contentContainer}>
           <View style={styles.charactersContainer}>
             <Text style={styles.sectionTitle}>My Characters</Text>
-            <ScrollView 
-              style={styles.charactersScrollView} 
-              horizontal={true}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.charactersScrollContent}
-            >
               {characters.length > 0 ? (
-                <View style={styles.charactersGrid}>
-                  {characters.map(character => (
-                    <TouchableOpacity
-                      key={character.id}
-                      style={styles.characterCard}
-                      onPress={() => handleCharacterPress(character)}
-                    >
-                      <View style={styles.characterAvatarContainer}>
-                        <Image
-                          source={getCharacterAvatar(character)}
-                          style={styles.characterAvatar}
-                        />
-                        <View style={styles.characterLevelBadge}>
-                          <Star size={12} color="#fff" />
-                          <Text style={styles.characterLevel}>{character.level}</Text>
+                <ScrollView 
+                  style={styles.charactersScrollView} 
+                  horizontal={true}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.charactersScrollContent}
+                >
+                  <View style={styles.charactersGrid}>
+                    {characters.map(character => (
+                      <TouchableOpacity
+                        key={character.id}
+                        style={styles.characterCard}
+                        onPress={() => handleCharacterPress(character)}
+                      >
+                        <View style={styles.characterAvatarContainer}>
+                          <Image
+                            source={getCharacterAvatar(character)}
+                            style={styles.characterAvatar}
+                          />
+                          <View style={styles.characterLevelBadge}>
+                            <Star size={12} color="#fff" />
+                            <Text style={styles.characterLevel}>{character.level}</Text>
+                          </View>
                         </View>
-                      </View>
-                      <View style={styles.characterInfo}>
-                        <Text style={styles.characterName} numberOfLines={1}>
-                          {character.name}
-                        </Text>
-                        <Text style={styles.characterClass} numberOfLines={1}>
-                          {character.race} {character.class}
-                        </Text>
-                        <Text style={styles.characterCampaign} numberOfLines={1}>
-                          {getCharacterCampaignName(character)}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                        <View style={styles.characterInfo}>
+                          <Text style={styles.characterName} numberOfLines={1}>
+                            {character.name}
+                          </Text>
+                          <Text style={styles.characterClass} numberOfLines={1}>
+                            {character.race} {character.class}
+                          </Text>
+                          <Text style={styles.characterCampaign} numberOfLines={1}>
+                            {getCharacterCampaignName(character)}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
               ) : (
                 <View style={styles.noCharactersContainer}>
-                  <User size={48} color="#666" />
                   <Text style={styles.noCharacters}>No characters created yet</Text>
                   <Text style={styles.noCharactersSubtext}>
                     Create your first character to begin your adventures!
@@ -206,7 +204,7 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 </View>
               )}
-            </ScrollView>
+            
           </View>
           <View style={styles.campaignsContainer}>
             <Text style={styles.sectionTitle}>My Campaigns</Text>
@@ -276,28 +274,24 @@ export default function HomeScreen() {
                 <View style={styles.noCampaignsContainer}>
                   <Text style={styles.noCampaigns}>No active campaigns</Text>
                   <Text style={styles.noCampaignsSubtext}>
-                    Create a new campaign or join an existing one to start your adventure!
+                    Create a new campaign or join an existing one!
                   </Text>
-                </View>
-              )}
+                  <View style={styles.campaignActionButtons}>
+                    <TouchableOpacity
+                      style={styles.createButton}
+                      onPress={() => router.push('/create')}
+                    >
+                      <Text style={styles.buttonText}>Create Campaign</Text>
+                    </TouchableOpacity>
 
-              {/* Show campaign action buttons only if user is not in an active campaign */}
-              {!isInActiveCampaign() && (
-                <View style={styles.campaignActionButtons}>
-                  <TouchableOpacity
-                    style={styles.createButton}
-                    onPress={() => router.push('/create')}
-                  >
-                    <Text style={styles.buttonText}>Create Campaign</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.joinButton}
-                    onPress={handleJoinCampaign}
-                  >
-                    <Users size={20} color="#fff" />
-                    <Text style={styles.buttonText}>Join via Code</Text>
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.joinButton}
+                      onPress={handleJoinCampaign}
+                    >
+                      <Users size={20} color="#fff" />
+                      <Text style={styles.buttonText}>Join via Code</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </ScrollView>
@@ -353,6 +347,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     marginTop: 20,
+    width: '100%',
   },
   logo: {
     fontSize: 32,
@@ -493,7 +488,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   campaignActionButtons: {
+    paddingTop: 20,
     gap: 12,
+    flexDirection: 'row'
   },
   charactersGrid: {
     flexDirection: 'row',
@@ -569,7 +566,7 @@ const styles = StyleSheet.create({
   noCharactersContainer: {
     backgroundColor: 'rgba(42, 42, 42, 0.8)',
     borderRadius: 12,
-    padding: 32,
+    padding: 12,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -582,7 +579,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: 'Inter-Bold',
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: 6,
     marginBottom: 8,
   },
   noCharactersSubtext: {
@@ -598,6 +595,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
+    marginBottom: 10,
   },
   createCharacterButtonText: {
     color: '#fff',
@@ -646,4 +644,8 @@ const styles = StyleSheet.create({
   charactersScrollContent: {
     paddingHorizontal: 20,
   },
+  logoImg: {
+    width: 300,
+    height: 50,
+  }
 });
