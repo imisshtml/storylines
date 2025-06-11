@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Play, Users, Settings, Menu, Crown, UserCheck, Star } from 'lucide-react-native';
+import { Play, Users, Settings, Menu, Crown, UserCheck, Star, Circle } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, ScrollView, Image } from 'react-native';
 import { useAtom } from 'jotai';
