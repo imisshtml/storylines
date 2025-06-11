@@ -26,6 +26,7 @@ import {
   clearCampaignHistoryAtom,
   addCampaignMessageAtom
 } from '../atoms/campaignHistoryAtoms';
+import { updateCampaignReadStatusAtom } from '../atoms/campaignReadStatusAtoms';
 import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
 import StoryChoices from '../components/StoryChoices';
@@ -51,6 +52,7 @@ export default function StoryScreen() {
   const [, initializeRealtimeSubscription] = useAtom(initializeCampaignHistoryRealtimeAtom);
   const [, clearCampaignHistory] = useAtom(clearCampaignHistoryAtom);
   const [, addCampaignMessage] = useAtom(addCampaignMessageAtom);
+  const [, updateCampaignReadStatus] = useAtom(updateCampaignReadStatusAtom);
 
   const scrollViewRef = useRef<ScrollView>(null);
   const realtimeUnsubscribeRef = useRef<(() => void) | null>(null);
@@ -88,6 +90,19 @@ export default function StoryScreen() {
       }, 100);
     }
   }, [campaignHistory]);
+
+  useEffect(() => {
+    // Update read status when new messages arrive
+    if (currentCampaign && campaignHistory.length > 0) {
+      const latestMessage = campaignHistory[campaignHistory.length - 1];
+      updateCampaignReadStatus({
+        campaignUid: currentCampaign.uid,
+        messageId: latestMessage.id,
+      }).catch(error => {
+        console.error('Error updating read status:', error);
+      });
+    }
+  }, [campaignHistory, currentCampaign, updateCampaignReadStatus]);
 
   useEffect(() => {
     // Show error alert if there's an error

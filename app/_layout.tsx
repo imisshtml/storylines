@@ -5,6 +5,7 @@ import React, { useEffect } from 'react';
 import { useAtom } from 'jotai';
 import { initializeAuthAtom } from '../src/atoms/authAtoms'
 import { initializeRealtimeAtom } from '../src/atoms/campaignAtoms';
+import { initializeCampaignReadStatusRealtimeAtom } from '../src/atoms/campaignReadStatusAtoms';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -23,6 +24,7 @@ export default function RootLayout() {
 
   const [, initializeAuth] = useAtom(initializeAuthAtom);
   const [, initializeRealtime] = useAtom(initializeRealtimeAtom);
+  const [, initializeReadStatusRealtime] = useAtom(initializeCampaignReadStatusRealtimeAtom);
 
   useEffect(() => {
     // Initialize authentication and real-time subscriptions
@@ -30,10 +32,12 @@ export default function RootLayout() {
       await initializeAuth();
       // Initialize real-time subscription after auth is ready
       await initializeRealtime();
+      // Initialize read status real-time subscription
+      await initializeReadStatusRealtime();
     };
     
     initialize();
-  }, [initializeAuth, initializeRealtime]);
+  }, [initializeAuth, initializeRealtime, initializeReadStatusRealtime]);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
