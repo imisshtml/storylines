@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/sl_logo.jpg",
+      "image": "./assets/images/sl_logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
@@ -32,11 +32,11 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/sl_logo.jpg",
+          "image": "./assets/images/sl_logo.png",
           "resizeMode": "contain",
           "backgroundColor": "#000000",
           "dark": {
-            "image": "./assets/images/sl_logo.jpg",
+            "image": "./assets/images/sl_logo.png",
             "resizeMode": "contain",
             "backgroundColor": "#000000"
           }
