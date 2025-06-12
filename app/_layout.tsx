@@ -11,6 +11,7 @@ import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { View } from 'react-native';
+import CustomSplashScreen from '../src/components/CustomSplashScreen';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -60,7 +61,7 @@ export default function RootLayout() {
   }, [appIsReady, fontsLoaded, fontError]);
 
   if (!appIsReady || (!fontsLoaded && !fontError)) {
-    return null;
+    return <CustomSplashScreen />;
   }
 
   return (

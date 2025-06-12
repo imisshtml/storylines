@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/sl_logo.jpg",
-      "resizeMode": "cover",
+      "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
     "ios": {
@@ -33,8 +33,13 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/sl_logo.jpg",
-          "resizeMode": "cover",
-          "backgroundColor": "#000000"
+          "resizeMode": "contain",
+          "backgroundColor": "#000000",
+          "dark": {
+            "image": "./assets/images/sl_logo.jpg",
+            "resizeMode": "contain",
+            "backgroundColor": "#000000"
+          }
         }
       ]
     ],
