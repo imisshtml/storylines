@@ -1,7 +1,7 @@
 import { Inter_400Regular, Inter_700Bold, useFonts } from '@expo-google-fonts/inter';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAtom } from 'jotai';
 import { initializeAuthAtom } from '../src/atoms/authAtoms'
 import { initializeRealtimeAtom } from '../src/atoms/campaignAtoms';
@@ -25,27 +25,41 @@ export default function RootLayout() {
   const [, initializeAuth] = useAtom(initializeAuthAtom);
   const [, initializeRealtime] = useAtom(initializeRealtimeAtom);
   const [, initializeReadStatusRealtime] = useAtom(initializeCampaignReadStatusRealtimeAtom);
+  
+  const [appIsReady, setAppIsReady] = useState(false);
 
   useEffect(() => {
     // Initialize authentication and real-time subscriptions
     const initialize = async () => {
-      await initializeAuth();
-      // Initialize real-time subscription after auth is ready
-      await initializeRealtime();
-      // Initialize read status real-time subscription
-      await initializeReadStatusRealtime();
+      try {
+        await initializeAuth();
+        // Initialize real-time subscription after auth is ready
+        await initializeRealtime();
+        // Initialize read status real-time subscription
+        await initializeReadStatusRealtime();
+        
+        // Add a small delay to ensure splash screen is visible
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        setAppIsReady(true);
+      } catch (error) {
+        console.error('Error initializing app:', error);
+        setAppIsReady(true); // Still set ready to prevent infinite loading
+      }
     };
     
-    initialize();
-  }, [initializeAuth, initializeRealtime, initializeReadStatusRealtime]);
+    if (fontsLoaded || fontError) {
+      initialize();
+    }
+  }, [fontsLoaded, fontError, initializeAuth, initializeRealtime, initializeReadStatusRealtime]);
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    if (appIsReady && (fontsLoaded || fontError)) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [appIsReady, fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) {
+  if (!appIsReady || (!fontsLoaded && !fontError)) {
     return null;
   }
 
