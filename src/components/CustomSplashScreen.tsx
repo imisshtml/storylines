@@ -7,7 +7,7 @@ export default function CustomSplashScreen() {
   return (
     <View style={styles.container}>
       <Image 
-        source={require('../../assets/images/sl_logo.jpg')} 
+        source={require('../../assets/images/sl_logo.png')} 
         style={styles.logo}
         resizeMode="cover"
       />
