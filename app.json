@@ -8,6 +8,11 @@
     "scheme": "storylines",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/sl_logo.jpg",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1a1a"
+    },
     "ios": {
       "supportsTablet": true
     },
@@ -23,9 +28,9 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/storylines_splash.jpg",
-          "imageWidth": 1024,
-          "resizeMode": "cover",
+          "image": "./assets/images/sl_logo.jpg",
+          "imageWidth": 200,
+          "resizeMode": "contain",
           "backgroundColor": "#1a1a1a"
         }
       ]
