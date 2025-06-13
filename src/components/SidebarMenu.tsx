@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image, ScrollView } from 'react-native';
 import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
@@ -191,6 +191,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
         </View>
 
         {/* Menu Items */}
+        <ScrollView>
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (
             <TouchableOpacity
@@ -214,7 +215,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
             </TouchableOpacity>
           ))}
         </View>
-
+        </ScrollView>
         {/* Logout Button */}
         <View style={styles.footer}>
           <TouchableOpacity
