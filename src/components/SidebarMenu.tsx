@@ -112,7 +112,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
     {
       icon: <Settings size={24} color="#fff" />,
       title: 'Friends',
-      subtitle: 'Even the mightiest wizard needs a fellowship',
+      subtitle: 'Every Hero needs a fellowship',
       onPress: () => {
         onClose();
         router.push('/settings');
