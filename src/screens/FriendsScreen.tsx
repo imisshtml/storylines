@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,7 @@ import {
   UserCheck,
   Clock,
   UserX,
+  Key,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
@@ -78,14 +79,17 @@ export default function FriendsScreen() {
   const [, removeFriend] = useAtom(removeFriendAtom);
   const [, sendCampaignInvitation] = useAtom(sendCampaignInvitationAtom);
   const [, respondToCampaignInvitation] = useAtom(respondToCampaignInvitationAtom);
+  const [, setUserSearchResults] = useAtom(userSearchResultsAtom);
 
-  const { showAlert, AlertComponent } = useCustomAlert();
+  const { showAlert, hideAlert } = useCustomAlert();
 
   const [activeTab, setActiveTab] = useState<TabType>('friends');
   const [searchQuery, setSearchQuery] = useState('');
   const [showCampaignInviteModal, setShowCampaignInviteModal] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<Friendship | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const searchInputRef = useRef<TextInput>(null);
+  const sentRef = useRef(false);
 
   useEffect(() => {
     if (user) {
@@ -111,15 +115,35 @@ export default function FriendsScreen() {
   };
 
   const handleSendFriendRequest = async (targetUserId: string) => {
+    if (sentRef.current) {
+      console.log('[handleSendFriendRequest] blocked by sentRef');
+      return;
+    }
+    sentRef.current = true;
+    console.log('[handleSendFriendRequest] called with', targetUserId);
     try {
       setIsLoading(true);
+      console.log('[handleSendFriendRequest] setIsLoading(true)');
       await sendFriendRequest(targetUserId);
+      console.log('[handleSendFriendRequest] sendFriendRequest resolved');
       showAlert('Friend Request Sent', 'Your friend request has been sent successfully!', undefined, 'success');
-      setSearchQuery('');
+      console.log('[handleSendFriendRequest] showAlert called (success)');
+      setTimeout(() => {
+        setSearchQuery('');
+        setUserSearchResults([]);
+        if (searchInputRef.current) {
+          searchInputRef.current.blur();
+        }
+        sentRef.current = false;
+        console.log('[handleSendFriendRequest] setSearchQuery("") and blur input, sentRef reset');
+      }, 1500);
     } catch (error) {
       showAlert('Error', 'Failed to send friend request. Please try again.', undefined, 'error');
+      console.log('[handleSendFriendRequest] showAlert called (error)', error);
+      sentRef.current = false;
     } finally {
       setIsLoading(false);
+      console.log('[handleSendFriendRequest] setIsLoading(false)');
     }
   };
 
@@ -245,10 +269,12 @@ export default function FriendsScreen() {
     >
       <Text style={[styles.tabButtonText, activeTab === tab && styles.activeTabButtonText]}>
         {title}
-        {count !== undefined && count > 0 && (
-          <Text style={styles.tabCount}> ({count})</Text>
-        )}
       </Text>
+      {count !== undefined && count > 0 && (
+        <View style={styles.tabBadge}>
+          <Text style={styles.tabBadgeText}>{count}</Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 
@@ -289,13 +315,13 @@ export default function FriendsScreen() {
                     style={styles.actionButton}
                     onPress={() => handleInviteToCampaign(friend)}
                   >
-                    <Send size={16} color="#4CAF50" />
+                    <Key size={16} color="#4CAF50" />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionButton, styles.dangerButton]}
                     onPress={() => handleRemoveFriend(friend)}
                   >
-                    <Trash2 size={16} color="#ff4444" />
+                    <Trash2 size={16} color="#fff" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -428,14 +454,12 @@ export default function FriendsScreen() {
                 onPress={() => handleRespondToCampaignInvitation(invitation.id, 'accepted')}
               >
                 <Check size={16} color="#fff" />
-                <Text style={styles.actionButtonText}>Accept</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionButton, styles.rejectButton]}
                 onPress={() => handleRespondToCampaignInvitation(invitation.id, 'rejected')}
               >
                 <X size={16} color="#fff" />
-                <Text style={styles.actionButtonText}>Decline</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -449,6 +473,7 @@ export default function FriendsScreen() {
       <View style={styles.searchInputContainer}>
         <Search size={20} color="#666" />
         <TextInput
+          ref={searchInputRef}
           style={styles.searchInput}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -552,8 +577,8 @@ export default function FriendsScreen() {
                 getAvailableCampaigns().map((campaign) => (
                   <TouchableOpacity
                     key={campaign.id}
+                    onPress={() => handleSendCampaignInvite(campaign.uid)}
                     style={styles.campaignOption}
-                    onPress={() => handleSendCampaignInvite(campaign.id)}
                   >
                     <View style={styles.campaignInfo}>
                       <Text style={styles.campaignName}>{campaign.name}</Text>
@@ -567,8 +592,6 @@ export default function FriendsScreen() {
           </View>
         </View>
       </Modal>
-
-      <AlertComponent />
     </SafeAreaView>
   );
 }
@@ -627,9 +650,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontFamily: 'Inter-Bold',
   },
-  tabCount: {
+  tabBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(33, 150, 243, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    zIndex: 1,
+  },
+  tabBadgeText: {
+    color: '#fff',
     fontSize: 12,
     fontFamily: 'Inter-Bold',
+    textAlign: 'center',
   },
   content: {
     flex: 1,
@@ -743,13 +781,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   dangerButton: {
-    backgroundColor: '#ff4444',
+    backgroundColor: '#aa3333',
   },
   acceptButton: {
     backgroundColor: '#4CAF50',
   },
   rejectButton: {
-    backgroundColor: '#ff4444',
+    backgroundColor: '#aa3333',
   },
   addButton: {
     backgroundColor: '#4CAF50',
@@ -923,5 +961,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#888',
+  },
+  dangerButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    marginLeft: 4,
   },
 });

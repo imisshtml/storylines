@@ -4,6 +4,7 @@ import { LogOut, X, User, Settings, Info, UserPlus, Plus, Users, Handshake, Bina
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
+import { friendRequestsReceivedAtom } from '../atoms/friendsAtoms';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.8;
@@ -20,6 +21,8 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
   const [imageError, setImageError] = React.useState(false);
   const slideAnim = React.useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
+  const [friendRequestsReceived] = useAtom(friendRequestsReceivedAtom);
+  const friendRequestCount = friendRequestsReceived.length;
 
   React.useEffect(() => {
     if (isVisible) {
@@ -108,6 +111,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
         onClose();
         router.push('/friends');
       },
+      badge: friendRequestCount > 0 ? friendRequestCount : undefined,
     },
     {
       icon: <User size={24} color="#fff" />,
@@ -192,6 +196,11 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
             >
               <View style={styles.menuIcon}>
                 {item.icon}
+                {item.badge && (
+                  <View style={styles.menuBadge}>
+                    <Text style={styles.menuBadgeText}>{item.badge}</Text>
+                  </View>
+                )}
               </View>
               <View style={styles.menuText}>
                 <Text style={styles.menuTitle}>{item.title}</Text>
@@ -352,5 +361,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Bold',
     color: '#fff',
+  },
+  menuBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(33, 150, 243, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    zIndex: 1,
+  },
+  menuBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    textAlign: 'center',
   },
 });

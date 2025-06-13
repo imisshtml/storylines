@@ -58,11 +58,11 @@ export default function AvatarSelector({
         onAvatarSelect(result.url);
         onClose();
       } else {
-        Alert.alert('Upload Failed', result.error || 'Failed to upload avatar');
+        useCustomAlert.showAlert('Upload Failed', result.error || 'Failed to upload avatar');
       }
     } catch (error) {
       console.error('Error uploading avatar:', error);
-      Alert.alert('Error', 'Failed to upload avatar. Please try again.');
+      useCustomAlert.showAlert('Error', 'Failed to upload avatar. Please try again.');
     } finally {
       setIsUploading(false);
       setUploadProgress('');

@@ -32,7 +32,7 @@ export default function CharacterViewScreen() {
   const [characters] = useAtom(charactersAtom);
   const [campaigns] = useAtom(campaignsAtom);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
-  const { showAlert, AlertComponent } = useCustomAlert();
+  const { showAlert, hideAlert } = useCustomAlert();
   const [character, setCharacter] = useState<Character | null>(null);
   const [isEditingAvatar, setIsEditingAvatar] = useState(false);
   const [isEditingSpells, setIsEditingSpells] = useState(false);
@@ -750,8 +750,6 @@ export default function CharacterViewScreen() {
           </View>
         </View>
       </Modal>
-      
-      <AlertComponent />
     </SafeAreaView>
   );
 }
