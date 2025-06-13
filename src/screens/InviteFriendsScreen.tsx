@@ -505,7 +505,7 @@ export default function InviteFriendsScreen() {
                 <View style={styles.playerRow}>
                   <View style={styles.playerInfo}>
                     {player.id === currentCampaign.owner ? (
-                      <Crown size={16} color="#FFD700" />
+                      <Crown size={20} color="#FFD700" />
                     ) : (
                       <Users size={20} color="#4CAF50" />
                     )}
