@@ -335,23 +335,6 @@ export default function HomeScreen() {
                   <Text style={styles.noCampaignsSubtext}>
                     Create a new campaign or join an existing one!
                   </Text>
-                  <View style={styles.campaignActionButtons}>
-                    <TouchableOpacity
-                      style={styles.createButton}
-                      onPress={handleCreateCampaign}
-                    >
-                      <Plus size={20} color="#fff" />
-                      <Text style={styles.buttonText}>Create Campaign</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.joinButton}
-                      onPress={handleJoinCampaign}
-                    >
-                      <Users size={20} color="#fff" />
-                      <Text style={styles.buttonText}>Join via Code</Text>
-                    </TouchableOpacity>
-                  </View>
                 </View>
               )}
             </ScrollView>
