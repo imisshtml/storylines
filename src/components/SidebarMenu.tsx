@@ -102,7 +102,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
     },
     {
       icon: <User size={24} color="#fff" />,
-      title: 'Profile',
+      title: 'Account & Settings',
       subtitle: 'Manage your account',
       onPress: () => {
         onClose();
@@ -111,8 +111,8 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
     },
     {
       icon: <Settings size={24} color="#fff" />,
-      title: 'Settings',
-      subtitle: 'App preferences',
+      title: 'Friends',
+      subtitle: 'Even the mightiest wizard needs a fellowship',
       onPress: () => {
         onClose();
         router.push('/settings');
