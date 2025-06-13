@@ -16,7 +16,7 @@ export default function FriendsScreen() {
             <TouchableOpacity onPress={handleBack} style={styles.touchable} />
             <ArrowLeft color="#fff" size={24} />
           </View>
-        <Text style={styles.title}>Settings</Text>
+        <Text style={styles.title}>Friends</Text>
       </View>
     </SafeAreaView>
   );
