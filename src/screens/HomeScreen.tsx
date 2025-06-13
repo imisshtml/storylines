@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
   charactersContainer: {
     flex: 0.30,
     paddingBottom: 5,
-    marginBottom:10,
+    marginBottom:5,
   },
   sectionTitle: {
     fontSize: 20,
