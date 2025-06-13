@@ -221,64 +221,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.contentContainer}>
-          <View style={styles.charactersContainer}>
-            <Text style={styles.sectionTitle}>My Characters</Text>
-            {characters.length > 0 ? (
-              <ScrollView
-                style={styles.charactersScrollView}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.charactersScrollContent}
-              >
-                <View style={styles.charactersGrid}>
-                  {characters.map(character => (
-                    <TouchableOpacity
-                      key={character.id}
-                      style={styles.characterCard}
-                      onPress={() => handleCharacterPress(character)}
-                    >
-                      <View style={styles.characterAvatarContainer}>
-                        <Image
-                          source={getCharacterAvatar(character)}
-                          style={styles.characterAvatar}
-                        />
-                        <View style={styles.characterLevelBadge}>
-                          <Star size={12} color="#fff" />
-                          <Text style={styles.characterLevel}>{character.level}</Text>
-                        </View>
-                      </View>
-                      <View style={styles.characterInfo}>
-                        <Text style={styles.characterName} numberOfLines={1}>
-                          {character.name}
-                        </Text>
-                        <Text style={styles.characterClass} numberOfLines={1}>
-                          {character.race} {character.class}
-                        </Text>
-                        <Text style={styles.characterCampaign} numberOfLines={1}>
-                          {getCharacterCampaignName(character)}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-            ) : (
-              <View style={styles.noCharactersContainer}>
-                <Text style={styles.noCharacters}>No characters created yet</Text>
-                <Text style={styles.noCharactersSubtext}>
-                  Create your first character to begin your adventures!
-                </Text>
-                <TouchableOpacity
-                  style={styles.createCharacterButton}
-                  onPress={() => router.push('/creation')}
-                >
-                  <Text style={styles.createCharacterButtonText}>Create Character</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-          </View>
+        
           <View style={styles.campaignsContainer}>
             <Text style={styles.sectionTitle}>My Campaigns</Text>
             <ScrollView style={styles.campaignsScrollView} showsVerticalScrollIndicator={false}>
