@@ -221,7 +221,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        
+        <View style={styles.contentContainer}>
           <View style={styles.campaignsContainer}>
             <Text style={styles.sectionTitle}>My Campaigns</Text>
             <ScrollView style={styles.campaignsScrollView} showsVerticalScrollIndicator={false}>
