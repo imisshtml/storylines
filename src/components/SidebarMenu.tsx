@@ -192,29 +192,29 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
 
         {/* Menu Items */}
         <ScrollView>
-        <View style={styles.menuContainer}>
-          {menuItems.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.menuItem}
-              onPress={item.onPress}
-              activeOpacity={0.7}
-            >
-              <View style={styles.menuIcon}>
-                {item.icon}
-                {item.badge && (
-                  <View style={styles.menuBadge}>
-                    <Text style={styles.menuBadgeText}>{item.badge}</Text>
-                  </View>
-                )}
-              </View>
-              <View style={styles.menuText}>
-                <Text style={styles.menuTitle}>{item.title}</Text>
-                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+          <View style={styles.menuContainer}>
+            {menuItems.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.menuItem}
+                onPress={item.onPress}
+                activeOpacity={0.7}
+              >
+                <View style={styles.menuIcon}>
+                  {item.icon}
+                  {item.badge && (
+                    <View style={styles.menuBadge}>
+                      <Text style={styles.menuBadgeText}>{item.badge}</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.menuText}>
+                  <Text style={styles.menuTitle}>{item.title}</Text>
+                  <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
         </ScrollView>
         {/* Logout Button */}
         <View style={styles.footer}>
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   },
   menuContainer: {
     flex: 1,
-    paddingTop: 20,
+    paddingTop: 10,
   },
   menuItem: {
     flexDirection: 'row',
