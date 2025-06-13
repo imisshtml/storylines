@@ -342,7 +342,7 @@ export default function HomeScreen() {
                       style={styles.createButton}
                       onPress={handleCreateCampaign}
                     >
-                      <Plus size={20} color="#fff" />
+                      
                       <Text style={styles.buttonText}>Create Campaign</Text>
                     </TouchableOpacity>
 
