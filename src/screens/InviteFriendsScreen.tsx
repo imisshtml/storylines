@@ -504,13 +504,14 @@ export default function InviteFriendsScreen() {
               <View key={player.id} style={styles.playerItem}>
                 <View style={styles.playerRow}>
                   <View style={styles.playerInfo}>
-                    <Users size={20} color="#4CAF50" />
+                    {player.id === currentCampaign.owner ? (
+                      <Crown size={16} color="#FFD700" />
+                    ) : (
+                      <Users size={20} color="#4CAF50" />
+                    )}
                     <Text style={styles.playerName}>{player.name || `Player ${index + 1}`}</Text>
                     {player.ready && (
                       <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
-                    )}
-                    {player.id === currentCampaign.owner && (
-                      <Text style={styles.ownerBadge}>DM</Text>
                     )}
                   </View>
 
