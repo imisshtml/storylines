@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
   campaignActionButtons: {
     paddingTop: 20,
     gap: 12,
-    //flexDirection: 'row'
+    flexDirection: 'row'
   },
   charactersGrid: {
     flexDirection: 'row',
