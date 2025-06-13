@@ -45,7 +45,7 @@ export default function CreateCampaignScreen() {
   const [error] = useAtom(campaignsErrorAtom);
   const [, upsertCampaign] = useAtom(upsertCampaignAtom);
   const [user] = useAtom(userAtom);
-  
+
   const [campaignName, setCampaignName] = useState('');
   const [selectedAdventure, setSelectedAdventure] = useState<Adventure | null>(null);
   const [startingLevel, setStartingLevel] = useState('1');
@@ -58,7 +58,8 @@ export default function CreateCampaignScreen() {
   const isEditing = currentCampaign !== null;
 
   useEffect(() => {
-    if (currentCampaign) {
+    if (currentCampaign && isEditing) {
+      // Only populate form if we're editing an existing campaign
       setCampaignName(currentCampaign.name);
       setStartingLevel(currentCampaign.level.toString());
       setSelectedTone(currentCampaign.tone);
@@ -70,8 +71,17 @@ export default function CreateCampaignScreen() {
       if (adventure) {
         setSelectedAdventure(adventure);
       }
+    } else {
+      // Reset form for new campaign
+      setCampaignName('');
+      setStartingLevel('1');
+      setSelectedTone(null);
+      setExcludedTags([]);
+      setContentLevel('adults');
+      setRpFocus('balanced');
+      setSelectedAdventure(null);
     }
-  }, [currentCampaign]);
+  }, [currentCampaign, isEditing]);
 
   const handleBack = () => {
     setCurrentCampaign(null);
@@ -79,8 +89,8 @@ export default function CreateCampaignScreen() {
   };
 
   const toggleTag = (tag: string) => {
-    setExcludedTags(prev => 
-      prev.includes(tag) 
+    setExcludedTags(prev =>
+      prev.includes(tag)
         ? prev.filter(t => t !== tag)
         : [...prev, tag]
     );
@@ -140,13 +150,13 @@ export default function CreateCampaignScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-          <View style={styles.backButton}>
-            <TouchableOpacity onPress={handleBack} style={styles.touchable} />
-            <ArrowLeft color="#fff" size={24} />
-          </View>
+        <View style={styles.backButton}>
+          <TouchableOpacity onPress={handleBack} style={styles.touchable} />
+          <ArrowLeft color="#fff" size={24} />
+        </View>
         <Text style={styles.title}>{isEditing ? 'Edit Campaign' : 'Create New Campaign'}</Text>
       </View>
-      
+
       {error && (
         <View style={styles.errorContainer}>
           <AlertCircle color="#f44336" size={20} />
