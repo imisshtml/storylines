@@ -1,5 +1,6 @@
-import { atom } from 'jotai';
+import { atom , set } from 'jotai';
 import { supabase } from '../config/supabase';
+import { currentCampaignAtom } from './campaignAtoms';
 
 export type Friendship = {
   id: string;
@@ -204,15 +205,20 @@ export const searchUsersAtom = atom(
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const searchPattern = `%${query}%`;
       const { data: users, error } = await supabase
         .from('profiles')
         .select('id, username, email')
         .neq('id', user.id) // Exclude current user
-        .or(`username.ilike.%${query}%,email.ilike.%${query}%`)
+        .or(`username.ilike.${searchPattern},email.ilike.${searchPattern}`)
         .limit(10);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Search error:', error);
+        throw error;
+      }
 
+      console.log('Search results:', users); // Debug log
       set(userSearchResultsAtom, users || []);
     } catch (error) {
       console.error('Error searching users:', error);
@@ -227,8 +233,10 @@ export const searchUsersAtom = atom(
 export const sendFriendRequestAtom = atom(
   null,
   async (get, set, targetUserId: string) => {
+    console.log('[sendFriendRequestAtom] called with targetUserId:', targetUserId);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      console.log('[sendFriendRequestAtom] current user:', user);
       if (!user) throw new Error('Not authenticated');
 
       const { error } = await supabase
@@ -238,13 +246,14 @@ export const sendFriendRequestAtom = atom(
           addressee_id: targetUserId,
           status: 'pending'
         });
-
+      console.log('[sendFriendRequestAtom] insert error:', error);
       if (error) throw error;
 
       // Refresh friend requests sent
-      const { fetchFriendRequestsSentAtom } = await import('./friendsAtoms');
       set(fetchFriendRequestsSentAtom, null);
+      console.log('[sendFriendRequestAtom] friend request sent and atom refreshed');
     } catch (error) {
+      console.error('[sendFriendRequestAtom] error:', error);
       throw error;
     }
   }
@@ -254,19 +263,21 @@ export const sendFriendRequestAtom = atom(
 export const respondToFriendRequestAtom = atom(
   null,
   async (get, set, { friendshipId, response }: { friendshipId: string; response: 'accepted' | 'rejected' }) => {
+    console.log('[respondToFriendRequestAtom] called with', { friendshipId, response });
     try {
       const { error } = await supabase
         .from('friendships')
         .update({ status: response })
         .eq('id', friendshipId);
-
+      console.log('[respondToFriendRequestAtom] update error:', error);
       if (error) throw error;
 
       // Refresh all friend data
-      const { fetchFriendsAtom, fetchFriendRequestsReceivedAtom } = await import('./friendsAtoms');
       set(fetchFriendsAtom, null);
       set(fetchFriendRequestsReceivedAtom, null);
+      console.log('[respondToFriendRequestAtom] friend data refreshed');
     } catch (error) {
+      console.error('[respondToFriendRequestAtom] error:', error);
       throw error;
     }
   }
@@ -297,8 +308,10 @@ export const removeFriendAtom = atom(
 export const sendCampaignInvitationAtom = atom(
   null,
   async (get, set, { campaignId, friendId }: { campaignId: string; friendId: string }) => {
+    console.log('[sendCampaignInvitationAtom] called with', { campaignId, friendId });
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      console.log('[sendCampaignInvitationAtom] current user:', user);
       if (!user) throw new Error('Not authenticated');
 
       const { error } = await supabase
@@ -308,9 +321,10 @@ export const sendCampaignInvitationAtom = atom(
           inviter_id: user.id,
           invitee_id: friendId
         });
-
+      console.log('[sendCampaignInvitationAtom] insert error:', error);
       if (error) throw error;
     } catch (error) {
+      console.error('[sendCampaignInvitationAtom] error:', error);
       throw error;
     }
   }
@@ -320,54 +334,55 @@ export const sendCampaignInvitationAtom = atom(
 export const respondToCampaignInvitationAtom = atom(
   null,
   async (get, set, { invitationId, response }: { invitationId: string; response: 'accepted' | 'rejected' }) => {
+    console.log('[respondToCampaignInvitationAtom] called with', { invitationId, response });
     try {
       const { error } = await supabase
         .from('campaign_invitations')
         .update({ status: response })
         .eq('id', invitationId);
-
+      console.log('[respondToCampaignInvitationAtom] update error:', error);
       if (error) throw error;
 
       if (response === 'accepted') {
         // Get the campaign invitation details
         const { data: invitation, error: invitationError } = await supabase
           .from('campaign_invitations')
-          .select(`
-            campaign_id,
-            campaign:campaigns(*)
-          `)
+          .select(`campaign_id, campaign:campaigns(*)`)
           .eq('id', invitationId)
           .single();
-
         if (invitationError) throw invitationError;
 
         if (invitation?.campaign) {
-          // Add user to campaign players
+          // Add user to campaign players (if not already present)
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) throw new Error('Not authenticated');
 
           const currentPlayers = invitation.campaign.players || [];
-          const newPlayer = {
-            id: user.id,
-            name: user.username || user.email || 'Player',
-            ready: false,
-          };
-
-          const updatedPlayers = [...currentPlayers, newPlayer];
-
-          const { error: campaignError } = await supabase
-            .from('campaigns')
-            .update({ players: updatedPlayers })
-            .eq('id', invitation.campaign_id);
-
-          if (campaignError) throw campaignError;
+          const alreadyIn = currentPlayers.some((p: any) => p.id === user.id);
+          let updatedPlayers = currentPlayers;
+          if (!alreadyIn) {
+            const newPlayer = {
+              id: user.id,
+              name: user.user_metadata?.username || user.email || 'Player',
+              ready: false,
+            };
+            updatedPlayers = [...currentPlayers, newPlayer];
+            const { error: campaignError } = await supabase
+              .from('campaigns')
+              .update({ players: updatedPlayers })
+              .eq('uid', invitation.campaign.uid);
+            if (campaignError) throw campaignError;
+          }
+          // Set current campaign in atom (for /invite screen)
+          set(currentCampaignAtom, { ...invitation.campaign, players: updatedPlayers });
         }
       }
 
       // Refresh campaign invitations
-      const { fetchCampaignInvitationsAtom } = await import('./friendsAtoms');
       set(fetchCampaignInvitationsAtom, null);
+      console.log('[respondToCampaignInvitationAtom] campaign invitation handled');
     } catch (error) {
+      console.error('[respondToCampaignInvitationAtom] error:', error);
       throw error;
     }
   }

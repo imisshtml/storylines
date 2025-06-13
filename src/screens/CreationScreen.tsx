@@ -80,7 +80,7 @@ const POINT_BUY_TOTAL = 27;
 export default function CreationScreen() {
   const [user] = useAtom(userAtom);
   const [currentStep, setCurrentStep] = useAtom(characterCreationStepAtom);
-  const { showAlert, AlertComponent } = useCustomAlert();
+  const { showAlert, hideAlert } = useCustomAlert();
   const [characterName, setCharacterName] = useAtom(characterNameAtom);
   const [selectedRace, setSelectedRace] = useAtom(selectedRaceAtom);
   const [selectedClass, setSelectedClass] = useAtom(selectedClassAtom);
@@ -1559,8 +1559,6 @@ export default function CreationScreen() {
           </View>
         </View>
       </Modal>
-
-      <AlertComponent />
     </SafeAreaView>
   );
 }

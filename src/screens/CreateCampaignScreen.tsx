@@ -13,11 +13,16 @@ type RPFocus = 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heav
 
 const contentTags = [
   'Gore',
-  'Betrayal',
   'Horror',
-  'Violence',
+  'Abuse',
   'Death',
+  'Rituals',
   'Romance',
+  'Betrayal',
+  'Drug Use',
+  'Violence',
+  'Self-harm',
+  'Mental Health',
 ];
 
 const rpFocusLabels: Record<RPFocus, string> = {
@@ -179,7 +184,7 @@ export default function CreateCampaignScreen() {
           )}
         </View>
 
-        <View style={styles.section}>
+        {false && (<View style={styles.section}>
           <Text style={styles.label}>Starting Level</Text>
           <TextInput
             style={styles.input}
@@ -189,7 +194,7 @@ export default function CreateCampaignScreen() {
             placeholder="Enter starting level"
             placeholderTextColor="#666"
           />
-        </View>
+        </View>)}
 
         <View style={styles.section}>
           <Text style={styles.label}>Campaign Tone</Text>
@@ -265,6 +270,9 @@ export default function CreateCampaignScreen() {
 
         <View style={styles.section}>
           <Text style={styles.label}>Content to Exclude</Text>
+          <Text style={styles.contentLevelDescription}>
+            Dark Realms content—such as sexual themes, religious extremism, or real-world hate—are banished from our adventures.
+          </Text>
           <View style={styles.tagsContainer}>
             {contentTags.map(tag => (
               <TouchableOpacity
@@ -508,7 +516,7 @@ const styles = StyleSheet.create({
   contentLevelDescription: {
     color: '#999',
     fontSize: 14,
-    marginTop: 8,
+    marginTop: 0,
     fontFamily: 'Inter-Regular',
   },
   rpFocusContainer: {

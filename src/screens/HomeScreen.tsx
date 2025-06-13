@@ -34,7 +34,7 @@ export default function HomeScreen() {
   const [user] = useAtom(userAtom);
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
-  const { showAlert, AlertComponent } = useCustomAlert();
+  const { showAlert, hideAlert } = useCustomAlert();
 
   // Fetch characters and read status when component mounts or user changes
   useEffect(() => {
@@ -212,44 +212,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Campaign Invitations Banner */}
-        {campaignInvitations.length > 0 && (
-          <View style={styles.invitationsBanner}>
-            <View style={styles.invitationsHeader}>
-              <Bell size={20} color="#FFD700" />
-              <Text style={styles.invitationsTitle}>
-                Campaign Invitation{campaignInvitations.length > 1 ? 's' : ''}
-              </Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {campaignInvitations.map((invitation) => (
-                <View key={invitation.id} style={styles.invitationCard}>
-                  <Text style={styles.invitationCampaignName}>
-                    {invitation.campaign?.name}
-                  </Text>
-                  <Text style={styles.invitationFrom}>
-                    From {invitation.inviter_profile?.username}
-                  </Text>
-                  <View style={styles.invitationActions}>
-                    <TouchableOpacity
-                      style={styles.acceptInvitationButton}
-                      onPress={() => handleAcceptCampaignInvitation(invitation.id)}
-                    >
-                      <Text style={styles.invitationButtonText}>Accept</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.declineInvitationButton}
-                      onPress={() => handleDeclineCampaignInvitation(invitation.id)}
-                    >
-                      <Text style={styles.invitationButtonText}>Decline</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
         <View style={styles.contentContainer}>
           <View style={styles.charactersContainer}>
             <Text style={styles.sectionTitle}>My Characters</Text>
@@ -311,6 +273,43 @@ export default function HomeScreen() {
           <View style={styles.campaignsContainer}>
             <Text style={styles.sectionTitle}>My Campaigns</Text>
             <ScrollView style={styles.campaignsScrollView} showsVerticalScrollIndicator={false}>
+               {/* Campaign Invitations Banner */}
+                {campaignInvitations.length > 0 && (
+                  <View style={styles.invitationsBanner}>
+                    <View style={styles.invitationsHeader}>
+                      <Bell size={20} color="#FFD700" />
+                      <Text style={styles.invitationsTitle}>
+                        Campaign Invitation{campaignInvitations.length > 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {campaignInvitations.map((invitation) => (
+                        <View key={invitation.id} style={styles.invitationCard}>
+                          <Text style={styles.invitationCampaignName}>
+                            {invitation.campaign?.name}
+                          </Text>
+                          <Text style={styles.invitationFrom}>
+                            From {invitation.inviter_profile?.username}
+                          </Text>
+                          <View style={styles.invitationActions}>
+                            <TouchableOpacity
+                              style={styles.acceptInvitationButton}
+                              onPress={() => handleAcceptCampaignInvitation(invitation.id)}
+                            >
+                              <Text style={styles.invitationButtonText}>Accept</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.declineInvitationButton}
+                              onPress={() => handleDeclineCampaignInvitation(invitation.id)}
+                            >
+                              <Text style={styles.invitationButtonText}>Decline</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
               {campaigns
                 .filter(campaign => 
                   // Double-check: only show campaigns where user is owner or player
@@ -418,8 +417,6 @@ export default function HomeScreen() {
         isVisible={isJoinModalVisible}
         onClose={() => setIsJoinModalVisible(false)}
       />
-
-      <AlertComponent />
     </ImageBackground>
   );
 }
@@ -478,13 +475,13 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   invitationsBanner: {
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    backgroundColor: 'rgba(0, 215, 0, 0.1)',
     borderRadius: 12,
     padding: 16,
-    marginHorizontal: 20,
+    marginHorizontal: 0,
     marginBottom: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#FFD700',
+    borderLeftColor: '#00ff18',
   },
   invitationsHeader: {
     flexDirection: 'row',

@@ -22,7 +22,7 @@ export default function ProfileScreen() {
   const [user] = useAtom(userAtom);
   const [campaigns] = useAtom(campaignsAtom);
   const [, signOut] = useAtom(signOutAtom);
-  const { showAlert, AlertComponent } = useCustomAlert();
+  const { showAlert, hideAlert } = useCustomAlert();
   
   // Settings state
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -326,8 +326,6 @@ export default function ProfileScreen() {
         {/* Bottom spacing */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
-
-      <AlertComponent />
     </SafeAreaView>
   );
 }
