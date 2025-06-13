@@ -16,7 +16,7 @@ import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
-import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, X, Plus } from 'lucide-react-native';
+import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, X, Plus, Crown } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as SMS from 'expo-sms';
