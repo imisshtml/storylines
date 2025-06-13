@@ -1,15 +1,15 @@
 import { router } from 'expo-router';
-import { Play, Users, Settings, Menu, Crown, UserCheck, Star, Circle, Bell } from 'lucide-react-native';
+import { Play, Users, Settings, Menu, Crown, UserCheck, Star, Circle, Bell, Plus } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, ScrollView, Image } from 'react-native';
 import { useAtom } from 'jotai';
 import { campaignsAtom, currentCampaignAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
-import { 
-  fetchCampaignReadStatusAtom, 
+import {
+  fetchCampaignReadStatusAtom,
   updateCampaignReadStatusAtom,
-  initializeCampaignReadStatusRealtimeAtom 
+  initializeCampaignReadStatusRealtimeAtom
 } from '../atoms/campaignReadStatusAtoms';
 import {
   campaignInvitationsAtom,
@@ -52,7 +52,7 @@ export default function HomeScreen() {
     const campaign = campaigns.find(c => c.id === campaignId);
     if (campaign) {
       setCurrentCampaign(campaign);
-      
+
       // Mark campaign as read when entering it
       if (campaign.latest_message_id) {
         try {
@@ -64,7 +64,7 @@ export default function HomeScreen() {
           console.error('Error updating read status:', error);
         }
       }
-      
+
       if (campaign.status === 'creation') {
         router.push('/invite');
       } else {
@@ -132,10 +132,19 @@ export default function HomeScreen() {
     }
   };
 
+  const handleCreateCampaign = () => {
+    // Clear current campaign data to ensure new campaign starts fresh
+    setCurrentCampaign(null);
+    // Small delay to ensure state is cleared before navigation
+    setTimeout(() => {
+      router.push('/create');
+    }, 50);
+  };
+
   const getCharacterAvatar = (character: Character) => {
     // Try to get avatar from character_data
     const avatarUrl = character.character_data?.avatar;
-    
+
     if (avatarUrl && typeof avatarUrl === 'string') {
       // Check if it's a default avatar reference
       if (avatarUrl.startsWith('default:')) {
@@ -144,11 +153,11 @@ export default function HomeScreen() {
         const defaultAvatar = getAvatarById(avatarId);
         return defaultAvatar ? defaultAvatar.imagePath : require('../data/defaultAvatars').DEFAULT_AVATARS[0].imagePath;
       }
-      
+
       // Return URL as-is for uploaded images
       return { uri: avatarUrl };
     }
-    
+
     // Fallback to first default avatar
     const { DEFAULT_AVATARS } = require('../data/defaultAvatars');
     return DEFAULT_AVATARS[0].imagePath;
@@ -176,12 +185,12 @@ export default function HomeScreen() {
 
   // Check if user is currently in any active campaigns
   const isInActiveCampaign = () => {
-    return campaigns.some(campaign => 
-      // Only check campaigns that the user should legitimately have access to
-      (
-        isOwner(campaign) || 
-        (campaign.players && campaign.players.some((player: any) => player.id === user?.id))
-      )
+    return campaigns.some(campaign =>
+    // Only check campaigns that the user should legitimately have access to
+    (
+      isOwner(campaign) ||
+      (campaign.players && campaign.players.some((player: any) => player.id === user?.id))
+    )
     );
   };
 
@@ -215,60 +224,60 @@ export default function HomeScreen() {
         <View style={styles.contentContainer}>
           <View style={styles.charactersContainer}>
             <Text style={styles.sectionTitle}>My Characters</Text>
-              {characters.length > 0 ? (
-                <ScrollView 
-                  style={styles.charactersScrollView} 
-                  horizontal={true}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.charactersScrollContent}
-                >
-                  <View style={styles.charactersGrid}>
-                    {characters.map(character => (
-                      <TouchableOpacity
-                        key={character.id}
-                        style={styles.characterCard}
-                        onPress={() => handleCharacterPress(character)}
-                      >
-                        <View style={styles.characterAvatarContainer}>
-                          <Image
-                            source={getCharacterAvatar(character)}
-                            style={styles.characterAvatar}
-                          />
-                          <View style={styles.characterLevelBadge}>
-                            <Star size={12} color="#fff" />
-                            <Text style={styles.characterLevel}>{character.level}</Text>
-                          </View>
+            {characters.length > 0 ? (
+              <ScrollView
+                style={styles.charactersScrollView}
+                horizontal={true}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.charactersScrollContent}
+              >
+                <View style={styles.charactersGrid}>
+                  {characters.map(character => (
+                    <TouchableOpacity
+                      key={character.id}
+                      style={styles.characterCard}
+                      onPress={() => handleCharacterPress(character)}
+                    >
+                      <View style={styles.characterAvatarContainer}>
+                        <Image
+                          source={getCharacterAvatar(character)}
+                          style={styles.characterAvatar}
+                        />
+                        <View style={styles.characterLevelBadge}>
+                          <Star size={12} color="#fff" />
+                          <Text style={styles.characterLevel}>{character.level}</Text>
                         </View>
-                        <View style={styles.characterInfo}>
-                          <Text style={styles.characterName} numberOfLines={1}>
-                            {character.name}
-                          </Text>
-                          <Text style={styles.characterClass} numberOfLines={1}>
-                            {character.race} {character.class}
-                          </Text>
-                          <Text style={styles.characterCampaign} numberOfLines={1}>
-                            {getCharacterCampaignName(character)}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-              ) : (
-                <View style={styles.noCharactersContainer}>
-                  <Text style={styles.noCharacters}>No characters created yet</Text>
-                  <Text style={styles.noCharactersSubtext}>
-                    Create your first character to begin your adventures!
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.createCharacterButton}
-                    onPress={() => router.push('/creation')}
-                  >
-                    <Text style={styles.createCharacterButtonText}>Create Character</Text>
-                  </TouchableOpacity>
+                      </View>
+                      <View style={styles.characterInfo}>
+                        <Text style={styles.characterName} numberOfLines={1}>
+                          {character.name}
+                        </Text>
+                        <Text style={styles.characterClass} numberOfLines={1}>
+                          {character.race} {character.class}
+                        </Text>
+                        <Text style={styles.characterCampaign} numberOfLines={1}>
+                          {getCharacterCampaignName(character)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              )}
-            
+              </ScrollView>
+            ) : (
+              <View style={styles.noCharactersContainer}>
+                <Text style={styles.noCharacters}>No characters created yet</Text>
+                <Text style={styles.noCharactersSubtext}>
+                  Create your first character to begin your adventures!
+                </Text>
+                <TouchableOpacity
+                  style={styles.createCharacterButton}
+                  onPress={() => router.push('/creation')}
+                >
+                  <Text style={styles.createCharacterButtonText}>Create Character</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
           </View>
           <View style={styles.campaignsContainer}>
             <Text style={styles.sectionTitle}>My Campaigns</Text>
@@ -311,72 +320,72 @@ export default function HomeScreen() {
                   </View>
                 )}
               {campaigns
-                .filter(campaign => 
+                .filter(campaign =>
                   // Double-check: only show campaigns where user is owner or player
-                  isOwner(campaign) || 
+                  isOwner(campaign) ||
                   (campaign.players && campaign.players.some((player: any) => player.id === user?.id))
                 )
                 .map(campaign => (
-                <View key={campaign.id} style={styles.campaignCard}>
-                  {/* Notification dot positioned absolutely in top-right corner */}
-                  {campaign.has_unread && (
-                    <View style={styles.notificationDot}>
-                      <Circle size={8} color="#4CAF50" fill="#4CAF50" />
-                    </View>
-                  )}
-                  
-                  <View style={styles.campaignHeader}>
-                    <View style={styles.campaignTitleRow}>
-                      <Text style={styles.campaignTitle}>{campaign.name}</Text>
-                      <View style={styles.roleContainer}>
-                        {isOwner(campaign) ? (
-                          <Crown size={16} color="#FFD700" />
-                        ) : (
-                          <UserCheck size={16} color="#4CAF50" />
-                        )}
-                        <Text style={[
-                          styles.roleText,
-                          isOwner(campaign) ? styles.ownerText : styles.playerText
-                        ]}>
-                          {getUserRole(campaign)}
-                        </Text>
+                  <View key={campaign.id} style={styles.campaignCard}>
+                    {/* Notification dot positioned absolutely in top-right corner */}
+                    {campaign.has_unread && (
+                      <View style={styles.notificationDot}>
+                        <Circle size={8} color="#4CAF50" fill="#4CAF50" />
                       </View>
+                    )}
+
+                    <View style={styles.campaignHeader}>
+                      <View style={styles.campaignTitleRow}>
+                        <Text style={styles.campaignTitle}>{campaign.name}</Text>
+                        <View style={styles.roleContainer}>
+                          {isOwner(campaign) ? (
+                            <Crown size={16} color="#FFD700" />
+                          ) : (
+                            <UserCheck size={16} color="#4CAF50" />
+                          )}
+                          <Text style={[
+                            styles.roleText,
+                            isOwner(campaign) ? styles.ownerText : styles.playerText
+                          ]}>
+                            {getUserRole(campaign)}
+                          </Text>
+                        </View>
+                      </View>
+                      {campaign.status === 'creation' && isOwner(campaign) && (
+                        <TouchableOpacity
+                          style={styles.settingsButton}
+                          onPress={() => handleSettingsPress(campaign.id)}
+                        >
+                          <Settings size={20} color="#888" />
+                        </TouchableOpacity>
+                      )}
                     </View>
-                    {campaign.status === 'creation' && isOwner(campaign) && (
-                      <TouchableOpacity
-                        style={styles.settingsButton}
-                        onPress={() => handleSettingsPress(campaign.id)}
-                      >
-                        <Settings size={20} color="#888" />
-                      </TouchableOpacity>
-                    )}
+                    <Text style={styles.campaignDetails}>
+                      {campaign.status === 'creation'
+                        ? 'In Creation'
+                        : `Players: ${campaign.players.length} • ${campaign.status === 'waiting' ? 'Waiting' : 'In Progress'}`
+                      }
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.continueButton}
+                      onPress={() => handleCampaignPress(campaign.id)}
+                    >
+                      {campaign.status === 'creation' ? (
+                        <>
+                          <Users size={20} color="#fff" />
+                          <Text style={styles.buttonText}>
+                            {isOwner(campaign) ? 'Invite Friends' : 'Waiting for Start'}
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <Play size={20} color="#fff" />
+                          <Text style={styles.buttonText}>Continue Story</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
                   </View>
-                  <Text style={styles.campaignDetails}>
-                    {campaign.status === 'creation'
-                      ? 'In Creation'
-                      : `Players: ${campaign.players.length} • ${campaign.status === 'waiting' ? 'Waiting' : 'In Progress'}`
-                    }
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.continueButton}
-                    onPress={() => handleCampaignPress(campaign.id)}
-                  >
-                    {campaign.status === 'creation' ? (
-                      <>
-                        <Users size={20} color="#fff" />
-                        <Text style={styles.buttonText}>
-                          {isOwner(campaign) ? 'Invite Friends' : 'Waiting for Start'}
-                        </Text>
-                      </>
-                    ) : (
-                      <>
-                        <Play size={20} color="#fff" />
-                        <Text style={styles.buttonText}>Continue Story</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              ))}
+                ))}
 
               {campaigns.length === 0 && (
                 <View style={styles.noCampaignsContainer}>
@@ -387,8 +396,9 @@ export default function HomeScreen() {
                   <View style={styles.campaignActionButtons}>
                     <TouchableOpacity
                       style={styles.createButton}
-                      onPress={() => router.push('/create')}
+                      onPress={handleCreateCampaign}
                     >
+                      <Plus size={20} color="#fff" />
                       <Text style={styles.buttonText}>Create Campaign</Text>
                     </TouchableOpacity>
 
