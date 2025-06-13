@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image } from 'react-native';
-import { LogOut, X, User, Settings, Info, UserPlus, Plus, Users } from 'lucide-react-native';
+import { LogOut, X, User, Settings, Info, UserPlus, Plus, Users, Handshake } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
@@ -101,7 +101,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       },
     },
     {
-      icon: <Settings size={24} color="#fff" />,
+      icon: <Handshake size={24} color="#fff" />,
       title: 'Friends',
       subtitle: 'Every Hero needs a fellowship',
       onPress: () => {
