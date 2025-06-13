@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View, SafeAreaView } from 'react-native';
 import { useAtom } from 'jotai';
 
-export default function FriendsScreen() {
+export default function ShopScreen() {
   const handleBack = () => {
     router.push('/');
   };
@@ -16,7 +16,7 @@ export default function FriendsScreen() {
             <TouchableOpacity onPress={handleBack} style={styles.touchable} />
             <ArrowLeft color="#fff" size={24} />
           </View>
-        <Text style={styles.title}>Friends</Text>
+        <Text style={styles.title}>Shop</Text>
       </View>
     </SafeAreaView>
   );
