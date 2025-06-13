@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image } from 'react-native';
-import { LogOut, X, User, Settings, Info, UserPlus, Plus, Users, Handshake } from 'lucide-react-native';
+import { LogOut, X, User, Settings, Info, UserPlus, Plus, Users, Handshake, Binary } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
@@ -86,7 +86,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       onPress: handleCreateCampaign,
     },
     {
-      icon: <Users size={24} color="#fff" />,
+      icon: <Binary size={24} color="#fff" />,
       title: 'Join via Code',
       subtitle: 'Join an existing campaign',
       onPress: handleJoinCampaign,
