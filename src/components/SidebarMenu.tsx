@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   },
   menuContainer: {
     flex: 1,
-    paddingTop: 10,
+    paddingTop: 0,
   },
   menuItem: {
     flexDirection: 'row',
