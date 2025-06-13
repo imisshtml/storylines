@@ -16,7 +16,7 @@ import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
-import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, X, Plus } from 'lucide-react-native';
+import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, X, Plus, Crown } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as SMS from 'expo-sms';
@@ -365,7 +365,7 @@ export default function InviteFriendsScreen() {
   }, [user, currentCampaign]);
 
   // Determine minimum players required (assuming 2 is minimum)
-  const minimumPlayers = 2;
+  const minimumPlayers = 1;
   const hasEnoughPlayers = currentCampaign ? currentCampaign.players.length >= minimumPlayers : false;
 
   // Determine button state and text
@@ -495,7 +495,7 @@ export default function InviteFriendsScreen() {
 
       <View style={styles.playersContainer}>
         <Text style={styles.playersLabel}>
-          Players ({currentCampaign.players.length}/{minimumPlayers} minimum)
+          Players
         </Text>
         <Text style={styles.realtimeIndicator}>
           Updates automatically when players join
@@ -510,13 +510,14 @@ export default function InviteFriendsScreen() {
               <View key={player.id} style={styles.playerItem}>
                 <View style={styles.playerRow}>
                   <View style={styles.playerInfo}>
-                    <Users size={20} color="#4CAF50" />
+                    {player.id === currentCampaign.owner ? (
+                      <Crown size={20} color="#FFD700" />
+                    ) : (
+                      <Users size={20} color="#4CAF50" />
+                    )}
                     <Text style={styles.playerName}>{player.name || `Player ${index + 1}`}</Text>
                     {player.ready && (
                       <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
-                    )}
-                    {player.id === currentCampaign.owner && (
-                      <Text style={styles.ownerBadge}>DM</Text>
                     )}
                   </View>
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -39,7 +39,7 @@ export const CustomAlert: React.FC<CustomAlertProps> = ({
       case 'success':
         return <CheckCircle size={24} color="#4CAF50" />;
       case 'error':
-        return <XCircle size={24} color="#ff4444" />;
+        return <XCircle size={24} color="#aa3333" />;
       case 'warning':
         return <AlertTriangle size={24} color="#FFA726" />;
       default:
@@ -52,7 +52,7 @@ export const CustomAlert: React.FC<CustomAlertProps> = ({
       case 'success':
         return '#4CAF50';
       case 'error':
-        return '#ff4444';
+        return '#aa3333';
       case 'warning':
         return '#FFA726';
       default:
@@ -126,9 +126,20 @@ export const CustomAlert: React.FC<CustomAlertProps> = ({
   );
 };
 
-// Hook for easier usage
-export const useCustomAlert = () => {
-  const [alertState, setAlertState] = React.useState<{
+// Context for global alert
+const CustomAlertContext = createContext<{
+  showAlert: (
+    title: string,
+    message?: string,
+    buttons?: CustomAlertButton[],
+    type?: 'success' | 'error' | 'warning' | 'info',
+    loading?: boolean
+  ) => void;
+  hideAlert: () => void;
+} | undefined>(undefined);
+
+export const CustomAlertProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [alertState, setAlertState] = useState<{
     visible: boolean;
     title: string;
     message?: string;
@@ -140,7 +151,7 @@ export const useCustomAlert = () => {
     title: '',
   });
 
-  const showAlert = (
+  const showAlert = useCallback((
     title: string,
     message?: string,
     buttons?: CustomAlertButton[],
@@ -155,24 +166,24 @@ export const useCustomAlert = () => {
       type,
       loading,
     });
-  };
+  }, []);
 
-  const hideAlert = () => {
+  const hideAlert = useCallback(() => {
     setAlertState(prev => ({ ...prev, visible: false }));
-  };
+  }, []);
 
-  const AlertComponent = () => (
-    <CustomAlert
-      {...alertState}
-      onRequestClose={hideAlert}
-    />
+  return (
+    <CustomAlertContext.Provider value={{ showAlert, hideAlert }}>
+      {children}
+      <CustomAlert {...alertState} onRequestClose={hideAlert} />
+    </CustomAlertContext.Provider>
   );
+};
 
-  return {
-    showAlert,
-    hideAlert,
-    AlertComponent,
-  };
+export const useCustomAlert = () => {
+  const ctx = useContext(CustomAlertContext);
+  if (!ctx) throw new Error('useCustomAlert must be used within a CustomAlertProvider');
+  return ctx;
 };
 
 const styles = StyleSheet.create({
@@ -242,7 +253,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
   },
   destructiveButton: {
-    backgroundColor: '#ff4444',
+    backgroundColor: '#aa3333',
   },
   buttonText: {
     fontSize: 16,
