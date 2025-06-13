@@ -72,25 +72,40 @@ export default function InviteFriendsScreen() {
   useEffect(() => {
     if (!currentCampaign || !user) return;
 
-    // Create a unique channel name with timestamp to avoid conflicts
-    const channelName = `campaign-${currentCampaign.id}-${Date.now()}`;
-
-    // Remove any existing channel with the same name first
-    supabase.removeAllChannels();
+    const channelName = `invite-screen-${currentCampaign.id}-${Date.now()}`;
 
     const subscription = supabase
-      .channel(channelName)
+      .channel(channelName, {
+        config: {
+          broadcast: { self: false },
+          presence: { key: user.id },
+        },
+      })
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'campaigns',
           filter: `id=eq.${currentCampaign.id}`,
         },
         (payload) => {
           if (payload.new) {
-            setCurrentCampaign(payload.new as any);
+            setTimeout(async () => {
+              try {
+                const { data: freshCampaign, error } = await supabase
+                  .from('campaigns')
+                  .select('*')
+                  .eq('id', currentCampaign.id)
+                  .single();
+
+                if (!error && freshCampaign) {
+                  setCurrentCampaign(freshCampaign as any);
+                }
+              } catch (error) {
+                console.error('Error updating campaign from real-time:', error);
+              }
+            }, 100);
           }
         }
       )
@@ -100,37 +115,28 @@ export default function InviteFriendsScreen() {
           event: '*',
           schema: 'public',
           table: 'characters',
+          filter: `campaign_id=eq.${currentCampaign.uid}`,
         },
         (payload) => {
-          const newCharacter = payload.new as any;
-          const oldCharacter = payload.old as any;
-
-          if (
-            (newCharacter && newCharacter.campaign_id === currentCampaign.uid) ||
-            (oldCharacter && oldCharacter.campaign_id === currentCampaign.uid)
-          ) {
-            fetchCharactersRef.current();
+          setTimeout(() => {
             fetchCampaignCharactersRef.current();
-          }
+          }, 100);
         }
       )
       .subscribe();
 
     return () => {
-      // Proper cleanup: unsubscribe and remove the channel
       const cleanup = async () => {
         try {
           await subscription.unsubscribe();
-          // Remove the channel from Supabase's internal state
           supabase.removeChannel(subscription);
         } catch (error) {
           console.error('Error during subscription cleanup:', error);
         }
       };
       cleanup();
-      supabase.removeChannel(subscription);
     };
-  }, [currentCampaign?.id, currentCampaign?.uid, user?.id, fetchCharacters, setCurrentCampaign, fetchCampaignCharacters]);
+  }, [currentCampaign?.id, user?.id, setCurrentCampaign]);
 
   const checkSmsAvailability = async () => {
     const isAvailable = await SMS.isAvailableAsync();
@@ -324,7 +330,7 @@ export default function InviteFriendsScreen() {
   const handleCreateCharacter = () => {
     // Close the character selector modal first
     setShowCharacterSelector(null);
-    
+
     // Store the current campaign in a way that the creation flow can access it
     // We'll use router params to pass the campaign info
     router.push({
