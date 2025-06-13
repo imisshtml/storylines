@@ -756,6 +756,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     flexDirection: 'row',
+    justifyContent: 'center',
   },
   joinButton: {
     backgroundColor: 'rgba(33, 150, 243, 0.9)',
