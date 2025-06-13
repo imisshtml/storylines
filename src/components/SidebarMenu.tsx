@@ -94,7 +94,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
     {
       icon: <UserPlus size={24} color="#fff" />,
       title: 'Create Character',
-      subtitle: 'Build a new D&D character',
+      subtitle: 'Build a new 5e character',
       onPress: () => {
         onClose();
         router.push('/creation');
