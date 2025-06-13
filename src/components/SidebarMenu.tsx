@@ -115,7 +115,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       subtitle: 'Every Hero needs a fellowship',
       onPress: () => {
         onClose();
-        router.push('/settings');
+        router.push('/friends');
       },
     },
     {
