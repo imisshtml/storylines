@@ -101,21 +101,21 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       },
     },
     {
-      icon: <User size={24} color="#fff" />,
-      title: 'Account & Settings',
-      subtitle: 'Manage your account',
-      onPress: () => {
-        onClose();
-        router.push('/profile');
-      },
-    },
-    {
       icon: <Settings size={24} color="#fff" />,
       title: 'Friends',
       subtitle: 'Every Hero needs a fellowship',
       onPress: () => {
         onClose();
         router.push('/friends');
+      },
+    },
+    {
+      icon: <User size={24} color="#fff" />,
+      title: 'Account & Settings',
+      subtitle: 'Manage your account',
+      onPress: () => {
+        onClose();
+        router.push('/profile');
       },
     },
     {
