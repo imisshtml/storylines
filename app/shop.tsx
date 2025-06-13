@@ -1,6 +1,6 @@
 import React from 'react';
-import ProfileScreen from '../src/screens/ProfileScreen';
+import ShopScreen from '../src/screens/ShopScreen';
 
-export default function Profile() {
-  return <ProfileScreen />;
+export default function Shop() {
+  return <ShopScreen />;
 }
