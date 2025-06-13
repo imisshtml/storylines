@@ -4,6 +4,7 @@ import { LogOut, X, User, Settings, Info, UserPlus, Plus, Users } from 'lucide-r
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
+import { currentCampaignAtom } from '../atoms/campaignAtoms';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.8;
@@ -17,6 +18,7 @@ interface SidebarMenuProps {
 export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: SidebarMenuProps) {
   const [user] = useAtom(userAtom);
   const [, signOut] = useAtom(signOutAtom);
+  const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [imageError, setImageError] = React.useState(false);
   const slideAnim = React.useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
@@ -68,7 +70,10 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
 
   const handleCreateCampaign = () => {
     onClose();
-    router.push('/create');
+    setCurrentCampaign(null);
+    setTimeout(() => {
+      router.push('/create');
+    }, 50);
   };
 
   const handleJoinCampaign = () => {
@@ -134,13 +139,13 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
   return (
     <View style={styles.container}>
       {/* Overlay */}
-      <Animated.View 
+      <Animated.View
         style={[
           styles.overlay,
           { opacity: overlayOpacity }
         ]}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.overlayTouchable}
           onPress={onClose}
           activeOpacity={1}
@@ -148,7 +153,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       </Animated.View>
 
       {/* Sidebar */}
-      <Animated.View 
+      <Animated.View
         style={[
           styles.sidebar,
           { transform: [{ translateX: slideAnim }] }
@@ -159,7 +164,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <X size={24} color="#fff" />
           </TouchableOpacity>
-          
+
           <View style={styles.userInfo}>
             <View style={styles.avatar}>
               {!imageError ? (

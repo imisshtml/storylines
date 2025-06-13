@@ -70,9 +70,16 @@ export default function StoryScreen() {
     fetchCampaignHistory(currentCampaign.uid);
 
     // Initialize real-time subscription
-    initializeRealtimeSubscription(currentCampaign.uid).then(unsubscribe => {
-      realtimeUnsubscribeRef.current = unsubscribe;
-    });
+    const initializeSubscription = async () => {
+      try {
+        const unsubscribe = await initializeRealtimeSubscription(currentCampaign.uid);
+        realtimeUnsubscribeRef.current = unsubscribe;
+      } catch (error) {
+        console.error('Error initializing realtime subscription:', error);
+      }
+    };
+
+    initializeSubscription();
 
     // Mark campaign as read when entering
     if (currentCampaign.latest_message_id) {
@@ -87,10 +94,15 @@ export default function StoryScreen() {
     // Cleanup function
     return () => {
       if (realtimeUnsubscribeRef.current) {
-        realtimeUnsubscribeRef.current();
+        try {
+          realtimeUnsubscribeRef.current();
+          realtimeUnsubscribeRef.current = null;
+        } catch (error) {
+          console.error('Error during subscription cleanup:', error);
+        }
       }
     };
-  }, [currentCampaign, fetchCampaignHistory, initializeRealtimeSubscription, clearCampaignHistory, updateCampaignReadStatus]);
+  }, [currentCampaign?.uid, fetchCampaignHistory, initializeRealtimeSubscription, clearCampaignHistory, updateCampaignReadStatus]);
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages are added
