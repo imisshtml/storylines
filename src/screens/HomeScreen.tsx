@@ -636,7 +636,7 @@ const styles = StyleSheet.create({
     //flexDirection: 'row'
   },
   charactersGrid: {
-    flexDirection: 'row',
+    //flexDirection: 'row',
     gap: 12,
   },
   characterCard: {
