@@ -403,11 +403,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   campaignsContainer: {
-    flex: 0.75,
+    flex: 0.70,
     marginBottom: 20,
   },
   charactersContainer: {
-    flex: 0.25,
+    flex: 0.30,
     paddingBottom: 5,
     marginBottom:10,
   },
