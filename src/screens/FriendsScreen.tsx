@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View, SafeAreaView } from 'react-native';
 import { useAtom } from 'jotai';
 
-export default function SettingsScreen() {
+export default function FriendsScreen() {
   const handleBack = () => {
     router.push('/');
   };
