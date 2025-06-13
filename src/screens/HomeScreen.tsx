@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Play, Users, Settings, Menu, Crown, UserCheck, Star, Plus, Circle } from 'lucide-react-native';
+import { Play, Users, Settings, Menu, Crown, UserCheck, Star, Circle, Bell, Plus } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, ScrollView, Image } from 'react-native';
 import { useAtom } from 'jotai';
@@ -11,31 +11,42 @@ import {
   updateCampaignReadStatusAtom,
   initializeCampaignReadStatusRealtimeAtom
 } from '../atoms/campaignReadStatusAtoms';
+import {
+  campaignInvitationsAtom,
+  fetchCampaignInvitationsAtom,
+  respondToCampaignInvitationAtom,
+} from '../atoms/friendsAtoms';
 import SidebarMenu from '../components/SidebarMenu';
 import JoinCampaignModal from '../components/JoinCampaignModal';
+import { useCustomAlert } from '../components/CustomAlert';
 
 export default function HomeScreen() {
   const [campaigns] = useAtom(campaignsAtom);
   const [characters] = useAtom(charactersAtom);
+  const [campaignInvitations] = useAtom(campaignInvitationsAtom);
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
   const [, fetchCampaignReadStatus] = useAtom(fetchCampaignReadStatusAtom);
   const [, updateCampaignReadStatus] = useAtom(updateCampaignReadStatusAtom);
   const [, initializeReadStatusRealtime] = useAtom(initializeCampaignReadStatusRealtimeAtom);
+  const [, fetchCampaignInvitations] = useAtom(fetchCampaignInvitationsAtom);
+  const [, respondToCampaignInvitation] = useAtom(respondToCampaignInvitationAtom);
   const [user] = useAtom(userAtom);
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
+  const { showAlert, hideAlert } = useCustomAlert();
 
   // Fetch characters and read status when component mounts or user changes
   useEffect(() => {
     if (user) {
       fetchCharacters();
       fetchCampaignReadStatus();
-
+      fetchCampaignInvitations();
+      
       // Initialize real-time subscription for read status
       initializeReadStatusRealtime();
     }
-  }, [user, fetchCharacters, fetchCampaignReadStatus, initializeReadStatusRealtime]);
+  }, [user, fetchCharacters, fetchCampaignReadStatus, fetchCampaignInvitations, initializeReadStatusRealtime]);
 
   const handleCampaignPress = async (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
@@ -91,6 +102,34 @@ export default function HomeScreen() {
 
   const handleJoinCampaign = () => {
     setIsJoinModalVisible(true);
+  };
+
+  const handleAcceptCampaignInvitation = async (invitationId: string) => {
+    try {
+      await respondToCampaignInvitation({ invitationId, response: 'accepted' });
+      showAlert(
+        'Campaign Invitation Accepted',
+        'You have joined the campaign! Redirecting to campaign setup...',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.push('/invite'),
+          },
+        ],
+        'success'
+      );
+    } catch (error) {
+      showAlert('Error', 'Failed to accept campaign invitation. Please try again.', undefined, 'error');
+    }
+  };
+
+  const handleDeclineCampaignInvitation = async (invitationId: string) => {
+    try {
+      await respondToCampaignInvitation({ invitationId, response: 'rejected' });
+      showAlert('Campaign Invitation Declined', 'You have declined the campaign invitation.', undefined, 'success');
+    } catch (error) {
+      showAlert('Error', 'Failed to decline campaign invitation. Please try again.', undefined, 'error');
+    }
   };
 
   const handleCreateCampaign = () => {
@@ -243,6 +282,43 @@ export default function HomeScreen() {
           <View style={styles.campaignsContainer}>
             <Text style={styles.sectionTitle}>My Campaigns</Text>
             <ScrollView style={styles.campaignsScrollView} showsVerticalScrollIndicator={false}>
+               {/* Campaign Invitations Banner */}
+                {campaignInvitations.length > 0 && (
+                  <View style={styles.invitationsBanner}>
+                    <View style={styles.invitationsHeader}>
+                      <Bell size={20} color="#FFD700" />
+                      <Text style={styles.invitationsTitle}>
+                        Campaign Invitation{campaignInvitations.length > 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {campaignInvitations.map((invitation) => (
+                        <View key={invitation.id} style={styles.invitationCard}>
+                          <Text style={styles.invitationCampaignName}>
+                            {invitation.campaign?.name}
+                          </Text>
+                          <Text style={styles.invitationFrom}>
+                            From {invitation.inviter_profile?.username}
+                          </Text>
+                          <View style={styles.invitationActions}>
+                            <TouchableOpacity
+                              style={styles.acceptInvitationButton}
+                              onPress={() => handleAcceptCampaignInvitation(invitation.id)}
+                            >
+                              <Text style={styles.invitationButtonText}>Accept</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.declineInvitationButton}
+                              onPress={() => handleDeclineCampaignInvitation(invitation.id)}
+                            >
+                              <Text style={styles.invitationButtonText}>Decline</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
               {campaigns
                 .filter(campaign =>
                   // Double-check: only show campaigns where user is owner or player
@@ -408,18 +484,81 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
+  invitationsBanner: {
+    backgroundColor: 'rgba(0, 215, 0, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 0,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#00ff18',
+  },
+  invitationsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  invitationsTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+  },
+  invitationCard: {
+    backgroundColor: 'rgba(26, 26, 26, 0.8)',
+    borderRadius: 8,
+    padding: 12,
+    marginRight: 12,
+    minWidth: 200,
+  },
+  invitationCampaignName: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  invitationFrom: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#4CAF50',
+    marginBottom: 8,
+  },
+  invitationActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  acceptInvitationButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    flex: 1,
+  },
+  declineInvitationButton: {
+    backgroundColor: '#ff4444',
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    flex: 1,
+  },
+  invitationButtonText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    textAlign: 'center',
+  },
   contentContainer: {
     flex: 1,
     paddingHorizontal: 20,
   },
   campaignsContainer: {
-    flex: 0.75,
+    flex: 0.70,
     marginBottom: 20,
   },
   charactersContainer: {
-    flex: 0.25,
+    flex: 0.30,
     paddingBottom: 5,
-    marginBottom: 10,
+    marginBottom:5,
   },
   sectionTitle: {
     fontSize: 20,

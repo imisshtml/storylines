@@ -242,7 +242,7 @@ export default function LoginScreen() {
       {/* Fixed Footer */}
       <View style={styles.footer}>
         <View style={styles.builtWithContainer}>
-          <Text style={styles.builtWithText}>Built with Bolt</Text>
+          <Text style={styles.builtWithText}>Built on Bolt</Text>
           <Zap size={16} color="#FFD700" />
         </View>
       </View>

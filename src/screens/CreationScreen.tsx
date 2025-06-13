@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -80,7 +80,7 @@ const POINT_BUY_TOTAL = 27;
 export default function CreationScreen() {
   const [user] = useAtom(userAtom);
   const [currentStep, setCurrentStep] = useAtom(characterCreationStepAtom);
-  const { showAlert, AlertComponent } = useCustomAlert();
+  const { showAlert, hideAlert } = useCustomAlert();
   const [characterName, setCharacterName] = useAtom(characterNameAtom);
   const [selectedRace, setSelectedRace] = useAtom(selectedRaceAtom);
   const [selectedClass, setSelectedClass] = useAtom(selectedClassAtom);
@@ -122,6 +122,8 @@ export default function CreationScreen() {
   const [expandedSpells, setExpandedSpells] = useState<Set<string>>(new Set());
   const [selectedSpellLevel, setSelectedSpellLevel] = useState<'cantrips' | 'level1'>('cantrips');
 
+  const currStepRef = useRef<ScrollView>();
+
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -160,6 +162,7 @@ export default function CreationScreen() {
   const handleNext = () => {
     if (currentStep < CREATION_STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
+      currStepRef.current?.scrollTo({ y: 0, animated: true });
     }
   };
 
@@ -1379,7 +1382,7 @@ export default function CreationScreen() {
 
       {renderStepIndicator()}
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={currStepRef} style={styles.content} showsVerticalScrollIndicator={false}>
         {renderCurrentStep()}
       </ScrollView>
 
@@ -1556,8 +1559,6 @@ export default function CreationScreen() {
           </View>
         </View>
       </Modal>
-
-      <AlertComponent />
     </SafeAreaView>
   );
 }

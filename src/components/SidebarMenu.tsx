@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image } from 'react-native';
-import { LogOut, X, User, Settings, Info, UserPlus, Plus, Users } from 'lucide-react-native';
+import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
+import { friendRequestsReceivedAtom } from '../atoms/friendsAtoms';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -22,6 +23,8 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
   const [imageError, setImageError] = React.useState(false);
   const slideAnim = React.useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
+  const [friendRequestsReceived] = useAtom(friendRequestsReceivedAtom);
+  const friendRequestCount = friendRequestsReceived.length;
 
   React.useEffect(() => {
     if (isVisible) {
@@ -91,7 +94,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       onPress: handleCreateCampaign,
     },
     {
-      icon: <Users size={24} color="#fff" />,
+      icon: <Binary size={24} color="#fff" />,
       title: 'Join via Code',
       subtitle: 'Join an existing campaign',
       onPress: handleJoinCampaign,
@@ -99,28 +102,29 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
     {
       icon: <UserPlus size={24} color="#fff" />,
       title: 'Create Character',
-      subtitle: 'Build a new D&D character',
+      subtitle: 'Build a new 5e character',
       onPress: () => {
         onClose();
         router.push('/creation');
       },
     },
     {
+      icon: <Handshake size={24} color="#fff" />,
+      title: 'Friends',
+      subtitle: 'Every Hero needs a fellowship',
+      onPress: () => {
+        onClose();
+        router.push('/friends');
+      },
+      badge: friendRequestCount > 0 ? friendRequestCount : undefined,
+    },
+    {
       icon: <User size={24} color="#fff" />,
-      title: 'Profile',
+      title: 'Account & Settings',
       subtitle: 'Manage your account',
       onPress: () => {
         onClose();
         router.push('/profile');
-      },
-    },
-    {
-      icon: <Settings size={24} color="#fff" />,
-      title: 'Settings',
-      subtitle: 'App preferences',
-      onPress: () => {
-        onClose();
-        router.push('/settings');
       },
     },
     {
@@ -197,6 +201,11 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
             >
               <View style={styles.menuIcon}>
                 {item.icon}
+                {item.badge && (
+                  <View style={styles.menuBadge}>
+                    <Text style={styles.menuBadgeText}>{item.badge}</Text>
+                  </View>
+                )}
               </View>
               <View style={styles.menuText}>
                 <Text style={styles.menuTitle}>{item.title}</Text>
@@ -357,5 +366,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Bold',
     color: '#fff',
+  },
+  menuBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(33, 150, 243, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    zIndex: 1,
+  },
+  menuBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    textAlign: 'center',
   },
 });
