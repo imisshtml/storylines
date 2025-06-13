@@ -223,7 +223,6 @@ export default function HomeScreen() {
 
         <View style={styles.contentContainer}>
           <View style={styles.campaignsContainer}>
-            <Text style={styles.sectionTitle}></Text>
             <ScrollView style={styles.campaignsScrollView} showsVerticalScrollIndicator={false}>
                {/* Campaign Invitations Banner */}
                 {campaignInvitations.length > 0 && (
