@@ -359,7 +359,7 @@ export default function InviteFriendsScreen() {
   }, [user, currentCampaign]);
 
   // Determine minimum players required (assuming 2 is minimum)
-  const minimumPlayers = 2;
+  const minimumPlayers = 1;
   const hasEnoughPlayers = currentCampaign ? currentCampaign.players.length >= minimumPlayers : false;
 
   // Determine button state and text
@@ -489,7 +489,7 @@ export default function InviteFriendsScreen() {
 
       <View style={styles.playersContainer}>
         <Text style={styles.playersLabel}>
-          Players ({currentCampaign.players.length}/{minimumPlayers} minimum)
+          Players
         </Text>
         <Text style={styles.realtimeIndicator}>
           Updates automatically when players join
