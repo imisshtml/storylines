@@ -9,6 +9,8 @@ import {
   Image,
   Modal,
   ActivityIndicator,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { ArrowLeft, Camera, LocationEdit as Edit3, Scroll, X, Trash2, ChevronUp, ChevronDown } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -758,6 +760,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0
   },
   header: {
     flexDirection: 'row',
