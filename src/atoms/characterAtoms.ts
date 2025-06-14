@@ -79,10 +79,9 @@ export type Character = {
   background: string;
   level: number;
   abilities: DnDAbilities;
-  skills: DnDSkill[];
+  skills: string[]; // Changed to string[] to match actual usage
   spells: DnDSpell[];
-  equipment: DnDEquipment;
-  character_data: any;
+  equipment: Equipment[]; // Changed to Equipment[] to match actual usage
   current_hitpoints: number;
   max_hitpoints: number;
   temp_hitpoints: number;
@@ -91,6 +90,12 @@ export type Character = {
   gold: number;
   silver: number;
   copper: number;
+  // New separated columns
+  avatar?: string;
+  traits?: any[];
+  features?: any[];
+  saving_throws?: any[];
+  proficiency?: any[];
   created_at?: string;
   updated_at?: string;
 };
