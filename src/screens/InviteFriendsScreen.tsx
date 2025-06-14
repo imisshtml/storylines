@@ -1009,7 +1009,7 @@ const styles = StyleSheet.create({
   playersContainer: {
     marginHorizontal: 20,
     marginTop: 20,
-    marginBottom: 20,
+    //marginBottom: 20,
   },
   playersLabel: {
     fontSize: 16,
