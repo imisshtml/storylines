@@ -205,7 +205,7 @@ export default function CharactersScreen() {
             </View>
             <Text style={styles.emptyTitle}>No Characters Yet</Text>
             <Text style={styles.emptyDescription}>
-              Create your first D&D 5e character to begin your adventure!
+              Create your first 5e character to begin your adventure!
             </Text>
             <TouchableOpacity
               style={styles.createFirstCharacterButton}
