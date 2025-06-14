@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
   },
   combatStatValue: {
     fontSize: 20,
-    color: '#1a1a1a',
+    color: '##2a2a2a',
     fontFamily: 'Inter-Bold',
   },
   statsGrid: {
