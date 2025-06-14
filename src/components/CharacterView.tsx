@@ -99,7 +99,7 @@ export default function CharacterView({ character }: CharacterViewProps) {
     { name: 'Initiative', value: getAbilityModifier(getFinalAbilityScore('dexterity')), icon: <Zap size={20} color="#ffc107" /> },
     { name: 'HP', value: character.current_hitpoints || 0, icon: <Heart size={20} color="#e91e63" /> },
     { name: 'AC', value: character.armor_class || 10, icon: <Shield size={20} color="#1976d2" /> },
-    { name: 'Proficiency', value: Math.ceil(character.level / 4) + 1, icon: <Medal size={20} color="#9c27b0" /> },
+    { name: 'Modifier', value: Math.ceil(character.level / 4) + 1, icon: <Medal size={20} color="#9c27b0" /> },
   ];
 
   // Build core stats from character data
