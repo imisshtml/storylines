@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
   },
   statItem: {
     width: '30%',
-    backgroundColor: 'white',
+    backgroundColor: '#2a2a2a',
     padding: 12,
     borderRadius: 12,
     alignItems: 'center',
