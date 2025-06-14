@@ -487,13 +487,83 @@ export default function InviteFriendsScreen() {
       )}
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Players Section */}
+        <View style={styles.playersContainer}>
+          <Text style={styles.playersLabel}>
+            Players
+          </Text>
+          <Text style={styles.realtimeIndicator}>
+            Updates automatically when players join
+          </Text>
+          <View style={styles.playersList}>
+            {currentCampaign.players.map((player, index) => {
+              const playerCharacter = getPlayerCharacter(player.id);
+              const availableCharacters = getAvailableCharacters(player.id);
+              const canSelectCharacter = player.id === user?.id;
+
+              return (
+                <View key={player.id} style={styles.playerItem}>
+                  <View style={styles.playerRow}>
+                    <View style={styles.playerInfo}>
+                      {player.id === currentCampaign.owner ? (
+                        <Crown size={20} color="#FFD700" />
+                      ) : (
+                        <Users size={20} color="#4CAF50" />
+                      )}
+                      <Text style={styles.playerName}>{player.name || `Player ${index + 1}`}</Text>
+                      {player.ready && (
+                        <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
+                      )}
+                    </View>
+
+                    <View style={styles.characterInfo}>
+                      {playerCharacter ? (
+                        <TouchableOpacity
+                          style={styles.selectedCharacterContainer}
+                          onPress={() => canSelectCharacter ? setShowCharacterSelector(player.id) : undefined}
+                          disabled={!canSelectCharacter}
+                        >
+                          <Image
+                            source={getCharacterAvatarUrl(playerCharacter)}
+                            style={styles.characterAvatar}
+                          />
+                          <View style={styles.characterDetails}>
+                            <Text style={styles.selectedCharacterText}>
+                              {playerCharacter.name}
+                            </Text>
+                            <Text style={styles.selectedCharacterSubtext}>
+                              Lv{playerCharacter.level} {playerCharacter.race} {playerCharacter.class}
+                            </Text>
+                          </View>
+                          {canSelectCharacter && (
+                            <ChevronDown size={16} color="#4CAF50" style={styles.chevronIcon} />
+                          )}
+                        </TouchableOpacity>
+                      ) : canSelectCharacter ? (
+                        <TouchableOpacity
+                          style={styles.selectCharacterButton}
+                          onPress={() => setShowCharacterSelector(player.id)}
+                        >
+                          <Text style={styles.selectCharacterText}>Select Character</Text>
+                          <ChevronDown size={16} color="#888" />
+                        </TouchableOpacity>
+                      ) : (
+                        <Text style={styles.noCharacterText}>No Character</Text>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
         {/* Collapsible Invite Players Section */}
         <View style={styles.inviteSection}>
           <TouchableOpacity 
             style={styles.inviteSectionHeader}
             onPress={() => setIsInviteSectionOpen(!isInviteSectionOpen)}
           >
-            <Text style={styles.inviteSectionTitle}>Invite Players</Text>
+            <Text style={styles.inviteSectionTitle}>Invite New Players</Text>
             {isInviteSectionOpen ? (
               <ChevronUp size={24} color="#fff" />
             ) : (
@@ -597,8 +667,6 @@ export default function InviteFriendsScreen() {
             )}
           </View>
         </View>
-
-        
       </ScrollView>
 
       <TouchableOpacity
