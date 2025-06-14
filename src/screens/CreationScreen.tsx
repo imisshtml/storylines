@@ -421,6 +421,16 @@ export default function CreationScreen() {
       const hitPoints = calculateHitPoints();
       const armorClass = calculateArmorClass();
 
+      // Calculate final ability scores with racial bonuses
+      const finalAbilities = {
+        strength: getFinalAbilityScore('strength'),
+        dexterity: getFinalAbilityScore('dexterity'),
+        constitution: getFinalAbilityScore('constitution'),
+        intelligence: getFinalAbilityScore('intelligence'),
+        wisdom: getFinalAbilityScore('wisdom'),
+        charisma: getFinalAbilityScore('charisma'),
+      };
+
       const characterData = {
         user_id: user.id,
         name: characterName,
@@ -428,7 +438,7 @@ export default function CreationScreen() {
         class: selectedClass.name,
         background: 'Folk Hero', // Default background for now
         level: 1,
-        abilities,
+        abilities: finalAbilities, // Store final abilities with racial bonuses
         skills: selectedSkills,
         spells: selectedSpells,
         equipment: purchasedEquipment, // Use the purchased equipment, not starting equipment
@@ -440,16 +450,12 @@ export default function CreationScreen() {
         gold: characterGold,
         silver: characterSilver,
         copper: characterCopper,
-        character_data: {
-          race: selectedRace,
-          class: selectedClass,
-          abilities,
-          skills: selectedSkills,
-          spells: selectedSpells,
-          equipment: purchasedEquipment, // Use purchased equipment here too
-          purchasedEquipment,
-          avatar: getCurrentAvatarReference(),
-        },
+        // New separated columns
+        avatar: getCurrentAvatarReference(),
+        traits: selectedRace.traits || [],
+        saving_throws: selectedClass.saving_throws || [],
+        proficiency: selectedClass.proficiencies || [],
+        features: [], // Can be populated later with class features
       };
 
       await saveCharacter(characterData);
@@ -1328,7 +1334,7 @@ export default function CreationScreen() {
     if (selectedAvatarId) {
       return `default:${selectedAvatarId}`;
     }
-    return selectedClass ? getDefaultAvatar(selectedClass.name) : `default:${DEFAULT_AVATARS[0].id}`;
+    return selectedClass ? getDefaultAvatar() : `default:${DEFAULT_AVATARS[0].id}`;
   };
 
   const handleAvatarSelect = (avatarId: string) => {
