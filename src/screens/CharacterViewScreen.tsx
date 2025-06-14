@@ -20,6 +20,7 @@ import {
   fetchCharactersAtom,
   type Character,
   type DnDSpell,
+  type DnDAbilities,
 } from '../atoms/characterAtoms';
 import { campaignsAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
@@ -96,14 +97,9 @@ export default function CharacterViewScreen() {
 
     setIsLoading(true);
     try {
-      const updatedCharacterData = {
-        ...character.character_data,
-        avatar: avatarUrl,
-      };
-
       const { error } = await supabase
         .from('characters')
-        .update({ character_data: updatedCharacterData })
+        .update({ avatar: avatarUrl })
         .eq('id', character.id);
 
       if (error) throw error;
@@ -111,7 +107,7 @@ export default function CharacterViewScreen() {
       // Update local state
       setCharacter({
         ...character,
-        character_data: updatedCharacterData,
+        avatar: avatarUrl,
       });
 
       // Refresh characters list
@@ -129,16 +125,10 @@ export default function CharacterViewScreen() {
 
     setIsLoading(true);
     try {
-      const updatedCharacterData = {
-        ...character.character_data,
-        spells: selectedSpells,
-      };
-
       const { error } = await supabase
         .from('characters')
         .update({ 
-          spells: selectedSpells,
-          character_data: updatedCharacterData 
+          spells: selectedSpells
         })
         .eq('id', character.id);
 
@@ -148,7 +138,6 @@ export default function CharacterViewScreen() {
       setCharacter({
         ...character,
         spells: selectedSpells,
-        character_data: updatedCharacterData,
       });
 
       // Refresh characters list
@@ -166,21 +155,9 @@ export default function CharacterViewScreen() {
     return Math.floor((score - 10) / 2);
   };
 
-  const getFinalAbilityScore = (ability: string) => {
-    const baseScore = character?.abilities?.[ability] || 10;
-    
-    // Add racial bonuses if available
-    const raceData = character?.character_data?.race;
-    if (raceData?.ability_bonuses) {
-      const bonus = raceData.ability_bonuses.find(
-        (bonus: any) => bonus.ability_score.index === ability.substring(0, 3)
-      );
-      if (bonus) {
-        return baseScore + bonus.bonus;
-      }
-    }
-    
-    return baseScore;
+  const getFinalAbilityScore = (ability: keyof DnDAbilities) => {
+    // Abilities are now stored with racial bonuses already applied
+    return character?.abilities?.[ability] || 10;
   };
 
   const getCampaignName = () => {
@@ -193,9 +170,8 @@ export default function CharacterViewScreen() {
   };
 
   const hasSpellcasting = () => {
-    // Check if the character's class supports spellcasting
-    const classData = character?.character_data?.class;
-    return classData?.spellcasting || false;
+    // Check if the character's class supports spellcasting by looking at spells
+    return (character?.spells && character.spells.length > 0) || false;
   };
 
   const handleDeleteCharacter = async () => {
@@ -278,8 +254,8 @@ export default function CharacterViewScreen() {
 
   // Get spellcasting info for the character's class
   const getSpellcastingInfo = () => {
-    const classData = character?.character_data?.class;
-    if (!classData?.spellcasting) return null;
+    // Simple spellcasting info based on character class name
+    if (!character?.class) return null;
     
     // Basic spellcasting info for level 1 characters (can be enhanced for higher levels)
     const spellcastingInfo = {
@@ -288,7 +264,7 @@ export default function CharacterViewScreen() {
     };
 
     // Set cantrips and spells known based on class
-    switch (classData.index) {
+    switch (character.class.toLowerCase()) {
       case 'bard':
         spellcastingInfo.cantripsKnown = 2;
         spellcastingInfo.spellsKnown = 4;
@@ -397,7 +373,7 @@ export default function CharacterViewScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Ability Scores</Text>
           <View style={styles.abilitiesGrid}>
-            {['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'].map((ability) => {
+            {(['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'] as const).map((ability) => {
               const finalScore = getFinalAbilityScore(ability);
               const modifier = getAbilityModifier(finalScore);
               
@@ -474,18 +450,18 @@ export default function CharacterViewScreen() {
           <Text style={styles.sectionTitle}>Equipment</Text>
           <View style={styles.equipmentList}>
             {(() => {
-              // Get equipment from character_data.purchasedEquipment or character.equipment
-              const purchasedEquipment = character.character_data?.purchasedEquipment || [];
+              // Get equipment from the equipment column
+              const equipment = character.equipment || [];
               
-              if (purchasedEquipment.length === 0) {
+              if (equipment.length === 0) {
                 return (
                   <Text style={styles.equipmentItem}>• No equipment</Text>
                 );
               }
 
               // Group equipment by ID and count quantities
-              const groupedEquipment = purchasedEquipment.reduce((acc: any[], item: any) => {
-                const existingGroup = acc.find(group => group.item.id === item.id);
+              const groupedEquipment = equipment.reduce((acc: { item: any; quantity: number }[], item: any) => {
+                const existingGroup = acc.find((group: { item: any; quantity: number }) => group.item.id === item.id);
                 if (existingGroup) {
                   existingGroup.quantity += 1;
                 } else {
@@ -494,7 +470,7 @@ export default function CharacterViewScreen() {
                 return acc;
               }, []);
 
-              return groupedEquipment.map((group, index) => {
+              return groupedEquipment.map((group: { item: any; quantity: number }, index: number) => {
                 const baseQuantity = group.item.quantity || 1;
                 const totalQuantity = group.quantity * baseQuantity;
                 const displayName = totalQuantity > 1 
