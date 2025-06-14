@@ -513,7 +513,7 @@ export default function CreationScreen() {
             </View>
           );
         })}
-      </ScrollView>
+      </View>
     </View>
   );
 
