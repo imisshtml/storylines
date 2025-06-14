@@ -64,7 +64,8 @@ export default function RootLayout() {
               <Stack.Screen name="profile" />
               <Stack.Screen name="shop" />
               <Stack.Screen name="friends" />
-              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="invite" />
+              <Stack.Screen name="create" />
               <Stack.Screen 
                 name="story" 
                 options={{
