@@ -1624,7 +1624,7 @@ const styles = StyleSheet.create({
   },
   stepItem: {
     alignItems: 'center',
-    marginRight: 15,
+    //marginRight: 15,
     minWidth: 25,
   },
   stepCircle: {
