@@ -261,7 +261,7 @@ export default function StoryScreen() {
 
       switch (selectedInputType) {
         case 'say':
-          formattedMessage = `"${action}"`;
+          formattedMessage = `${playerName} says, "${action}"`;
           break;
         case 'rp':
           formattedMessage = `*${action}*`;
