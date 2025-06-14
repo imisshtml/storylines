@@ -76,6 +76,7 @@ export default function HomeScreen() {
 
   const handleSettingsPress = (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
+    console.log('::: C ', campaignId, campaigns)
     if (campaign) {
       setCurrentCampaign(campaign);
       router.push('/create');
