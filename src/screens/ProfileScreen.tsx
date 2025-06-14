@@ -9,6 +9,8 @@ import {
   Switch,
   Alert,
   ActivityIndicator,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import { ArrowLeft, User, Mail, Calendar, Crown, Users, UserX, Bell, BellOff, Volume2, VolumeX, Trash2, Shield } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -147,7 +149,7 @@ export default function ProfileScreen() {
 
   if (!user) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, styles.androidSafeArea]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4CAF50" />
           <Text style={styles.loadingText}>Loading profile...</Text>
@@ -335,6 +337,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#121212',
   },
+  androidSafeArea: {
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0
+  }
   header: {
     flexDirection: 'row',
     alignItems: 'center',
