@@ -167,7 +167,7 @@ export default function StoryScreen() {
   // Get current user's character for this campaign
   const getCurrentCharacter = (): Character | null => {
     if (!user || !currentCampaign) return null;
-    return characters.find(char => 
+    return characters.find(char =>
       char.user_id === user.id && char.campaign_id === currentCampaign.uid
     ) || null;
   };
@@ -249,6 +249,17 @@ export default function StoryScreen() {
   const sendPlayerAction = async (action: string, playerId: string = 'player1', playerName: string = 'Player') => {
     if (!currentCampaign || !action.trim()) return;
 
+    console.log('🎭 Player action - User data:', {
+      userId: user?.id,
+      userEmail: user?.email,
+      username: user?.username
+    });
+
+    if (!user?.id) {
+      setError('You need to be logged in to play. Please sign in again.');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setCurrentChoices([]); // Clear choices while loading
@@ -293,7 +304,7 @@ export default function StoryScreen() {
           storyHistory: campaignHistory.slice(-5), // Get last 5 messages for context
         };
 
-        // Send request to our API route
+        // Send request to our API route with user ID in the body
         const response = await fetch('/api/story', {
           method: 'POST',
           headers: {
@@ -301,6 +312,7 @@ export default function StoryScreen() {
           },
           body: JSON.stringify({
             campaignId: currentCampaign.id,
+            playerId: user.id, // Pass the user ID directly
             message: `Player action: ${action}`,
             context,
             playerAction: action,
@@ -308,10 +320,17 @@ export default function StoryScreen() {
         });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Authentication failed. Please sign in again.');
+          }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to get DM response');
+        }
 
         // Add DM response to campaign history
         await addCampaignMessage({
@@ -492,8 +511,8 @@ export default function StoryScreen() {
                       key={`${option.type}-${option.target || 'default'}-${index}`}
                       style={[
                         styles.inputTypeOption,
-                        selectedInputType === option.type && 
-                        (!option.target || option.target === whisperTarget) && 
+                        selectedInputType === option.type &&
+                        (!option.target || option.target === whisperTarget) &&
                         styles.selectedInputTypeOption
                       ]}
                       onPress={() => handleInputTypeSelect(option)}
@@ -568,7 +587,7 @@ export default function StoryScreen() {
               ) : (
                 <View style={styles.noCharacterContainer}>
                   <Text style={styles.noCharacterText}>
-                    You haven't selected a character for this campaign yet.
+                    You haven&apos;t selected a character for this campaign yet.
                   </Text>
                   <TouchableOpacity
                     style={styles.selectCharacterButton}
