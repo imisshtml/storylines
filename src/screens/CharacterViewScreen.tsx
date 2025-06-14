@@ -252,7 +252,7 @@ export default function CharacterViewScreen() {
     if (!character) return 1;
     const characterLevel = character.level || 1;
     
-    // Maximum spell level based on character level (simplified D&D 5e progression)
+    // Maximum spell level based on character level (simplified 5e progression)
     if (characterLevel >= 17) return 9;
     if (characterLevel >= 15) return 8;
     if (characterLevel >= 13) return 7;
