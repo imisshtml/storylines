@@ -1615,7 +1615,7 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   stepIndicatorContent: {
-    paddingHorizontal: 12,
+    //paddingHorizontal: 12,
     alignItems: 'center',
   },
   stepItem: {
