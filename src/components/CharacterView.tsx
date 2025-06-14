@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
   },
   modifier: {
     fontSize: 16,
-    color: '#4CAF50',
+    color: '#fff',
     fontFamily: 'Inter-Bold',
   },
   saveContainer: {
