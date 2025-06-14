@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#121212',
   },
   androidSafeArea: {
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 50
   },
   header: {
     flexDirection: 'row',
