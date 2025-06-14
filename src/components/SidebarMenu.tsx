@@ -170,17 +170,6 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
           </TouchableOpacity>
 
           <View style={styles.userInfo}>
-            <View style={styles.avatar}>
-              {!imageError ? (
-                <Image
-                  source={{ uri: 'https://images.pexels.com/photos/27567849/pexels-photo-27567849.jpeg?auto=compress&cs=tinysrgb&w=400' }}
-                  style={styles.avatarImage}
-                  onError={() => setImageError(true)}
-                />
-              ) : (
-                <Text style={styles.avatarText}>{getUserInitial()}</Text>
-              )}
-            </View>
             <Text style={styles.userName}>
               {user?.username || user?.email || 'Adventurer'}
             </Text>
