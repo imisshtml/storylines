@@ -15,7 +15,7 @@ import {
   Alert,
   StatusBar,
 } from 'react-native';
-import { Send, Home, User as User2, X, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Send, Home, User as User2, X, CircleAlert as AlertCircle, Forward } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
@@ -356,7 +356,7 @@ export default function StoryScreen() {
               {isLoading ? (
                 <ActivityIndicator size="small" color="#666" />
               ) : (
-                <Send size={24} color={userInput.trim() ? '#fff' : '#666'} />
+                <Forward size={24} color={userInput.trim() ? '#fff' : '#666'} />
               )}
             </TouchableOpacity>
           </View>
