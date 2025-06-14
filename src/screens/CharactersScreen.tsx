@@ -11,7 +11,7 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
-import { ArrowLeft, Plus, Star, Crown, Users, Sword, Shield } from 'lucide-react-native';
+import { ArrowLeft, Plus, Star, Crown, Users, Sword, Shield, UserPlus } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
@@ -189,7 +189,7 @@ export default function CharactersScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>My Characters</Text>
         <TouchableOpacity onPress={handleCreateCharacter} style={styles.createButton}>
-          <Plus color="#4CAF50" size={24} />
+          <UserPlus color="#4CAF50" size={24} />
         </TouchableOpacity>
       </View>
 
