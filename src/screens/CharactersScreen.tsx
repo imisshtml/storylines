@@ -6,7 +6,7 @@ import { useAtom } from 'jotai';
 
 export default function ShopScreen() {
   const handleBack = () => {
-    router.push('/');
+    router.back();
   };
 
   return (
