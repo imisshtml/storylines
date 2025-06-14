@@ -7,6 +7,7 @@ export default function CreateTab() {
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
 
   useEffect(() => {
+    console.log(':::: reset')
     // Clear current campaign when accessing create tab to ensure fresh state
     setCurrentCampaign(null);
   }, [setCurrentCampaign]);
