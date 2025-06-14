@@ -399,7 +399,7 @@ export default function CharacterView({ character }: CharacterViewProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#121212',
   },
   noCharacterContainer: {
     flex: 1,
