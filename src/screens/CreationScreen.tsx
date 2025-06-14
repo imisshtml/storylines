@@ -480,12 +480,12 @@ export default function CreationScreen() {
 
   const renderStepIndicator = () => (
     <View style={styles.stepIndicatorContainer}>
-      <ScrollView
-        horizontal
-        scrollEnabled={false}
-        showsHorizontalScrollIndicator={false}
+      <View
+        //horizontal
+        //scrollEnabled={false}
+        //showsHorizontalScrollIndicator={false}
         style={styles.stepIndicator}
-        contentContainerStyle={styles.stepIndicatorContent}
+        //contentContainerStyle={styles.stepIndicatorContent}
       >
         {CREATION_STEPS.map((step, index) => {
           const Icon = step.icon;
