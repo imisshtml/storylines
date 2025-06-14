@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image, ScrollView } from 'react-native';
-import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary, Users } from 'lucide-react-native';
+import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary, Users, UserCog } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
@@ -125,7 +125,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       badge: friendRequestCount > 0 ? friendRequestCount : undefined,
     },
     {
-      icon: <User size={24} color="#fff" />,
+      icon: <UserCog size={24} color="#fff" />,
       title: 'Account & Settings',
       subtitle: 'Manage your account',
       onPress: () => {
