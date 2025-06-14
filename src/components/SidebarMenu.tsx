@@ -90,7 +90,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
     {
       icon: <Users size={24} color="#fff" />,
       title: 'My Characters',
-      subtitle: 'Create a new Character',
+      subtitle: 'Your current characters',
       onPress: handleCreateCampaign,
     },
     {
