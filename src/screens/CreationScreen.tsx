@@ -1652,7 +1652,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepContent: {
-    padding: 20,
+    //padding: 20,
   },
   stepTitle: {
     fontSize: 24,
