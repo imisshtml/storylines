@@ -478,7 +478,6 @@ export default function StoryScreen() {
                 style={styles.inputTypeButton}
                 onPress={() => setShowInputTypeDropdown(!showInputTypeDropdown)}
               >
-                {currentInputOption?.icon}
                 <Text style={styles.inputTypeText}>{currentInputOption?.label}</Text>
                 <ChevronDown size={16} color="#888" />
               </TouchableOpacity>
@@ -497,7 +496,6 @@ export default function StoryScreen() {
                       ]}
                       onPress={() => handleInputTypeSelect(option)}
                     >
-                      
                       <Text style={styles.inputTypeOptionText}>{option.label}</Text>
                     </TouchableOpacity>
                   ))}
