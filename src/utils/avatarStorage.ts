@@ -252,8 +252,8 @@ export const pickAndUploadAvatar = async (
 export const getCharacterAvatarUrl = (character: Character | null) => {
   if (!character) return null;
 
-  // Try to get avatar from character_data
-  const avatarUrl = character.character_data?.avatar || character?.avatar;
+  // Use the avatar column
+  const avatarUrl = character.avatar;
   
   if (avatarUrl && typeof avatarUrl === 'string') {
     // Check if it's a default avatar reference
@@ -284,11 +284,7 @@ export const updateCharacterAvatar = async (
     const { error } = await supabase
       .from('characters')
       .update({ 
-        character_data: supabase.rpc('jsonb_set', {
-          target: 'character_data',
-          path: '{avatar}',
-          new_value: JSON.stringify(avatarUrl)
-        })
+        avatar: avatarUrl
       })
       .eq('id', characterId);
 

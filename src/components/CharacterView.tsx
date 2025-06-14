@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Shield, Swords, Brain, Heart, Footprints, Star, Package, BookOpen, Medal, Scroll, Sword, Sparkles, Zap } from 'lucide-react-native';
-import { Character } from '../atoms/characterAtoms';
+import { Character, type DnDAbilities } from '../atoms/characterAtoms';
 
 type CoreStat = {
   name: string;
@@ -77,21 +77,9 @@ export default function CharacterView({ character }: CharacterViewProps) {
   };
 
   // Helper function to get final ability score (including racial bonuses)
-  const getFinalAbilityScore = (ability: string) => {
-    const baseScore = character.abilities?.[ability] || 10;
-    
-    // Add racial bonuses if available
-    const raceData = character.character_data?.race;
-    if (raceData?.ability_bonuses) {
-      const bonus = raceData.ability_bonuses.find(
-        (bonus: any) => bonus.ability_score.index === ability.substring(0, 3)
-      );
-      if (bonus) {
-        return baseScore + bonus.bonus;
-      }
-    }
-    
-    return baseScore;
+  const getFinalAbilityScore = (ability: keyof DnDAbilities) => {
+    // Abilities are now stored with racial bonuses already applied
+    return character.abilities?.[ability] || 10;
   };
 
   // Build combat stats from character data
@@ -103,9 +91,9 @@ export default function CharacterView({ character }: CharacterViewProps) {
   ];
 
   // Build core stats from character data
-  const coreStats: CoreStat[] = [
+  const coreStats: CoreStat[] = ([
     'strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'
-  ].map(ability => {
+  ] as const).map(ability => {
     const finalScore = getFinalAbilityScore(ability);
     const modifier = getAbilityModifier(finalScore);
     const proficiencyBonus = Math.ceil(character.level / 4) + 1;
@@ -151,7 +139,7 @@ export default function CharacterView({ character }: CharacterViewProps) {
   const inventory: InventoryItem[] = [];
   
   // Add purchased equipment to inventory
-  const purchasedEquipment = character.character_data?.purchasedEquipment || [];
+  const purchasedEquipment = character.equipment || [];
   purchasedEquipment.forEach((item: any) => {
     inventory.push({
       name: item.name,
