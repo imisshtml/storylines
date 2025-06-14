@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
   },
   statName: {
     fontSize: 16,
-    color: '#666',
+    color: '#fff',
     fontFamily: 'Inter-Bold',
     marginTop: 4,
   },
