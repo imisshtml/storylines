@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image } from 'react-native';
-import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image, ScrollView } from 'react-native';
+import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary, Users, UserCog } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
@@ -88,6 +88,15 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
 
   const menuItems = [
     {
+      icon: <Users size={24} color="#fff" />,
+      title: 'My Characters',
+      subtitle: 'Your current 5e characters',
+      onPress: () => {
+        onClose();
+        router.push('/characters');
+      },
+    },
+    {
       icon: <Plus size={24} color="#fff" />,
       title: 'Create Campaign',
       subtitle: 'Start a new adventure',
@@ -119,7 +128,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       badge: friendRequestCount > 0 ? friendRequestCount : undefined,
     },
     {
-      icon: <User size={24} color="#fff" />,
+      icon: <UserCog size={24} color="#fff" />,
       title: 'Account & Settings',
       subtitle: 'Manage your account',
       onPress: () => {
@@ -170,17 +179,6 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
           </TouchableOpacity>
 
           <View style={styles.userInfo}>
-            <View style={styles.avatar}>
-              {!imageError ? (
-                <Image
-                  source={{ uri: 'https://images.pexels.com/photos/27567849/pexels-photo-27567849.jpeg?auto=compress&cs=tinysrgb&w=400' }}
-                  style={styles.avatarImage}
-                  onError={() => setImageError(true)}
-                />
-              ) : (
-                <Text style={styles.avatarText}>{getUserInitial()}</Text>
-              )}
-            </View>
             <Text style={styles.userName}>
               {user?.username || user?.email || 'Adventurer'}
             </Text>
@@ -191,30 +189,31 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
         </View>
 
         {/* Menu Items */}
-        <View style={styles.menuContainer}>
-          {menuItems.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.menuItem}
-              onPress={item.onPress}
-              activeOpacity={0.7}
-            >
-              <View style={styles.menuIcon}>
-                {item.icon}
-                {item.badge && (
-                  <View style={styles.menuBadge}>
-                    <Text style={styles.menuBadgeText}>{item.badge}</Text>
-                  </View>
-                )}
-              </View>
-              <View style={styles.menuText}>
-                <Text style={styles.menuTitle}>{item.title}</Text>
-                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-
+        <ScrollView>
+          <View style={styles.menuContainer}>
+            {menuItems.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.menuItem}
+                onPress={item.onPress}
+                activeOpacity={0.7}
+              >
+                <View style={styles.menuIcon}>
+                  {item.icon}
+                  {item.badge && (
+                    <View style={styles.menuBadge}>
+                      <Text style={styles.menuBadgeText}>{item.badge}</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.menuText}>
+                  <Text style={styles.menuTitle}>{item.title}</Text>
+                  <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
         {/* Logout Button */}
         <View style={styles.footer}>
           <TouchableOpacity
@@ -314,7 +313,7 @@ const styles = StyleSheet.create({
   },
   menuContainer: {
     flex: 1,
-    paddingTop: 20,
+    paddingTop: 0,
   },
   menuItem: {
     flexDirection: 'row',
