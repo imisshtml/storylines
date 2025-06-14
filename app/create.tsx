@@ -9,7 +9,7 @@ export default function CreateTab() {
   useEffect(() => {
     console.log(':::: reset')
     // Clear current campaign when accessing create tab to ensure fresh state
-    setCurrentCampaign(null);
+    //setCurrentCampaign(null);
   }, [setCurrentCampaign]);
 
   return <CreateCampaignScreen />;
