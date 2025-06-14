@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 24,
-    color: '#1a1a1a',
+    color: '#fff',
     fontFamily: 'Inter-Bold',
   },
   statDetails: {
