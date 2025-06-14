@@ -13,12 +13,14 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  StatusBar,
 } from 'react-native';
-import { Send, Home, User as User2, X, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Send, Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, MessageSquare, Drama, Ear, CircleHelp as HelpCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
+import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
 import {
   campaignHistoryAtom,
   fetchCampaignHistoryAtom,
@@ -31,10 +33,22 @@ import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
 import StoryChoices from '../components/StoryChoices';
 
+type InputType = 'say' | 'rp' | 'whisper' | 'ask';
+
+interface InputOption {
+  type: InputType;
+  label: string;
+  icon: React.ReactNode;
+  placeholder: string;
+  target?: string; // For whisper targets
+}
+
 export default function StoryScreen() {
   const [userInput, setUserInput] = useState('');
   const [currentCampaign] = useAtom(currentCampaignAtom);
   const [user] = useAtom(userAtom);
+  const [characters] = useAtom(charactersAtom);
+  const [, fetchCharacters] = useAtom(fetchCharactersAtom);
   const [isCharacterSheetVisible, setIsCharacterSheetVisible] = useState(false);
   const [showChoices, setShowChoices] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +60,11 @@ export default function StoryScreen() {
     'Listen carefully for any sounds',
   ]);
 
+  // Input type selection
+  const [selectedInputType, setSelectedInputType] = useState<InputType>('say');
+  const [showInputTypeDropdown, setShowInputTypeDropdown] = useState(false);
+  const [whisperTarget, setWhisperTarget] = useState<string>('');
+
   // Campaign history atoms
   const [campaignHistory] = useAtom(campaignHistoryAtom);
   const [, fetchCampaignHistory] = useAtom(fetchCampaignHistoryAtom);
@@ -56,6 +75,12 @@ export default function StoryScreen() {
 
   const scrollViewRef = useRef<ScrollView>(null);
   const realtimeUnsubscribeRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      fetchCharacters();
+    }
+  }, [user, fetchCharacters]);
 
   useEffect(() => {
     if (!currentCampaign) {
@@ -139,6 +164,88 @@ export default function StoryScreen() {
     }
   }, [error]);
 
+  // Get current user's character for this campaign
+  const getCurrentCharacter = (): Character | null => {
+    if (!user || !currentCampaign) return null;
+    return characters.find(char => 
+      char.user_id === user.id && char.campaign_id === currentCampaign.uid
+    ) || null;
+  };
+
+  // Get other players in the campaign (for whisper targets)
+  const getOtherPlayers = () => {
+    if (!currentCampaign || !user) return [];
+    return currentCampaign.players.filter(player => player.id !== user.id);
+  };
+
+  // Get input options based on current state
+  const getInputOptions = (): InputOption[] => {
+    const baseOptions: InputOption[] = [
+      {
+        type: 'say',
+        label: 'Say',
+        icon: <MessageSquare size={16} color="#4CAF50" />,
+        placeholder: 'Say something out loud...'
+      },
+      {
+        type: 'rp',
+        label: 'RP',
+        icon: <Drama size={16} color="#9C27B0" />,
+        placeholder: 'Roleplay your action...'
+      },
+      {
+        type: 'ask',
+        label: 'Ask',
+        icon: <HelpCircle size={16} color="#2196F3" />,
+        placeholder: 'Ask the Dungeon Master...'
+      }
+    ];
+
+    const otherPlayers = getOtherPlayers();
+    if (otherPlayers.length > 0) {
+      // Add whisper options for each other player
+      otherPlayers.forEach(player => {
+        baseOptions.push({
+          type: 'whisper',
+          label: `Whisper ${player.name}`,
+          icon: <Ear size={16} color="#FF9800" />,
+          placeholder: `Whisper to ${player.name}...`,
+          target: player.id
+        });
+      });
+    }
+
+    return baseOptions;
+  };
+
+  const getCurrentPlaceholder = () => {
+    const options = getInputOptions();
+    if (selectedInputType === 'whisper' && whisperTarget) {
+      const whisperOption = options.find(opt => opt.type === 'whisper' && opt.target === whisperTarget);
+      return whisperOption?.placeholder || 'Whisper...';
+    }
+    const option = options.find(opt => opt.type === selectedInputType);
+    return option?.placeholder || 'Type your message...';
+  };
+
+  const handleInputTypeSelect = (option: InputOption) => {
+    setSelectedInputType(option.type);
+    if (option.type === 'whisper' && option.target) {
+      setWhisperTarget(option.target);
+    } else {
+      setWhisperTarget('');
+    }
+    setShowInputTypeDropdown(false);
+  };
+
+  const getCurrentInputOption = () => {
+    const options = getInputOptions();
+    if (selectedInputType === 'whisper' && whisperTarget) {
+      return options.find(opt => opt.type === 'whisper' && opt.target === whisperTarget);
+    }
+    return options.find(opt => opt.type === selectedInputType);
+  };
+
   const sendPlayerAction = async (action: string, playerId: string = 'player1', playerName: string = 'Player') => {
     if (!currentCampaign || !action.trim()) return;
 
@@ -147,49 +254,75 @@ export default function StoryScreen() {
     setCurrentChoices([]); // Clear choices while loading
 
     try {
+      // Determine message type based on input type
+      let messageType: 'player' | 'dm' | 'system' = 'player';
+      let formattedMessage = action;
+      let messageAuthor = playerName;
+
+      switch (selectedInputType) {
+        case 'say':
+          formattedMessage = `${playerName} says, "${action}"`;
+          break;
+        case 'rp':
+          formattedMessage = `*${action}*`;
+          break;
+        case 'whisper':
+          if (whisperTarget) {
+            const targetPlayer = currentCampaign.players.find(p => p.id === whisperTarget);
+            formattedMessage = `[Whispers to ${targetPlayer?.name}] ${action}`;
+          }
+          break;
+        case 'ask':
+          formattedMessage = `[Asks DM] ${action}`;
+          break;
+      }
+
       // Add player message to campaign history
       await addCampaignMessage({
         campaign_uid: currentCampaign.uid,
-        message: action,
-        author: playerName,
-        message_type: 'player',
+        message: formattedMessage,
+        author: messageAuthor,
+        message_type: messageType,
       });
 
-      // Prepare context for the AI
-      const context = {
-        campaign: currentCampaign,
-        storyHistory: campaignHistory.slice(-5), // Get last 5 messages for context
-      };
+      // Only send to AI for non-whisper messages or DM questions
+      if (selectedInputType !== 'whisper') {
+        // Prepare context for the AI
+        const context = {
+          campaign: currentCampaign,
+          storyHistory: campaignHistory.slice(-5), // Get last 5 messages for context
+        };
 
-      // Send request to our API route
-      const response = await fetch('/api/story', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          campaignId: currentCampaign.id,
-          message: `Player action: ${action}`,
-          context,
-          playerAction: action,
-        }),
-      });
+        // Send request to our API route
+        const response = await fetch('/api/story', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            campaignId: currentCampaign.id,
+            message: `Player action: ${action}`,
+            context,
+            playerAction: action,
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Add DM response to campaign history
+        await addCampaignMessage({
+          campaign_uid: currentCampaign.uid,
+          message: data.response,
+          author: 'DM',
+          message_type: 'dm',
+        });
+
+        setCurrentChoices(data.choices || []); // Use choices from AI response
       }
-
-      const data = await response.json();
-
-      // Add DM response to campaign history
-      await addCampaignMessage({
-        campaign_uid: currentCampaign.uid,
-        message: data.response,
-        author: 'DM',
-        message_type: 'dm',
-      });
-
-      setCurrentChoices(data.choices || []); // Use choices from AI response
 
     } catch (error) {
       console.error('Error sending player action:', error);
@@ -213,8 +346,10 @@ export default function StoryScreen() {
       user?.username || user?.email || 'Player'
     );
 
-    // Show choices again after DM responds
-    setTimeout(() => setShowChoices(true), 1000);
+    // Show choices again after DM responds (except for whispers)
+    if (selectedInputType !== 'whisper') {
+      setTimeout(() => setShowChoices(true), 1000);
+    }
   };
 
   const handleChoiceSelect = async (choice: string) => {
@@ -227,8 +362,10 @@ export default function StoryScreen() {
       user?.username || user?.email || 'Player'
     );
 
-    // Show choices again after DM responds
-    setTimeout(() => setShowChoices(true), 1000);
+    // Show choices again after DM responds (except for whispers)
+    if (selectedInputType !== 'whisper') {
+      setTimeout(() => setShowChoices(true), 1000);
+    }
   };
 
   const handleHomePress = () => {
@@ -257,6 +394,9 @@ export default function StoryScreen() {
       'Set up camp for the night',
       'Listen carefully for any sounds',
     ];
+
+  const currentCharacter = getCurrentCharacter();
+  const currentInputOption = getCurrentInputOption();
 
   return (
     <ImageBackground
@@ -324,7 +464,7 @@ export default function StoryScreen() {
               </View>
             )}
 
-            {showChoices && !isLoading && choicesToShow.length > 0 && (
+            {showChoices && !isLoading && choicesToShow.length > 0 && selectedInputType !== 'whisper' && (
               <StoryChoices
                 choices={choicesToShow}
                 onChoiceSelect={handleChoiceSelect}
@@ -334,11 +474,42 @@ export default function StoryScreen() {
           </ScrollView>
 
           <View style={styles.inputContainer}>
+            {/* Input Type Selector */}
+            <View style={styles.inputTypeContainer}>
+              <TouchableOpacity
+                style={styles.inputTypeButton}
+                onPress={() => setShowInputTypeDropdown(!showInputTypeDropdown)}
+              >
+                <Text style={styles.inputTypeText}>{currentInputOption?.label}</Text>
+                <ChevronDown size={16} color="#888" />
+              </TouchableOpacity>
+
+              {/* Dropdown */}
+              {showInputTypeDropdown && (
+                <View style={styles.inputTypeDropdown}>
+                  {getInputOptions().map((option, index) => (
+                    <TouchableOpacity
+                      key={`${option.type}-${option.target || 'default'}-${index}`}
+                      style={[
+                        styles.inputTypeOption,
+                        selectedInputType === option.type && 
+                        (!option.target || option.target === whisperTarget) && 
+                        styles.selectedInputTypeOption
+                      ]}
+                      onPress={() => handleInputTypeSelect(option)}
+                    >
+                      <Text style={styles.inputTypeOptionText}>{option.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
             <TextInput
               style={styles.input}
               value={userInput}
               onChangeText={setUserInput}
-              placeholder="Write your own action..."
+              placeholder={getCurrentPlaceholder()}
               placeholderTextColor="#666"
               multiline
               maxLength={500}
@@ -355,7 +526,7 @@ export default function StoryScreen() {
               {isLoading ? (
                 <ActivityIndicator size="small" color="#666" />
               ) : (
-                <Send size={24} color={userInput.trim() ? '#fff' : '#666'} />
+                <Forward size={24} color={userInput.trim() ? '#fff' : '#666'} />
               )}
             </TouchableOpacity>
           </View>
@@ -371,8 +542,19 @@ export default function StoryScreen() {
             <View style={styles.bottomSheet}>
               <View style={styles.bottomSheetHeader}>
                 <View style={styles.sheetHeader}>
-                  <Text style={styles.characterName}>Eldric the Brave</Text>
-                  <Text style={styles.characterClass}>Level 5 Warrior</Text>
+                  {currentCharacter ? (
+                    <>
+                      <Text style={styles.characterName}>{currentCharacter.name}</Text>
+                      <Text style={styles.characterClass}>
+                        Level {currentCharacter.level} {currentCharacter.race} {currentCharacter.class}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.characterName}>No Character</Text>
+                      <Text style={styles.characterClass}>Select a character for this campaign</Text>
+                    </>
+                  )}
                 </View>
                 <TouchableOpacity
                   onPress={() => setIsCharacterSheetVisible(false)}
@@ -381,7 +563,24 @@ export default function StoryScreen() {
                   <X size={24} color="#fff" />
                 </TouchableOpacity>
               </View>
-              <CharacterView />
+              {currentCharacter ? (
+                <CharacterView character={currentCharacter} />
+              ) : (
+                <View style={styles.noCharacterContainer}>
+                  <Text style={styles.noCharacterText}>
+                    You haven't selected a character for this campaign yet.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.selectCharacterButton}
+                    onPress={() => {
+                      setIsCharacterSheetVisible(false);
+                      router.push('/invite');
+                    }}
+                  >
+                    <Text style={styles.selectCharacterButtonText}>Select Character</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         </Modal>
@@ -393,6 +592,8 @@ export default function StoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#121212',
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0
   },
   safeArea: {
     flex: 1,
@@ -509,7 +710,58 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(26, 26, 26, 0.9)',
     borderTopWidth: 1,
     borderTopColor: '#333',
-    gap: 12,
+    gap: 6,
+    position: 'relative',
+  },
+  inputTypeContainer: {
+    position: 'relative',
+  },
+  inputTypeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 6,
+    minWidth: 70,
+  },
+  inputTypeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+  },
+  inputTypeDropdown: {
+    position: 'absolute',
+    bottom: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 8,
+    zIndex: 1000,
+  },
+  inputTypeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  selectedInputTypeOption: {
+    backgroundColor: '#4CAF50',
+  },
+  inputTypeOptionText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    flex: 1,
   },
   input: {
     flex: 1,
@@ -568,5 +820,30 @@ const styles = StyleSheet.create({
   },
   sheetHeader: {
     // padding: 16,
+  },
+  noCharacterContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  noCharacterText: {
+    fontSize: 18,
+    color: '#666',
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  selectCharacterButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  selectCharacterButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
   },
 });

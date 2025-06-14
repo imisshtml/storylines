@@ -274,7 +274,7 @@ export const fetchRacesAtom = atom(
   }
 );
 
-// Fetch classes from D&D API
+// Fetch classes from API
 export const fetchClassesAtom = atom(
   null,
   async (get, set) => {
