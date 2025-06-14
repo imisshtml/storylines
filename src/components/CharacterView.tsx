@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
   },
   combatStatName: {
     fontSize: 12,
-    color: '#666',
+    color: '#fff',
     fontFamily: 'Inter-Regular',
     marginTop: 4,
   },
