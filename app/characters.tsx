@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import Characters from '../src/screens/CharactersScreen';
+import CharactersScreen from '../src/screens/CharactersScreen';
 
 export default function Characters() {
 
