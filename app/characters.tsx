@@ -1,16 +1,7 @@
 import React, { useEffect } from 'react';
-import { useAtom } from 'jotai';
-import CreateCampaignScreen from '../src/screens/CreateCampaignScreen';
-import { currentCampaignAtom } from '../src/atoms/campaignAtoms';
+import Characters from '../src/screens/CharactersScreen';
 
-export default function CreateTab() {
-  const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
+export default function Characters() {
 
-  useEffect(() => {
-    console.log(':::: reset')
-    // Clear current campaign when accessing create tab to ensure fresh state
-    //setCurrentCampaign(null);
-  }, [setCurrentCampaign]);
-
-  return <CreateCampaignScreen />;
+  return <CharactersScreen />;
 }
