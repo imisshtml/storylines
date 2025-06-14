@@ -15,7 +15,7 @@ import {
   Alert,
   StatusBar,
 } from 'react-native';
-import { Chrome as Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, MessageSquare, Drama, Ear, CircleHelp as HelpCircle } from 'lucide-react-native';
+import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, MessageSquare, Drama, Ear, CircleHelp as HelpCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
@@ -320,7 +320,7 @@ export default function StoryScreen() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            campaignId: currentCampaign.id,
+            campaignId: currentCampaign.uid, // Use UID for database consistency
             playerId: user.id, // Pass the user ID directly
             message: `Player action: ${action}`,
             context,
