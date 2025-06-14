@@ -708,7 +708,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(26, 26, 26, 0.9)',
     borderTopWidth: 1,
     borderTopColor: '#333',
-    gap: 12,
+    gap: 6,
     position: 'relative',
   },
   inputTypeContainer: {
