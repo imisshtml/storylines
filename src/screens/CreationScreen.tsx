@@ -71,7 +71,7 @@ const CREATION_STEPS = [
   { id: 7, title: 'Review', icon: Save },
 ];
 
-// Point buy cost chart for D&D 5e
+// Point buy cost chart for 5e
 const POINT_BUY_COSTS: { [key: number]: number } = {
   8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9
 };
