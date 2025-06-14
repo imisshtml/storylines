@@ -722,7 +722,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     gap: 6,
-    minWidth: 80,
+    minWidth: 70,
   },
   inputTypeText: {
     color: '#fff',
