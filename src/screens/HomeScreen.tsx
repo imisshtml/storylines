@@ -76,6 +76,7 @@ export default function HomeScreen() {
 
   const handleSettingsPress = (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
+    console.log('::: C ', campaignId, campaigns, campaign)
     if (campaign) {
       setCurrentCampaign(campaign);
       router.push('/create');
@@ -222,65 +223,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.contentContainer}>
-          <View style={styles.charactersContainer}>
-            <Text style={styles.sectionTitle}>My Characters</Text>
-            {characters.length > 0 ? (
-              <ScrollView
-                style={styles.charactersScrollView}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.charactersScrollContent}
-              >
-                <View style={styles.charactersGrid}>
-                  {characters.map(character => (
-                    <TouchableOpacity
-                      key={character.id}
-                      style={styles.characterCard}
-                      onPress={() => handleCharacterPress(character)}
-                    >
-                      <View style={styles.characterAvatarContainer}>
-                        <Image
-                          source={getCharacterAvatar(character)}
-                          style={styles.characterAvatar}
-                        />
-                        <View style={styles.characterLevelBadge}>
-                          <Star size={12} color="#fff" />
-                          <Text style={styles.characterLevel}>{character.level}</Text>
-                        </View>
-                      </View>
-                      <View style={styles.characterInfo}>
-                        <Text style={styles.characterName} numberOfLines={1}>
-                          {character.name}
-                        </Text>
-                        <Text style={styles.characterClass} numberOfLines={1}>
-                          {character.race} {character.class}
-                        </Text>
-                        <Text style={styles.characterCampaign} numberOfLines={1}>
-                          {getCharacterCampaignName(character)}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-            ) : (
-              <View style={styles.noCharactersContainer}>
-                <Text style={styles.noCharacters}>No characters created yet</Text>
-                <Text style={styles.noCharactersSubtext}>
-                  Create your first character to begin your adventures!
-                </Text>
-                <TouchableOpacity
-                  style={styles.createCharacterButton}
-                  onPress={() => router.push('/creation')}
-                >
-                  <Text style={styles.createCharacterButtonText}>Create Character</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-          </View>
           <View style={styles.campaignsContainer}>
-            <Text style={styles.sectionTitle}>My Campaigns</Text>
             <ScrollView style={styles.campaignsScrollView} showsVerticalScrollIndicator={false}>
                {/* Campaign Invitations Banner */}
                 {campaignInvitations.length > 0 && (
@@ -388,12 +331,14 @@ export default function HomeScreen() {
                 ))}
 
               {campaigns.length === 0 && (
+              <>
                 <View style={styles.noCampaignsContainer}>
                   <Text style={styles.noCampaigns}>No active campaigns</Text>
                   <Text style={styles.noCampaignsSubtext}>
                     Create a new campaign or join an existing one!
                   </Text>
-                  <View style={styles.campaignActionButtons}>
+                </View>
+                <View style={styles.campaignActionButtons}>
                     <TouchableOpacity
                       style={styles.createButton}
                       onPress={handleCreateCampaign}
@@ -401,7 +346,8 @@ export default function HomeScreen() {
                       <Plus size={20} color="#fff" />
                       <Text style={styles.buttonText}>Create Campaign</Text>
                     </TouchableOpacity>
-
+                </View>
+                <View style={styles.campaignActionButtons}>
                     <TouchableOpacity
                       style={styles.joinButton}
                       onPress={handleJoinCampaign}
@@ -410,7 +356,7 @@ export default function HomeScreen() {
                       <Text style={styles.buttonText}>Join via Code</Text>
                     </TouchableOpacity>
                   </View>
-                </View>
+              </>
               )}
             </ScrollView>
           </View>
@@ -688,7 +634,7 @@ const styles = StyleSheet.create({
   campaignActionButtons: {
     paddingTop: 20,
     gap: 12,
-    flexDirection: 'row'
+    //flexDirection: 'row'
   },
   charactersGrid: {
     flexDirection: 'row',
@@ -810,6 +756,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   joinButton: {
     backgroundColor: 'rgba(33, 150, 243, 0.9)',

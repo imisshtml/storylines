@@ -60,11 +60,12 @@ export default function RootLayout() {
               <Stack.Screen name="home" />
               <Stack.Screen name="login" />
               <Stack.Screen name="creation" />
-              <Stack.Screen name="settings" />
               <Stack.Screen name="profile" />
               <Stack.Screen name="shop" />
               <Stack.Screen name="friends" />
-              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="invite" />
+              <Stack.Screen name="create" />
+              <Stack.Screen name="characters" />
               <Stack.Screen 
                 name="story" 
                 options={{
