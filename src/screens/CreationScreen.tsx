@@ -1615,7 +1615,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    borderWidth: 1, borderColor: 'red'
   },
   stepIndicatorContent: {
     paddingHorizontal: 12,
