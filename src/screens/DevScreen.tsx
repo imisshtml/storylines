@@ -11,6 +11,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  StatusBar,
 } from 'react-native';
 import { Send, ArrowLeft, Trash2, Settings, MessageSquare } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -272,12 +273,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1a1a1a',
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
-    paddingTop: 40,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
