@@ -11,17 +11,20 @@ import {
   SafeAreaView,
   Modal,
   Image,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
-import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, X, Plus, Crown } from 'lucide-react-native';
+import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, ChevronUp, X, Plus, Crown, Info } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as SMS from 'expo-sms';
 import { supabase } from '../config/supabase';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
+import { ADVENTURES } from '../components/AdventureSelectSheet';
 
 export default function InviteFriendsScreen() {
   const [currentCampaign, setCurrentCampaign] = useAtom(currentCampaignAtom);
@@ -36,6 +39,7 @@ export default function InviteFriendsScreen() {
   const [phoneNumbers, setPhoneNumbers] = useState('');
   const [smsAvailable, setSmsAvailable] = useState(false);
   const [showCharacterSelector, setShowCharacterSelector] = useState<string | null>(null);
+  const [isInviteSectionOpen, setIsInviteSectionOpen] = useState(false);
 
   useEffect(() => {
     if (!currentCampaign) {
@@ -419,6 +423,36 @@ export default function InviteFriendsScreen() {
 
   const buttonState = getButtonState();
 
+  // Get adventure details
+  const getAdventureDetails = () => {
+    if (!currentCampaign) return null;
+    return ADVENTURES.find(adventure => adventure.id === currentCampaign.adventure);
+  };
+
+  const adventureDetails = getAdventureDetails();
+
+  // Format content level display
+  const getContentLevelDisplay = (level: string) => {
+    const levels = {
+      'kids': 'Kids Friendly',
+      'teens': 'Teen Appropriate',
+      'adults': 'Mature Content'
+    };
+    return levels[level as keyof typeof levels] || level;
+  };
+
+  // Format RP focus display
+  const getRpFocusDisplay = (focus: string) => {
+    const focuses = {
+      'heavy_rp': 'Heavy Roleplay',
+      'rp_focused': 'Roleplay Focused',
+      'balanced': 'Balanced',
+      'combat_focused': 'Combat Focused',
+      'heavy_combat': 'Heavy Combat'
+    };
+    return focuses[focus as keyof typeof focuses] || focus;
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -452,116 +486,188 @@ export default function InviteFriendsScreen() {
         </View>
       )}
 
-      <View style={styles.codeContainer}>
-        <Text style={styles.codeLabel}>Invite Code</Text>
-        <View style={styles.codeBox}>
-          <Text style={styles.code}>{currentCampaign.invite_code}</Text>
-          <TouchableOpacity style={styles.copyButton} onPress={handleCopyCode}>
-            {copied ? (
-              <CheckCircle2 size={24} color="#4CAF50" />
-            ) : (
-              <Copy size={24} color="#fff" />
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Players Section */}
+        <View style={styles.playersContainer}>
+          <Text style={styles.playersLabel}>
+            Players
+          </Text>
+          <Text style={styles.realtimeIndicator}>
+            Updates automatically when players join
+          </Text>
+          <View style={styles.playersList}>
+            {currentCampaign.players.map((player, index) => {
+              const playerCharacter = getPlayerCharacter(player.id);
+              const availableCharacters = getAvailableCharacters(player.id);
+              const canSelectCharacter = player.id === user?.id;
 
-      <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-        <ShareIcon size={20} color="#fff" />
-        <Text style={styles.shareButtonText}>Share Invite Link</Text>
-      </TouchableOpacity>
+              return (
+                <View key={player.id} style={styles.playerItem}>
+                  <View style={styles.playerRow}>
+                    <View style={styles.playerInfo}>
+                      {player.id === currentCampaign.owner ? (
+                        <Crown size={20} color="#FFD700" />
+                      ) : (
+                        <Users size={20} color="#4CAF50" />
+                      )}
+                      <Text style={styles.playerName}>{player.name || `Player ${index + 1}`}</Text>
+                      {player.ready && (
+                        <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
+                      )}
+                    </View>
 
-      {smsAvailable && (
-        <View style={styles.smsContainer}>
-          <Text style={styles.smsLabel}>Send SMS Invite</Text>
-          <View style={styles.smsInputContainer}>
-            <TextInput
-              style={styles.smsInput}
-              value={phoneNumbers}
-              onChangeText={setPhoneNumbers}
-              placeholder="Enter phone numbers (comma-separated)"
-              placeholderTextColor="#666"
-            />
-            <TouchableOpacity
-              style={[styles.smsButton, !phoneNumbers && styles.smsButtonDisabled]}
-              onPress={handleSendSMS}
-              disabled={!phoneNumbers}
-            >
-              <Send size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      <View style={styles.playersContainer}>
-        <Text style={styles.playersLabel}>
-          Players
-        </Text>
-        <Text style={styles.realtimeIndicator}>
-          Updates automatically when players join
-        </Text>
-        <ScrollView style={styles.playersList}>
-          {currentCampaign.players.map((player, index) => {
-            const playerCharacter = getPlayerCharacter(player.id);
-            const availableCharacters = getAvailableCharacters(player.id);
-            const canSelectCharacter = player.id === user?.id;
-
-            return (
-              <View key={player.id} style={styles.playerItem}>
-                <View style={styles.playerRow}>
-                  <View style={styles.playerInfo}>
-                    {player.id === currentCampaign.owner ? (
-                      <Crown size={20} color="#FFD700" />
-                    ) : (
-                      <Users size={20} color="#4CAF50" />
-                    )}
-                    <Text style={styles.playerName}>{player.name || `Player ${index + 1}`}</Text>
-                    {player.ready && (
-                      <CheckCircle2 size={20} color="#4CAF50" style={styles.readyIcon} />
-                    )}
-                  </View>
-
-                  <View style={styles.characterInfo}>
-                    {playerCharacter ? (
-                      <TouchableOpacity
-                        style={styles.selectedCharacterContainer}
-                        onPress={() => canSelectCharacter ? setShowCharacterSelector(player.id) : undefined}
-                        disabled={!canSelectCharacter}
-                      >
-                        <Image
-                          source={getCharacterAvatarUrl(playerCharacter)}
-                          style={styles.characterAvatar}
-                        />
-                        <View style={styles.characterDetails}>
-                          <Text style={styles.selectedCharacterText}>
-                            {playerCharacter.name}
-                          </Text>
-                          <Text style={styles.selectedCharacterSubtext}>
-                            Lv{playerCharacter.level} {playerCharacter.race} {playerCharacter.class}
-                          </Text>
-                        </View>
-                        {canSelectCharacter && (
-                          <ChevronDown size={16} color="#4CAF50" style={styles.chevronIcon} />
-                        )}
-                      </TouchableOpacity>
-                    ) : canSelectCharacter ? (
-                      <TouchableOpacity
-                        style={styles.selectCharacterButton}
-                        onPress={() => setShowCharacterSelector(player.id)}
-                      >
-                        <Text style={styles.selectCharacterText}>Select Character</Text>
-                        <ChevronDown size={16} color="#888" />
-                      </TouchableOpacity>
-                    ) : (
-                      <Text style={styles.noCharacterText}>No Character</Text>
-                    )}
+                    <View style={styles.characterInfo}>
+                      {playerCharacter ? (
+                        <TouchableOpacity
+                          style={styles.selectedCharacterContainer}
+                          onPress={() => canSelectCharacter ? setShowCharacterSelector(player.id) : undefined}
+                          disabled={!canSelectCharacter}
+                        >
+                          <Image
+                            source={getCharacterAvatarUrl(playerCharacter)}
+                            style={styles.characterAvatar}
+                          />
+                          <View style={styles.characterDetails}>
+                            <Text style={styles.selectedCharacterText}>
+                              {playerCharacter.name}
+                            </Text>
+                            <Text style={styles.selectedCharacterSubtext}>
+                              Lv{playerCharacter.level} {playerCharacter.race} {playerCharacter.class}
+                            </Text>
+                          </View>
+                          {canSelectCharacter && (
+                            <ChevronDown size={16} color="#4CAF50" style={styles.chevronIcon} />
+                          )}
+                        </TouchableOpacity>
+                      ) : canSelectCharacter ? (
+                        <TouchableOpacity
+                          style={styles.selectCharacterButton}
+                          onPress={() => setShowCharacterSelector(player.id)}
+                        >
+                          <Text style={styles.selectCharacterText}>Select Character</Text>
+                          <ChevronDown size={16} color="#888" />
+                        </TouchableOpacity>
+                      ) : (
+                        <Text style={styles.noCharacterText}>No Character</Text>
+                      )}
+                    </View>
                   </View>
                 </View>
+              );
+            })}
+          </View>
+        </View>
+        {/* Collapsible Invite Players Section */}
+        <View style={styles.inviteSection}>
+          <TouchableOpacity 
+            style={styles.inviteSectionHeader}
+            onPress={() => setIsInviteSectionOpen(!isInviteSectionOpen)}
+          >
+            <Text style={styles.inviteSectionTitle}>Invite New Players</Text>
+            {isInviteSectionOpen ? (
+              <ChevronUp size={24} color="#fff" />
+            ) : (
+              <ChevronDown size={24} color="#fff" />
+            )}
+          </TouchableOpacity>
+
+          {isInviteSectionOpen && (
+            <View style={styles.inviteContent}>
+              <View style={styles.codeContainer}>
+                <Text style={styles.codeLabel}>Invite Code</Text>
+                <View style={styles.codeBox}>
+                  <Text style={styles.code}>{currentCampaign.invite_code}</Text>
+                  <TouchableOpacity style={styles.copyButton} onPress={handleCopyCode}>
+                    {copied ? (
+                      <CheckCircle2 size={24} color="#4CAF50" />
+                    ) : (
+                      <Copy size={24} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
-            );
-          })}
-        </ScrollView>
-      </View>
+
+              <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+                <ShareIcon size={20} color="#fff" />
+                <Text style={styles.shareButtonText}>Share Invite Link</Text>
+              </TouchableOpacity>
+
+              {smsAvailable && (
+                <View style={styles.smsContainer}>
+                  <Text style={styles.smsLabel}>Send SMS Invite</Text>
+                  <View style={styles.smsInputContainer}>
+                    <TextInput
+                      style={styles.smsInput}
+                      value={phoneNumbers}
+                      onChangeText={setPhoneNumbers}
+                      placeholder="Enter phone numbers (comma-separated)"
+                      placeholderTextColor="#666"
+                    />
+                    <TouchableOpacity
+                      style={[styles.smsButton, !phoneNumbers && styles.smsButtonDisabled]}
+                      onPress={handleSendSMS}
+                      disabled={!phoneNumbers}
+                    >
+                      <Send size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Campaign Details Section */}
+        <View style={styles.campaignDetailsSection}>
+          <View style={styles.sectionHeader}>
+            <Info size={20} color="#4CAF50" />
+            <Text style={styles.sectionTitle}>Campaign Details</Text>
+          </View>
+
+          {adventureDetails && (
+            <View style={styles.adventureCard}>
+              <Text style={styles.adventureTitle}>{adventureDetails.title}</Text>
+              <Text style={styles.adventureDescription}>{adventureDetails.description}</Text>
+            </View>
+          )}
+
+          <View style={styles.detailsGrid}>
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Tone</Text>
+              <Text style={styles.detailValue}>
+                {currentCampaign.tone.charAt(0).toUpperCase() + currentCampaign.tone.slice(1)}
+              </Text>
+            </View>
+
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Content Level</Text>
+              <Text style={styles.detailValue}>
+                {getContentLevelDisplay(currentCampaign.content_level)}
+              </Text>
+            </View>
+
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Focus</Text>
+              <Text style={styles.detailValue}>
+                {getRpFocusDisplay(currentCampaign.rp_focus)}
+              </Text>
+            </View>
+
+            {currentCampaign.exclude && currentCampaign.exclude.length > 0 && (
+              <View style={[styles.detailItem, styles.fullWidth]}>
+                <Text style={styles.detailLabel}>Excluded Content</Text>
+                <View style={styles.excludedTags}>
+                  {currentCampaign.exclude.map((tag, index) => (
+                    <View key={index} style={styles.excludedTag}>
+                      <Text style={styles.excludedTagText}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </ScrollView>
 
       <TouchableOpacity
         style={[
@@ -659,6 +765,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0
   },
   header: {
     flexDirection: 'row',
@@ -692,6 +799,9 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
+  content: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -717,9 +827,30 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: 'Inter-Regular',
   },
-  codeContainer: {
+  inviteSection: {
     marginHorizontal: 20,
     marginTop: 20,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  inviteSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#333',
+  },
+  inviteSectionTitle: {
+    fontSize: 18,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  inviteContent: {
+    padding: 16,
+  },
+  codeContainer: {
+    marginBottom: 16,
   },
   codeLabel: {
     fontSize: 16,
@@ -730,7 +861,7 @@ const styles = StyleSheet.create({
   codeBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2a2a2a',
+    backgroundColor: '#1a1a1a',
     borderRadius: 8,
     padding: 16,
   },
@@ -749,8 +880,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#2196F3',
-    marginHorizontal: 20,
-    marginTop: 12,
+    marginBottom: 16,
     padding: 16,
     borderRadius: 8,
     gap: 8,
@@ -761,8 +891,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
   },
   smsContainer: {
-    marginHorizontal: 20,
-    marginTop: 20,
+    marginBottom: 8,
   },
   smsLabel: {
     fontSize: 16,
@@ -777,7 +906,7 @@ const styles = StyleSheet.create({
   },
   smsInput: {
     flex: 1,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: '#1a1a1a',
     borderRadius: 8,
     padding: 12,
     color: '#fff',
@@ -795,8 +924,89 @@ const styles = StyleSheet.create({
   smsButtonDisabled: {
     backgroundColor: '#666',
   },
-  playersContainer: {
+  campaignDetailsSection: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  adventureCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  adventureTitle: {
+    fontSize: 18,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
+  adventureDescription: {
+    fontSize: 14,
+    color: '#ccc',
+    fontFamily: 'Inter-Regular',
+    lineHeight: 20,
+  },
+  detailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  detailItem: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    padding: 12,
     flex: 1,
+    minWidth: '45%',
+  },
+  fullWidth: {
+    minWidth: '100%',
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: '#888',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  detailValue: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+  },
+  excludedTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  excludedTag: {
+    backgroundColor: '#ff4444',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  excludedTagText: {
+    fontSize: 12,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  playersContainer: {
     marginHorizontal: 20,
     marginTop: 20,
   },
@@ -814,13 +1024,12 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   playersList: {
-    flex: 1,
+    gap: 8,
   },
   playerItem: {
     backgroundColor: '#2a2a2a',
     padding: 16,
     borderRadius: 8,
-    marginBottom: 8,
   },
   playerRow: {
     flexDirection: 'row',
@@ -840,16 +1049,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   readyIcon: {
-    marginLeft: 8,
-  },
-  ownerBadge: {
-    backgroundColor: '#FFD700',
-    color: '#1a1a1a',
-    fontSize: 12,
-    fontFamily: 'Inter-Bold',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
     marginLeft: 8,
   },
   characterInfo: {

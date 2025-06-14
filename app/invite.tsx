@@ -1,5 +1,5 @@
 import React from 'react';
-import InviteFriendsScreen from '../../src/screens/InviteFriendsScreen';
+import InviteFriendsScreen from '../src/screens/InviteFriendsScreen';
 import { Stack } from 'expo-router';
 
 export default function InviteTab() {

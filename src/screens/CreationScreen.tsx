@@ -11,6 +11,7 @@ import {
   Image,
   Platform,
   Modal,
+  StatusBar,
 } from 'react-native';
 import { ArrowLeft, ArrowRight, Save, User, Dices, Scroll, Package, Camera, Upload, ShieldUser, Dna, Brain, BookOpen, X, ShoppingCart, Trash2, Coins, ChevronUp, ChevronDown } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -70,7 +71,7 @@ const CREATION_STEPS = [
   { id: 7, title: 'Review', icon: Save },
 ];
 
-// Point buy cost chart for D&D 5e
+// Point buy cost chart for 5e
 const POINT_BUY_COSTS: { [key: number]: number } = {
   8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9
 };
@@ -479,12 +480,12 @@ export default function CreationScreen() {
 
   const renderStepIndicator = () => (
     <View style={styles.stepIndicatorContainer}>
-      <ScrollView
-        horizontal
-        scrollEnabled={false}
-        showsHorizontalScrollIndicator={false}
+      <View
+        //horizontal
+        //scrollEnabled={false}
+        //showsHorizontalScrollIndicator={false}
         style={styles.stepIndicator}
-        contentContainerStyle={styles.stepIndicatorContent}
+        //contentContainerStyle={styles.stepIndicatorContent}
       >
         {CREATION_STEPS.map((step, index) => {
           const Icon = step.icon;
@@ -512,7 +513,7 @@ export default function CreationScreen() {
             </View>
           );
         })}
-      </ScrollView>
+      </View>
     </View>
   );
 
@@ -1567,6 +1568,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0
   },
   loadingContainer: {
     flex: 1,
@@ -1610,21 +1612,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   stepIndicator: {
-    flexGrow: 0,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   stepIndicatorContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     alignItems: 'center',
   },
   stepItem: {
     alignItems: 'center',
-    marginRight: 20,
-    minWidth: 30,
+    minWidth: 25,
   },
   stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: '#2a2a2a',
     justifyContent: 'center',
     alignItems: 'center',

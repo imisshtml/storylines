@@ -9,6 +9,8 @@ import {
   Switch,
   Alert,
   ActivityIndicator,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import { ArrowLeft, User, Mail, Calendar, Crown, Users, UserX, Bell, BellOff, Volume2, VolumeX, Trash2, Shield } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -334,6 +336,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0
   },
   header: {
     flexDirection: 'row',

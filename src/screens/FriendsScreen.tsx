@@ -11,6 +11,8 @@ import {
   Image,
   Modal,
   Alert,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import {
   ArrowLeft,
@@ -600,6 +602,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0
   },
   header: {
     flexDirection: 'row',
