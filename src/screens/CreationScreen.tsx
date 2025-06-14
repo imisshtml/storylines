@@ -11,6 +11,7 @@ import {
   Image,
   Platform,
   Modal,
+  StatusBar,
 } from 'react-native';
 import { ArrowLeft, ArrowRight, Save, User, Dices, Scroll, Package, Camera, Upload, ShieldUser, Dna, Brain, BookOpen, X, ShoppingCart, Trash2, Coins, ChevronUp, ChevronDown } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -1567,6 +1568,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0
   },
   loadingContainer: {
     flex: 1,
