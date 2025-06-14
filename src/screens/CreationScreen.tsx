@@ -1613,6 +1613,7 @@ const styles = StyleSheet.create({
   },
   stepIndicator: {
     flexGrow: 0,
+    flexDirection: 'row'
   },
   stepIndicatorContent: {
     paddingHorizontal: 12,
