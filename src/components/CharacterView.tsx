@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
   combatStatItem: {
     flex: 1,
     minWidth: '22%',
-    backgroundColor: 'white',
+    backgroundColor: '#2a2a2a',
     padding: 12,
     borderRadius: 12,
     alignItems: 'center',
