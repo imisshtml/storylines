@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ImageBackground, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Shield, Swords, Brain, Heart, Footprints, Star, Package, BookOpen, Medal, Scroll, Sword, Sparkles, Zap } from 'lucide-react-native';
+import { Character } from '../atoms/characterAtoms';
 
 type CoreStat = {
   name: string;
@@ -53,115 +54,134 @@ type Spell = {
   description: string[];
 };
 
-export default function CharacterView() {
+interface CharacterViewProps {
+  character?: Character | null;
+}
+
+export default function CharacterView({ character }: CharacterViewProps) {
   const [activeTab, setActiveTab] = useState<'stats' | 'features' | 'inventory' | 'spells' | 'equipment'>('stats');
   const [expandedSpell, setExpandedSpell] = useState<string | null>(null);
 
+  // If no character is provided, show placeholder message
+  if (!character) {
+    return (
+      <View style={styles.noCharacterContainer}>
+        <Text style={styles.noCharacterText}>No character data available</Text>
+      </View>
+    );
+  }
+
+  // Helper function to calculate ability modifier
+  const getAbilityModifier = (score: number) => {
+    return Math.floor((score - 10) / 2);
+  };
+
+  // Helper function to get final ability score (including racial bonuses)
+  const getFinalAbilityScore = (ability: string) => {
+    const baseScore = character.abilities?.[ability] || 10;
+    
+    // Add racial bonuses if available
+    const raceData = character.character_data?.race;
+    if (raceData?.ability_bonuses) {
+      const bonus = raceData.ability_bonuses.find(
+        (bonus: any) => bonus.ability_score.index === ability.substring(0, 3)
+      );
+      if (bonus) {
+        return baseScore + bonus.bonus;
+      }
+    }
+    
+    return baseScore;
+  };
+
+  // Build combat stats from character data
   const combatStats: CombatStat[] = [
-    { name: 'Initiative', value: 2, icon: <Zap size={20} color="#ffc107" /> },
-    { name: 'HP', value: 12, icon: <Heart size={20} color="#e91e63" /> },
-    { name: 'AC', value: 16, icon: <Shield size={20} color="#1976d2" /> },
-    { name: 'Proficiency', value: 2, icon: <Medal size={20} color="#9c27b0" /> },
+    { name: 'Initiative', value: getAbilityModifier(getFinalAbilityScore('dexterity')), icon: <Zap size={20} color="#ffc107" /> },
+    { name: 'HP', value: character.current_hitpoints || 0, icon: <Heart size={20} color="#e91e63" /> },
+    { name: 'AC', value: character.armor_class || 10, icon: <Shield size={20} color="#1976d2" /> },
+    { name: 'Proficiency', value: Math.ceil(character.level / 4) + 1, icon: <Medal size={20} color="#9c27b0" /> },
   ];
 
+  // Build core stats from character data
   const coreStats: CoreStat[] = [
-    { name: 'STR', value: 16, modifier: 3, savingThrow: 5, isProficient: true, icon: <Swords size={20} color="#d32f2f" /> },
-    { name: 'DEX', value: 14, modifier: 2, savingThrow: 2, isProficient: false, icon: <Footprints size={20} color="#4caf50" /> },
-    { name: 'CON', value: 15, modifier: 2, savingThrow: 4, isProficient: true, icon: <Heart size={20} color="#e91e63" /> },
-    { name: 'INT', value: 10, modifier: 0, savingThrow: 0, isProficient: false, icon: <Brain size={20} color="#9c27b0" /> },
-    { name: 'WIS', value: 12, modifier: 1, savingThrow: 1, isProficient: false, icon: <Star size={20} color="#ffc107" /> },
-    { name: 'CHA', value: 8, modifier: -1, savingThrow: -1, isProficient: false, icon: <Sparkles size={20} color="#2196f3" /> },
-  ];
+    'strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'
+  ].map(ability => {
+    const finalScore = getFinalAbilityScore(ability);
+    const modifier = getAbilityModifier(finalScore);
+    const proficiencyBonus = Math.ceil(character.level / 4) + 1;
+    
+    // Check if this is a saving throw proficiency (simplified - would need class data for accuracy)
+    const isProficient = false; // This would need to be determined from class data
+    const savingThrow = modifier + (isProficient ? proficiencyBonus : 0);
 
+    const icons = {
+      strength: <Swords size={20} color="#d32f2f" />,
+      dexterity: <Footprints size={20} color="#4caf50" />,
+      constitution: <Heart size={20} color="#e91e63" />,
+      intelligence: <Brain size={20} color="#9c27b0" />,
+      wisdom: <Star size={20} color="#ffc107" />,
+      charisma: <Sparkles size={20} color="#2196f3" />,
+    };
+
+    return {
+      name: ability.substring(0, 3).toUpperCase(),
+      value: finalScore,
+      modifier,
+      savingThrow,
+      isProficient,
+      icon: icons[ability as keyof typeof icons],
+    };
+  });
+
+  // Get features from character data (simplified)
   const features: Feature[] = [
     {
-      name: 'Fighting Style: Defense',
-      description: 'While wearing armor, you gain a +1 bonus to AC.',
-      source: 'Warrior 1',
+      name: `${character.class} Features`,
+      description: `Class features for a level ${character.level} ${character.class}.`,
+      source: `${character.class} ${character.level}`,
     },
     {
-      name: 'Second Wind',
-      description: 'Once per short rest, use a bonus action to regain 1d10 + fighter level HP.',
-      source: 'Warrior 1',
-    },
-    {
-      name: 'Martial Weapons',
-      description: 'You are proficient with all martial weapons.',
-      source: 'Warrior',
+      name: `${character.race} Traits`,
+      description: `Racial traits from ${character.race} heritage.`,
+      source: character.race,
     },
   ];
 
-  const inventory: InventoryItem[] = [
-    { name: 'Arrows', quantity: 20, weight: 1, type: 'adventuring gear' },
-    { name: 'Backpack', quantity: 1, weight: 5, type: 'adventuring gear' },
-    { name: 'Bedroll', quantity: 1, weight: 7, type: 'adventuring gear' },
-    { name: 'Rations (days)', quantity: 5, weight: 10, type: 'consumable' },
-    { name: 'Rope, hempen (50 feet)', quantity: 1, weight: 10, type: 'adventuring gear' },
-    { name: 'Tinderbox', quantity: 1, weight: 1, type: 'tool' },
-    { name: 'Torch', quantity: 5, weight: 5, type: 'adventuring gear' },
-    { name: 'Waterskin', quantity: 1, weight: 5, type: 'adventuring gear' },
-  ];
+  // Get inventory from character data
+  const inventory: InventoryItem[] = [];
+  
+  // Add purchased equipment to inventory
+  const purchasedEquipment = character.character_data?.purchasedEquipment || [];
+  purchasedEquipment.forEach((item: any) => {
+    inventory.push({
+      name: item.name,
+      quantity: item.quantity || 1,
+      weight: item.weight || 0,
+      type: item.equipment_category || 'adventuring gear',
+    });
+  });
 
-  const equipment: Equipment[] = [
-    {
-      name: 'Longsword',
-      type: 'weapon',
-      stats: {
-        damage: '1d8 slashing',
-        properties: 'Versatile (1d10)',
-        weight: 3,
-      },
-      description: 'Versatile melee weapon',
-      equipped: true,
-    },
-    {
-      name: 'Chain Mail',
-      type: 'armor',
-      stats: {
-        ac: 16,
-        weight: 55,
-        'str-requirement': 13,
-        'stealth': 'Disadvantage',
-      },
-      description: 'Heavy armor made of interlocking metal rings',
-      equipped: true,
-    },
-    {
-      name: 'Shield',
-      type: 'armor',
-      stats: {
-        ac: 2,
-        weight: 6,
-      },
-      description: 'A wooden or metal shield',
-      equipped: true,
-    },
-  ];
+  // Get equipment from character data
+  const equipment: Equipment[] = [];
+  
+  // Add purchased equipment as equipped items
+  purchasedEquipment.forEach((item: any) => {
+    if (item.equipment_category === 'weapon' || item.equipment_category === 'armor') {
+      equipment.push({
+        name: item.name,
+        type: item.equipment_category,
+        stats: {
+          weight: item.weight || 0,
+          cost: `${item.cost_quantity || 0} ${item.cost_unit || 'gp'}`,
+        },
+        description: item.description || 'No description available',
+        equipped: true,
+      });
+    }
+  });
 
-  const spells: Spell[] = [
-    {
-      index: 'fire-bolt',
-      name: 'Fire Bolt',
-      level: 0,
-      school: { name: 'Evocation' },
-      casting_time: '1 action',
-      range: '120 feet',
-      components: ['V', 'S'],
-      duration: 'Instantaneous',
-      description: ['Ranged spell attack deals 1d10 fire damage. Ignites flammable objects.'],
-    },
-    {
-      index: 'shield',
-      name: 'Shield',
-      level: 1,
-      school: { name: 'Abjuration' },
-      casting_time: '1 reaction',
-      range: 'Self',
-      components: ['V', 'S'],
-      duration: '1 round',
-      description: ['+5 to AC, including against triggering attack. Blocks Magic Missile.'],
-    },
-  ];
+  // Get spells from character data
+  const spells: Spell[] = character.spells || [];
 
   const renderCombatStats = () => (
     <View style={styles.combatStatsGrid}>
@@ -169,7 +189,9 @@ export default function CharacterView() {
         <View key={index} style={styles.combatStatItem}>
           {stat.icon}
           <Text style={styles.combatStatName}>{stat.name}</Text>
-          <Text style={styles.combatStatValue}>{stat.value}</Text>
+          <Text style={styles.combatStatValue}>
+            {stat.name === 'HP' ? `${character.current_hitpoints}/${character.max_hitpoints}` : stat.value}
+          </Text>
         </View>
       ))}
     </View>
@@ -212,73 +234,109 @@ export default function CharacterView() {
 
   const renderInventory = () => (
     <View style={styles.inventoryList}>
-      {inventory.map((item, index) => (
-        <View key={index} style={styles.inventoryItem}>
-          <View style={styles.itemInfo}>
-            <Text style={styles.itemName}>{item.name}</Text>
-            <Text style={styles.itemType}>{item.type}</Text>
+      {inventory.length === 0 ? (
+        <View style={styles.emptySection}>
+          <Text style={styles.emptySectionText}>No items in inventory</Text>
+        </View>
+      ) : (
+        inventory.map((item, index) => (
+          <View key={index} style={styles.inventoryItem}>
+            <View style={styles.itemInfo}>
+              <Text style={styles.itemName}>{item.name}</Text>
+              <Text style={styles.itemType}>{item.type}</Text>
+            </View>
+            <View style={styles.itemDetails}>
+              <Text style={styles.itemWeight}>{item.weight} lb</Text>
+              <Text style={styles.itemQuantity}>×{item.quantity}</Text>
+            </View>
           </View>
-          <View style={styles.itemDetails}>
-            <Text style={styles.itemWeight}>{item.weight} lb</Text>
-            <Text style={styles.itemQuantity}>×{item.quantity}</Text>
+        ))
+      )}
+      
+      {/* Currency */}
+      {(character.gold > 0 || character.silver > 0 || character.copper > 0) && (
+        <View style={styles.currencySection}>
+          <Text style={styles.currencyTitle}>Currency</Text>
+          <View style={styles.currencyContainer}>
+            {character.gold > 0 && (
+              <Text style={styles.currencyItem}>{character.gold} gp</Text>
+            )}
+            {character.silver > 0 && (
+              <Text style={styles.currencyItem}>{character.silver} sp</Text>
+            )}
+            {character.copper > 0 && (
+              <Text style={styles.currencyItem}>{character.copper} cp</Text>
+            )}
           </View>
         </View>
-      ))}
+      )}
     </View>
   );
 
   const renderEquipment = () => (
     <View style={styles.equipmentList}>
-      {equipment.map((item, index) => (
-        <View key={index} style={styles.equipmentItem}>
-          <View style={styles.equipmentHeader}>
-            <Text style={styles.equipmentName}>{item.name}</Text>
-            {item.equipped && <Text style={styles.equippedBadge}>Equipped</Text>}
-          </View>
-          <View style={styles.equipmentStats}>
-            {Object.entries(item.stats).map(([key, value]) => (
-              <Text key={key} style={styles.equipmentStat}>
-                {key}: {value}
-              </Text>
-            ))}
-          </View>
-          <Text style={styles.equipmentDescription}>{item.description}</Text>
+      {equipment.length === 0 ? (
+        <View style={styles.emptySection}>
+          <Text style={styles.emptySectionText}>No equipment</Text>
         </View>
-      ))}
+      ) : (
+        equipment.map((item, index) => (
+          <View key={index} style={styles.equipmentItem}>
+            <View style={styles.equipmentHeader}>
+              <Text style={styles.equipmentName}>{item.name}</Text>
+              {item.equipped && <Text style={styles.equippedBadge}>Equipped</Text>}
+            </View>
+            <View style={styles.equipmentStats}>
+              {Object.entries(item.stats).map(([key, value]) => (
+                <Text key={key} style={styles.equipmentStat}>
+                  {key}: {value}
+                </Text>
+              ))}
+            </View>
+            <Text style={styles.equipmentDescription}>{item.description}</Text>
+          </View>
+        ))
+      )}
     </View>
   );
 
   const renderSpells = () => (
     <View style={styles.spellsList}>
-      {spells.map((spell, index) => (
-        <TouchableOpacity
-          key={index}
-          style={styles.spellItem}
-          onPress={() => setExpandedSpell(expandedSpell === spell.name ? null : spell.name)}
-        >
-          <View style={styles.spellHeader}>
-            <Text style={styles.spellName}>
-              {spell.name}({spell.level === 0 ? 'c' : spell.level})
-            </Text>
-          </View>
-          {expandedSpell === spell.name ? (
-            <View style={styles.spellDetails}>
-              <Text style={styles.spellSchool}>{spell.school.name}</Text>
-              <Text style={styles.spellProperty}>Casting Time: {spell.casting_time}</Text>
-              <Text style={styles.spellProperty}>Range: {spell.range}</Text>
-              <Text style={styles.spellProperty}>Components: {spell.components.join(', ')}</Text>
-              <Text style={styles.spellProperty}>Duration: {spell.duration}</Text>
-              {spell.description.map((desc, i) => (
-                <Text key={i} style={styles.spellDescription}>{desc}</Text>
-              ))}
+      {spells.length === 0 ? (
+        <View style={styles.emptySection}>
+          <Text style={styles.emptySectionText}>No spells known</Text>
+        </View>
+      ) : (
+        spells.map((spell, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.spellItem}
+            onPress={() => setExpandedSpell(expandedSpell === spell.name ? null : spell.name)}
+          >
+            <View style={styles.spellHeader}>
+              <Text style={styles.spellName}>
+                {spell.name} ({spell.level === 0 ? 'c' : spell.level})
+              </Text>
             </View>
-          ) : (
-            <Text style={styles.spellPreview} numberOfLines={1}>
-              {spell.description[0]}
-            </Text>
-          )}
-        </TouchableOpacity>
-      ))}
+            {expandedSpell === spell.name ? (
+              <View style={styles.spellDetails}>
+                <Text style={styles.spellSchool}>{spell.school?.name || 'Unknown School'}</Text>
+                <Text style={styles.spellProperty}>Casting Time: {spell.casting_time}</Text>
+                <Text style={styles.spellProperty}>Range: {spell.range}</Text>
+                <Text style={styles.spellProperty}>Components: {spell.components?.join(', ') || 'None'}</Text>
+                <Text style={styles.spellProperty}>Duration: {spell.duration}</Text>
+                {spell.description && spell.description.map((desc, i) => (
+                  <Text key={i} style={styles.spellDescription}>{desc}</Text>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.spellPreview} numberOfLines={1}>
+                {spell.description?.[0] || 'No description available'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        ))
+      )}
     </View>
   );
 
@@ -342,6 +400,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  noCharacterContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  noCharacterText: {
+    fontSize: 18,
+    color: '#666',
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
   },
   tabs: {
     flexDirection: 'row',
@@ -531,6 +601,31 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontFamily: 'Inter-Bold',
   },
+  currencySection: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  currencyTitle: {
+    fontSize: 16,
+    color: '#1a1a1a',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
+  currencyContainer: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  currencyItem: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Bold',
+  },
   equipmentList: {
     gap: 12,
   },
@@ -630,5 +725,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     marginTop: 8,
     lineHeight: 20,
+  },
+  emptySection: {
+    backgroundColor: 'white',
+    padding: 32,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  emptySectionText: {
+    fontSize: 16,
+    color: '#666',
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
   },
 });

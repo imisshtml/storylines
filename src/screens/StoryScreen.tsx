@@ -362,8 +362,10 @@ export default function StoryScreen() {
       user?.username || user?.email || 'Player'
     );
 
-    // Show choices again after DM responds
-    setTimeout(() => setShowChoices(true), 1000);
+    // Show choices again after DM responds (except for whispers)
+    if (selectedInputType !== 'whisper') {
+      setTimeout(() => setShowChoices(true), 1000);
+    }
   };
 
   const handleHomePress = () => {
@@ -562,7 +564,7 @@ export default function StoryScreen() {
                 </TouchableOpacity>
               </View>
               {currentCharacter ? (
-                <CharacterView />
+                <CharacterView character={currentCharacter} />
               ) : (
                 <View style={styles.noCharacterContainer}>
                   <Text style={styles.noCharacterText}>
