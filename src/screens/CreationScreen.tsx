@@ -1621,7 +1621,7 @@ const styles = StyleSheet.create({
   stepItem: {
     alignItems: 'center',
     marginRight: 20,
-    minWidth: 30,
+    minWidth: 25,
   },
   stepCircle: {
     width: 32,
