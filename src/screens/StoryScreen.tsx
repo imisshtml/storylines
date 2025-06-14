@@ -497,7 +497,7 @@ export default function StoryScreen() {
                       ]}
                       onPress={() => handleInputTypeSelect(option)}
                     >
-                      {option.icon}
+                      
                       <Text style={styles.inputTypeOptionText}>{option.label}</Text>
                     </TouchableOpacity>
                   ))}
