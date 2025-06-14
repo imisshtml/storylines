@@ -77,21 +77,22 @@ export async function POST(request: Request) {
       throw new Error(middlewareResult.error || 'Middleware request failed');
     }
 
-    const { data } = middlewareResult;
+    // Use the actual middleware response structure
+    const { response, choices, gameState } = middlewareResult;
 
     // Return the enhanced response from middleware
     return Response.json({
-      response: data.narrative,
-      choices: data.personalizedChoices || [],
+      response: response, // This is the narrative text
+      choices: choices || [],
       campaignId,
       timestamp: new Date().toISOString(),
       gameState: {
-        mode: data.gameState?.mode,
-        scene: data.gameState?.currentScene?.title,
-        playersOnline: data.gameState?.playerStates ? Object.keys(data.gameState.playerStates).length : 0
+        mode: gameState?.mode,
+        scene: gameState?.scene?.title,
+        playersOnline: gameState?.playerStates ? Object.keys(gameState.playerStates).length : 0
       },
-      diceResults: data.diceResults || [],
-      modeTransition: data.modeTransition || null,
+      diceResults: [], // Not provided in current middleware response
+      modeTransition: null, // Not provided in current middleware response
       success: true
     });
 

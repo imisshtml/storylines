@@ -31,7 +31,7 @@ import {
 import { updateCampaignReadStatusAtom } from '../atoms/campaignReadStatusAtoms';
 import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
-import StoryChoices from '../components/StoryChoices';
+import EnhancedStoryChoices from '../components/EnhancedStoryChoices';
 import PlayerActionsPanel from '../components/PlayerActionsPanel';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask';
@@ -59,6 +59,14 @@ export default function StoryScreen() {
     'Search for signs of civilization',
     'Set up camp for the night',
     'Listen carefully for any sounds',
+    'Cast a detection spell to sense magic',
+    'Use your rope to climb the nearby tree',
+    'Talk to your companions about the situation',
+    'Attack the suspicious rustling in the bushes',
+    'Carefully examine the strange markings on the ground',
+    'Rest here and recover your strength',
+    'Intimidate any potential threats with a show of force',
+    'Use a healing potion to restore health',
   ]);
 
   // Input type selection
@@ -312,7 +320,7 @@ export default function StoryScreen() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            campaignId: currentCampaign.id,
+            campaignId: currentCampaign.uid, // Use UID for database consistency
             playerId: user.id, // Pass the user ID directly
             message: `Player action: ${action}`,
             context,
@@ -484,22 +492,8 @@ export default function StoryScreen() {
               </View>
             )}
 
-            {showChoices && !isLoading && selectedInputType !== 'whisper' && currentCampaign && user?.id && (
-              <PlayerActionsPanel
-                campaignUid={currentCampaign.uid}
-                userId={user.id}
-                currentGameMode="exploration"
-                onActionExecute={(action) => {
-                  // Handle action execution - convert to the same format as choice selection
-                  handleChoiceSelect(action.action_data.title);
-                }}
-                style={styles.playerActionsPanel}
-              />
-            )}
-
-            {/* Fallback to old choice system if no actions are available */}
-            {showChoices && !isLoading && choicesToShow.length > 0 && selectedInputType !== 'whisper' && (!currentCampaign || !user?.id) && (
-              <StoryChoices
+            {showChoices && !isLoading && selectedInputType !== 'whisper' && (
+              <EnhancedStoryChoices
                 choices={choicesToShow}
                 onChoiceSelect={handleChoiceSelect}
                 disabled={isLoading}
