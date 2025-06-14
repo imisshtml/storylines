@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import React from 'react';
 import { ArrowLeft } from 'lucide-react-native';
-import { StyleSheet, Text, TouchableOpacity, View, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, SafeAreaView, StatusBar, Platform } from 'react-native';
 import { useAtom } from 'jotai';
 
 export default function ShopScreen() {
@@ -25,6 +25,8 @@ export default function ShopScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#121212',
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0
   },
   header: {
     flexDirection: 'row',
