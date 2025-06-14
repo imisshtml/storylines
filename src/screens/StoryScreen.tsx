@@ -15,7 +15,7 @@ import {
   Alert,
   StatusBar,
 } from 'react-native';
-import { Send, Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, MessageSquare, Drama, Ear, CircleHelp as HelpCircle } from 'lucide-react-native';
+import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, MessageSquare, Drama, Ear, CircleHelp as HelpCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
@@ -32,6 +32,7 @@ import { updateCampaignReadStatusAtom } from '../atoms/campaignReadStatusAtoms';
 import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
 import StoryChoices from '../components/StoryChoices';
+import PlayerActionsPanel from '../components/PlayerActionsPanel';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask';
 
@@ -483,7 +484,21 @@ export default function StoryScreen() {
               </View>
             )}
 
-            {showChoices && !isLoading && choicesToShow.length > 0 && selectedInputType !== 'whisper' && (
+            {showChoices && !isLoading && selectedInputType !== 'whisper' && currentCampaign && user?.id && (
+              <PlayerActionsPanel
+                campaignUid={currentCampaign.uid}
+                userId={user.id}
+                currentGameMode="exploration"
+                onActionExecute={(action) => {
+                  // Handle action execution - convert to the same format as choice selection
+                  handleChoiceSelect(action.action_data.title);
+                }}
+                style={styles.playerActionsPanel}
+              />
+            )}
+
+            {/* Fallback to old choice system if no actions are available */}
+            {showChoices && !isLoading && choicesToShow.length > 0 && selectedInputType !== 'whisper' && (!currentCampaign || !user?.id) && (
               <StoryChoices
                 choices={choicesToShow}
                 onChoiceSelect={handleChoiceSelect}
@@ -864,5 +879,8 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
+  },
+  playerActionsPanel: {
+    marginVertical: 16,
   },
 });
