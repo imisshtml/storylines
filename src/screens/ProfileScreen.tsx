@@ -170,7 +170,7 @@ export default function ProfileScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile Information Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Profile Information</Text>
+          <Text style={styles.sectionTitle}>Profile Information!</Text>
           
           <View style={styles.infoItem}>
             <View style={styles.infoIcon}>
