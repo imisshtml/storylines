@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
-    paddingTop: 40,
+    //paddingTop: 40,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
