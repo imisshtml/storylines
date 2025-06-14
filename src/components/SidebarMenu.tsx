@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image, ScrollView } from 'react-native';
-import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary } from 'lucide-react-native';
+import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary, Users } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
@@ -87,6 +87,12 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
   };
 
   const menuItems = [
+    {
+      icon: <Users size={24} color="#fff" />,
+      title: 'My Characters',
+      subtitle: 'Create a new Character',
+      onPress: handleCreateCampaign,
+    },
     {
       icon: <Plus size={24} color="#fff" />,
       title: 'Create Campaign',
