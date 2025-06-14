@@ -59,7 +59,7 @@ export default function DevScreen() {
 
     const message = userInput.trim();
     setUserInput('');
-    
+
     // Add user message
     addMessage('user', message);
     setIsLoading(true);
@@ -70,10 +70,10 @@ export default function DevScreen() {
         campaign: {
           id: campaignUuid,
           name: 'Dev Test Campaign',
-          theme: 'fantasy',
           tone: 'serious',
-          level: 1,
-          exclude: [],
+          content_level: 'adults',
+          rp_focus: 'balanced',
+          exclude: ['gore', 'excessive violence'],
         },
         storyHistory: messages.filter(m => m.type !== 'system').slice(-5),
       };
@@ -195,7 +195,7 @@ export default function DevScreen() {
         style={styles.content}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <ScrollView 
+        <ScrollView
           ref={scrollViewRef}
           style={styles.chatContainer}
           showsVerticalScrollIndicator={false}
@@ -209,8 +209,8 @@ export default function DevScreen() {
                     {messageStyles.icon} {messageStyles.label}
                   </Text>
                   <Text style={styles.messageTime}>
-                    {new Date(message.timestamp).toLocaleTimeString([], { 
-                      hour: '2-digit', 
+                    {new Date(message.timestamp).toLocaleTimeString([], {
+                      hour: '2-digit',
                       minute: '2-digit',
                       second: '2-digit'
                     })}
