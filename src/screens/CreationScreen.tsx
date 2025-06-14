@@ -1612,7 +1612,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   stepIndicator: {
-    //flexGrow: 0,
     paddingHorizontal: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1624,7 +1623,6 @@ const styles = StyleSheet.create({
   },
   stepItem: {
     alignItems: 'center',
-    //marginRight: 15,
     minWidth: 25,
   },
   stepCircle: {
