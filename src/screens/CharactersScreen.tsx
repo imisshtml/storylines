@@ -222,7 +222,7 @@ export default function CharactersScreen() {
                 {characters.length} Character{characters.length !== 1 ? 's' : ''}
               </Text>
               <Text style={styles.headerSubtext}>
-                Tap a character to view details and manage equipment
+                Tap a character to view details and manage spells
               </Text>
             </View>
 
