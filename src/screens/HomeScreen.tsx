@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   campaignsContainer: {
-    flex: 0.70,
+    flex: 1,
     marginBottom: 20,
   },
   charactersContainer: {
