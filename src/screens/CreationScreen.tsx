@@ -160,6 +160,30 @@ export default function CreationScreen() {
     }
   };
 
+  const handleExit = () => {
+    showAlert(
+      'Exit Character Creation',
+      'Are you sure you want to exit? All progress will be lost.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Exit',
+          onPress: () => {
+            resetCharacterCreation();
+            setAvatarUri(null);
+            setSelectedAvatarId(null);
+            router.back();
+          },
+          style: 'destructive',
+        },
+      ],
+      'warning'
+    );
+  };
+
   const handleNext = () => {
     if (currentStep < CREATION_STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
@@ -401,9 +425,27 @@ export default function CreationScreen() {
     return spellcastingInfo;
   };
 
+  // Helper function to filter spells by class
+  const getSpellsForClass = (spellsArray: DnDSpell[]) => {
+    if (!selectedClass) return spellsArray;
+    
+    // Filter spells that are available to the selected class
+    return spellsArray.filter(spell => {
+      // If spell doesn't have classes property, allow it (for backwards compatibility)
+      if (!spell.classes || spell.classes.length === 0) return true;
+      
+      // Check if the spell is available to the selected class
+      return spell.classes.some(spellClass => 
+        spellClass.toLowerCase() === selectedClass.name.toLowerCase()
+      );
+    });
+  };
+
   // Helper computed values for spells
-  const cantrips = spells.filter(spell => spell.level === 0);
-  const level1Spells = spells.filter(spell => spell.level === 1);
+  const allCantrips = spells.filter(spell => spell.level === 0);
+  const allLevel1Spells = spells.filter(spell => spell.level === 1);
+  const cantrips = getSpellsForClass(allCantrips);
+  const level1Spells = getSpellsForClass(allLevel1Spells);
   const selectedCantrips = selectedSpells.filter(spell => spell.level === 0);
   const selectedLevel1Spells = selectedSpells.filter(spell => spell.level === 1);
   const spellcastingInfo = getSpellcastingInfo();
@@ -1385,6 +1427,9 @@ export default function CreationScreen() {
           <ArrowLeft color="#fff" size={24} />
         </TouchableOpacity>
         <Text style={styles.title}>Create Character</Text>
+        <TouchableOpacity onPress={handleExit} style={styles.exitButton}>
+          <X color="#fff" size={24} />
+        </TouchableOpacity>
       </View>
 
       {renderStepIndicator()}
@@ -1602,6 +1647,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  exitButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -1609,7 +1660,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     flex: 1,
     textAlign: 'center',
-    marginRight: 40,
   },
   stepIndicatorContainer: {
     backgroundColor: '#1a1a1a',
