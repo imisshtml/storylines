@@ -18,13 +18,22 @@ import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
-import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, ChevronUp, X, Plus, Crown, Info } from 'lucide-react-native';
+import { 
+  friendsAtom, 
+  fetchFriendsAtom, 
+  sendCampaignInvitationAtom,
+  campaignInvitationsAtom,
+  fetchCampaignInvitationsAtom,
+  type Friendship 
+} from '../atoms/friendsAtoms';
+import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, ChevronUp, X, Plus, Crown, Info, UserPlus, Clock, UserMinus } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as SMS from 'expo-sms';
 import { supabase } from '../config/supabase';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 import { ADVENTURES } from '../components/AdventureSelectSheet';
+import { useCustomAlert } from '../components/CustomAlert';
 
 export default function InviteFriendsScreen() {
   const [currentCampaign, setCurrentCampaign] = useAtom(currentCampaignAtom);
@@ -35,22 +44,24 @@ export default function InviteFriendsScreen() {
   const [characters] = useAtom(charactersAtom);
   const [campaignCharacters, setCampaignCharacters] = useState<Character[]>([]);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
+  const [friends] = useAtom(friendsAtom);
+  const [, fetchFriends] = useAtom(fetchFriendsAtom);
+  const [, sendCampaignInvitation] = useAtom(sendCampaignInvitationAtom);
+  const [campaignInvitations] = useAtom(campaignInvitationsAtom);
+  const [, fetchCampaignInvitations] = useAtom(fetchCampaignInvitationsAtom);
+  const [sentInvitations, setSentInvitations] = useState<any[]>([]);
   const [copied, setCopied] = useState(false);
   const [phoneNumbers, setPhoneNumbers] = useState('');
   const [smsAvailable, setSmsAvailable] = useState(false);
   const [showCharacterSelector, setShowCharacterSelector] = useState<string | null>(null);
   const [isInviteSectionOpen, setIsInviteSectionOpen] = useState(false);
+  const [sendingInvites, setSendingInvites] = useState<Set<string>>(new Set());
+  const { showAlert } = useCustomAlert();
 
-  useEffect(() => {
-    if (!currentCampaign) {
-      router.replace('/');
-    }
-    checkSmsAvailability();
-    if (user) {
-      fetchCharacters();
-      fetchCampaignCharacters();
-    }
-  }, [currentCampaign, user, fetchCharacters]);
+  const checkSmsAvailability = async () => {
+    const isAvailable = await SMS.isAvailableAsync();
+    setSmsAvailable(isAvailable);
+  };
 
   const fetchCampaignCharacters = useCallback(async () => {
     if (!currentCampaign) return;
@@ -71,6 +82,42 @@ export default function InviteFriendsScreen() {
       console.error('Error fetching campaign characters:', error);
     }
   }, [currentCampaign]);
+
+  const fetchSentInvitations = useCallback(async () => {
+    if (!currentCampaign || !user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('campaign_invitations')
+        .select('*')
+        .eq('campaign_id', currentCampaign.uid)
+        .eq('inviter_id', user.id)
+        .eq('status', 'pending');
+
+      if (error) {
+        console.error('Error fetching sent invitations:', error);
+        return;
+      }
+
+      setSentInvitations(data || []);
+    } catch (error) {
+      console.error('Error fetching sent invitations:', error);
+    }
+  }, [currentCampaign, user]);
+
+  useEffect(() => {
+    if (!currentCampaign) {
+      router.replace('/');
+    }
+    checkSmsAvailability();
+    if (user) {
+      fetchCharacters();
+      fetchCampaignCharacters();
+      fetchFriends();
+      fetchCampaignInvitations();
+      fetchSentInvitations();
+    }
+  }, [currentCampaign, user, fetchCharacters, fetchFriends, fetchCampaignInvitations, fetchSentInvitations]);
 
   // Set up real-time subscription for campaign and character updates
   useEffect(() => {
@@ -141,11 +188,6 @@ export default function InviteFriendsScreen() {
       cleanup();
     };
   }, [currentCampaign?.id, user?.id, setCurrentCampaign]);
-
-  const checkSmsAvailability = async () => {
-    const isAvailable = await SMS.isAvailableAsync();
-    setSmsAvailable(isAvailable);
-  };
 
   // Use refs to store latest functions for subscription callbacks
   const fetchCharactersRef = useRef(fetchCharacters);
@@ -346,6 +388,142 @@ export default function InviteFriendsScreen() {
     });
   };
 
+  const handleInviteFriend = async (friend: Friendship) => {
+    if (!currentCampaign || !friend.friend_profile) return;
+
+    const friendId = friend.friend_profile.id;
+    setSendingInvites(prev => new Set(prev).add(friendId));
+
+    try {
+      await sendCampaignInvitation({
+        campaignId: currentCampaign.uid,
+        friendId: friendId,
+      });
+      
+      // Show success alert
+      showAlert(
+        'Invitation Sent!',
+        `Campaign invitation sent to ${friend.friend_profile.username}`,
+        undefined,
+        'success'
+      );
+      
+      // Refresh invitations to update pending status
+      fetchCampaignInvitations();
+      fetchSentInvitations();
+    } catch (error) {
+      console.error('Error sending campaign invitation:', error);
+      showAlert(
+        'Invitation Failed',
+        `Failed to send invitation to ${friend.friend_profile?.username}. Please try again.`,
+        undefined,
+        'error'
+      );
+    } finally {
+      setSendingInvites(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(friendId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleRemovePlayer = async (playerId: string, playerName: string) => {
+    if (!currentCampaign || !user || currentCampaign.owner !== user.id) return;
+
+    showAlert(
+      'Remove Player',
+      `Are you sure you want to remove ${playerName} from the campaign?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Remove player from campaign players array
+              const updatedPlayers = currentCampaign.players.filter(player => player.id !== playerId);
+
+              // Update campaign in database
+              const { error: campaignError } = await supabase
+                .from('campaigns')
+                .update({ players: updatedPlayers })
+                .eq('id', currentCampaign.id);
+
+              if (campaignError) {
+                console.error('Error updating campaign:', campaignError);
+                throw campaignError;
+              }
+
+              // If the player had a character assigned, unassign it
+              const playerCharacter = getPlayerCharacter(playerId);
+              if (playerCharacter) {
+                const { error: characterError } = await supabase
+                  .from('characters')
+                  .update({ campaign_id: null })
+                  .eq('id', playerCharacter.id)
+                  .eq('user_id', playerId);
+
+                if (characterError) {
+                  console.error('Error unassigning character:', characterError);
+                  // Don't throw here, campaign update was successful
+                }
+              }
+
+              // Update local state
+              setCurrentCampaign({
+                ...currentCampaign,
+                players: updatedPlayers,
+              });
+
+              // Refresh data
+              await fetchCharacters();
+              await fetchCampaignCharacters();
+
+              showAlert(
+                'Player Removed',
+                `${playerName} has been removed from the campaign.`,
+                undefined,
+                'success'
+              );
+            } catch (error) {
+              console.error('Error removing player:', error);
+              showAlert(
+                'Error',
+                'Failed to remove player. Please try again.',
+                undefined,
+                'error'
+              );
+            }
+          },
+        },
+      ],
+      'warning'
+    );
+  };
+
+  // Check if a friend has a pending invitation to the current campaign
+  const hasPendingInvitation = (friendId: string) => {
+    if (!currentCampaign) return false;
+    
+    return sentInvitations.some(invitation => 
+      invitation.campaign_id === currentCampaign.uid &&
+      invitation.invitee_id === friendId &&
+      invitation.status === 'pending'
+    );
+  };
+
+  // Filter friends who are not already in the campaign
+  const getInvitableFriends = () => {
+    if (!currentCampaign) return [];
+    
+    const campaignPlayerIds = currentCampaign.players.map(p => p.id);
+    return friends.filter(friend => 
+      friend.friend_profile && 
+      !campaignPlayerIds.includes(friend.friend_profile.id)
+    );
+  };
+
   // Check if all players have characters assigned
   const allPlayersHaveCharacters = useMemo(() => {
     if (!currentCampaign || currentCampaign.players.length === 0) {
@@ -516,39 +694,51 @@ export default function InviteFriendsScreen() {
                       )}
                     </View>
 
-                    <View style={styles.characterInfo}>
-                      {playerCharacter ? (
+                    <View style={styles.playerActions}>
+                      <View style={styles.characterInfo}>
+                        {playerCharacter ? (
+                          <TouchableOpacity
+                            style={styles.selectedCharacterContainer}
+                            onPress={() => canSelectCharacter ? setShowCharacterSelector(player.id) : undefined}
+                            disabled={!canSelectCharacter}
+                          >
+                            <Image
+                              source={getCharacterAvatarUrl(playerCharacter)}
+                              style={styles.characterAvatar}
+                            />
+                            <View style={styles.characterDetails}>
+                              <Text style={styles.selectedCharacterText}>
+                                {playerCharacter.name}
+                              </Text>
+                              <Text style={styles.selectedCharacterSubtext}>
+                                Lv{playerCharacter.level} {playerCharacter.race} {playerCharacter.class}
+                              </Text>
+                            </View>
+                            {canSelectCharacter && (
+                              <ChevronDown size={16} color="#4CAF50" style={styles.chevronIcon} />
+                            )}
+                          </TouchableOpacity>
+                        ) : canSelectCharacter ? (
+                          <TouchableOpacity
+                            style={styles.selectCharacterButton}
+                            onPress={() => setShowCharacterSelector(player.id)}
+                          >
+                            <Text style={styles.selectCharacterText}>Select Character</Text>
+                            <ChevronDown size={16} color="#888" />
+                          </TouchableOpacity>
+                        ) : (
+                          <Text style={styles.noCharacterText}>No Character</Text>
+                        )}
+                      </View>
+                      
+                      {/* Remove Player Button - Only show for owner and not for the owner themselves */}
+                      {isOwner && player.id !== currentCampaign.owner && (
                         <TouchableOpacity
-                          style={styles.selectedCharacterContainer}
-                          onPress={() => canSelectCharacter ? setShowCharacterSelector(player.id) : undefined}
-                          disabled={!canSelectCharacter}
+                          style={styles.removePlayerButton}
+                          onPress={() => handleRemovePlayer(player.id, player.name || `Player ${index + 1}`)}
                         >
-                          <Image
-                            source={getCharacterAvatarUrl(playerCharacter)}
-                            style={styles.characterAvatar}
-                          />
-                          <View style={styles.characterDetails}>
-                            <Text style={styles.selectedCharacterText}>
-                              {playerCharacter.name}
-                            </Text>
-                            <Text style={styles.selectedCharacterSubtext}>
-                              Lv{playerCharacter.level} {playerCharacter.race} {playerCharacter.class}
-                            </Text>
-                          </View>
-                          {canSelectCharacter && (
-                            <ChevronDown size={16} color="#4CAF50" style={styles.chevronIcon} />
-                          )}
+                          <UserMinus size={16} color="#ff4444" />
                         </TouchableOpacity>
-                      ) : canSelectCharacter ? (
-                        <TouchableOpacity
-                          style={styles.selectCharacterButton}
-                          onPress={() => setShowCharacterSelector(player.id)}
-                        >
-                          <Text style={styles.selectCharacterText}>Select Character</Text>
-                          <ChevronDown size={16} color="#888" />
-                        </TouchableOpacity>
-                      ) : (
-                        <Text style={styles.noCharacterText}>No Character</Text>
                       )}
                     </View>
                   </View>
@@ -611,6 +801,49 @@ export default function InviteFriendsScreen() {
                       <Send size={20} color="#fff" />
                     </TouchableOpacity>
                   </View>
+                </View>
+              )}
+
+              {/* Friends List */}
+              {getInvitableFriends().length > 0 && (
+                <View style={styles.friendsContainer}>
+                  <Text style={styles.friendsLabel}>Invite Friends</Text>
+                  {getInvitableFriends().map((friend) => (
+                    <View key={friend.id} style={styles.friendItem}>
+                      <View style={styles.friendInfo}>
+                        <View style={styles.friendAvatar}>
+                          <Text style={styles.friendAvatarText}>
+                            {friend.friend_profile?.username?.charAt(0).toUpperCase() || 'F'}
+                          </Text>
+                        </View>
+                        <View style={styles.friendDetails}>
+                          <Text style={styles.friendName}>{friend.friend_profile?.username}</Text>
+                          <Text style={styles.friendEmail}>{friend.friend_profile?.email}</Text>
+                        </View>
+                      </View>
+                      {hasPendingInvitation(friend.friend_profile?.id || '') ? (
+                        <View style={styles.pendingIndicator}>
+                          <Clock size={16} color="#FFA726" />
+                          <Text style={styles.pendingText}>Pending</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={[
+                            styles.inviteFriendButton,
+                            sendingInvites.has(friend.friend_profile?.id || '') && styles.inviteFriendButtonDisabled
+                          ]}
+                          onPress={() => handleInviteFriend(friend)}
+                          disabled={sendingInvites.has(friend.friend_profile?.id || '')}
+                        >
+                          {sendingInvites.has(friend.friend_profile?.id || '') ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <UserPlus size={16} color="#fff" />
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
                 </View>
               )}
             </View>
@@ -1051,6 +1284,11 @@ const styles = StyleSheet.create({
   readyIcon: {
     marginLeft: 8,
   },
+  playerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   characterInfo: {
     alignItems: 'flex-end',
   },
@@ -1106,6 +1344,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     fontStyle: 'italic',
+  },
+  removePlayerButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ff4444',
   },
   startButton: {
     backgroundColor: '#4CAF50',
@@ -1238,5 +1486,77 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  friendsContainer: {
+    marginTop: 16,
+  },
+  friendsLabel: {
+    fontSize: 16,
+    color: '#fff',
+    marginBottom: 12,
+    fontFamily: 'Inter-Bold',
+  },
+  friendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#333',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  friendInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  friendAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  friendAvatarText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+  },
+  friendDetails: {
+    flex: 1,
+  },
+  friendName: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  friendEmail: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#888',
+  },
+  inviteFriendButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inviteFriendButtonDisabled: {
+    backgroundColor: '#666',
+  },
+  pendingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pendingText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#FFA726',
   },
 });

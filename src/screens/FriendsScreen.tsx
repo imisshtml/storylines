@@ -58,6 +58,7 @@ import {
   type UserProfile,
 } from '../atoms/friendsAtoms';
 import { useCustomAlert } from '../components/CustomAlert';
+import { supabase } from '../config/supabase';
 
 type TabType = 'friends' | 'requests' | 'invitations' | 'search';
 
@@ -92,6 +93,29 @@ export default function FriendsScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
   const sentRef = useRef(false);
+  const [sentInvitations, setSentInvitations] = useState<any[]>([]);
+
+  // Fetch sent campaign invitations
+  const fetchSentInvitations = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('campaign_invitations')
+        .select('*')
+        .eq('inviter_id', user.id)
+        .eq('status', 'pending');
+
+      if (error) {
+        console.error('Error fetching sent invitations:', error);
+        return;
+      }
+
+      setSentInvitations(data || []);
+    } catch (error) {
+      console.error('Error fetching sent invitations:', error);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -99,6 +123,7 @@ export default function FriendsScreen() {
       fetchRequestsReceived();
       fetchRequestsSent();
       fetchInvitations();
+      fetchSentInvitations();
     }
   }, [user, fetchFriends, fetchRequestsReceived, fetchRequestsSent, fetchInvitations]);
 
@@ -212,6 +237,10 @@ export default function FriendsScreen() {
         undefined,
         'success'
       );
+      
+      // Refresh sent invitations to update pending status
+      fetchSentInvitations();
+      
       setShowCampaignInviteModal(false);
       setSelectedFriend(null);
     } catch (error) {
@@ -257,11 +286,29 @@ export default function FriendsScreen() {
     );
   };
 
-  const getAvailableCampaigns = () => {
-    return campaigns.filter(campaign => 
-      campaign.owner === user?.id && 
-      campaign.status === 'creation'
+  // Check if a friend has a pending invitation to a specific campaign
+  const hasPendingInvitation = (friendId: string, campaignId: string) => {
+    return sentInvitations.some(invitation => 
+      invitation.campaign_id === campaignId &&
+      invitation.invitee_id === friendId &&
+      invitation.status === 'pending'
     );
+  };
+
+  const getAvailableCampaigns = () => {
+    if (!selectedFriend?.friend_profile) return [];
+    
+    return campaigns.filter(campaign => {
+      // Must be owned by current user and in creation phase
+      const isOwned = campaign.owner === user?.id && campaign.status === 'creation';
+      
+      // Friend must not already be in the campaign
+      const isNotInCampaign = !campaign.players.some((player: any) => 
+        player.id === selectedFriend.friend_profile!.id
+      );
+      
+      return isOwned && isNotInCampaign;
+    });
   };
 
   const renderTabButton = (tab: TabType, title: string, count?: number) => (
@@ -576,19 +623,36 @@ export default function FriendsScreen() {
                   </Text>
                 </View>
               ) : (
-                getAvailableCampaigns().map((campaign) => (
-                  <TouchableOpacity
-                    key={campaign.id}
-                    onPress={() => handleSendCampaignInvite(campaign.uid)}
-                    style={styles.campaignOption}
-                  >
-                    <View style={styles.campaignInfo}>
-                      <Text style={styles.campaignName}>{campaign.name}</Text>
-                      <Text style={styles.campaignAdventure}>{campaign.adventure}</Text>
-                    </View>
-                    <ChevronRight size={20} color="#4CAF50" />
-                  </TouchableOpacity>
-                ))
+                getAvailableCampaigns().map((campaign) => {
+                  const isPending = selectedFriend?.friend_profile ? 
+                    hasPendingInvitation(selectedFriend.friend_profile.id, campaign.uid) : 
+                    false;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={campaign.id}
+                      onPress={isPending ? undefined : () => handleSendCampaignInvite(campaign.uid)}
+                      style={[
+                        styles.campaignOption,
+                        isPending && styles.campaignOptionDisabled
+                      ]}
+                      disabled={isPending}
+                    >
+                      <View style={styles.campaignInfo}>
+                        <Text style={styles.campaignName}>{campaign.name}</Text>
+                        <Text style={styles.campaignAdventure}>{campaign.adventure}</Text>
+                      </View>
+                      {isPending ? (
+                        <View style={styles.pendingIndicator}>
+                          <Clock size={16} color="#FFA726" />
+                          <Text style={styles.pendingText}>Pending</Text>
+                        </View>
+                      ) : (
+                        <ChevronRight size={20} color="#4CAF50" />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })
               )}
             </ScrollView>
           </View>
@@ -950,6 +1014,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  campaignOptionDisabled: {
+    backgroundColor: '#1a1a1a',
+    opacity: 0.6,
   },
   campaignInfo: {
     flex: 1,
