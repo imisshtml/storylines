@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Play, Users, Settings, Menu, Crown, UserCheck, Star, Circle, Bell, Plus } from 'lucide-react-native';
+import { Play, Users, Settings, Menu, Crown, UserCheck, Star, Circle, Bell, Plus, UserPlus } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, ScrollView, Image } from 'react-native';
 import { useAtom } from 'jotai';
@@ -15,6 +15,9 @@ import {
   campaignInvitationsAtom,
   fetchCampaignInvitationsAtom,
   respondToCampaignInvitationAtom,
+  friendRequestsReceivedAtom,
+  fetchFriendRequestsReceivedAtom,
+  respondToFriendRequestAtom,
 } from '../atoms/friendsAtoms';
 import SidebarMenu from '../components/SidebarMenu';
 import JoinCampaignModal from '../components/JoinCampaignModal';
@@ -24,6 +27,7 @@ export default function HomeScreen() {
   const [campaigns] = useAtom(campaignsAtom);
   const [characters] = useAtom(charactersAtom);
   const [campaignInvitations] = useAtom(campaignInvitationsAtom);
+  const [friendRequestsReceived] = useAtom(friendRequestsReceivedAtom);
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
   const [, fetchCampaignReadStatus] = useAtom(fetchCampaignReadStatusAtom);
@@ -31,6 +35,8 @@ export default function HomeScreen() {
   const [, initializeReadStatusRealtime] = useAtom(initializeCampaignReadStatusRealtimeAtom);
   const [, fetchCampaignInvitations] = useAtom(fetchCampaignInvitationsAtom);
   const [, respondToCampaignInvitation] = useAtom(respondToCampaignInvitationAtom);
+  const [, fetchFriendRequestsReceived] = useAtom(fetchFriendRequestsReceivedAtom);
+  const [, respondToFriendRequest] = useAtom(respondToFriendRequestAtom);
   const [user] = useAtom(userAtom);
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
@@ -42,11 +48,12 @@ export default function HomeScreen() {
       fetchCharacters();
       fetchCampaignReadStatus();
       fetchCampaignInvitations();
+      fetchFriendRequestsReceived();
       
       // Initialize real-time subscription for read status
       initializeReadStatusRealtime();
     }
-  }, [user, fetchCharacters, fetchCampaignReadStatus, fetchCampaignInvitations, initializeReadStatusRealtime]);
+  }, [user, fetchCharacters, fetchCampaignReadStatus, fetchCampaignInvitations, fetchFriendRequestsReceived, initializeReadStatusRealtime]);
 
   const handleCampaignPress = async (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
@@ -130,6 +137,24 @@ export default function HomeScreen() {
       showAlert('Campaign Invitation Declined', 'You have declined the campaign invitation.', undefined, 'success');
     } catch (error) {
       showAlert('Error', 'Failed to decline campaign invitation. Please try again.', undefined, 'error');
+    }
+  };
+
+  const handleAcceptFriendRequest = async (friendshipId: string) => {
+    try {
+      await respondToFriendRequest({ friendshipId, response: 'accepted' });
+      showAlert('Friend Request Accepted', 'You are now friends!', undefined, 'success');
+    } catch (error) {
+      showAlert('Error', 'Failed to accept friend request. Please try again.', undefined, 'error');
+    }
+  };
+
+  const handleDeclineFriendRequest = async (friendshipId: string) => {
+    try {
+      await respondToFriendRequest({ friendshipId, response: 'rejected' });
+      showAlert('Friend Request Declined', 'You have declined the friend request.', undefined, 'success');
+    } catch (error) {
+      showAlert('Error', 'Failed to decline friend request. Please try again.', undefined, 'error');
     }
   };
 
@@ -255,6 +280,44 @@ export default function HomeScreen() {
                               onPress={() => handleDeclineCampaignInvitation(invitation.id)}
                             >
                               <Text style={styles.invitationButtonText}>Decline</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {/* Friend Requests Banner */}
+                {friendRequestsReceived.length > 0 && (
+                  <View style={styles.friendRequestsBanner}>
+                    <View style={styles.friendRequestsHeader}>
+                      <UserPlus size={20} color="#4CAF50" />
+                      <Text style={styles.friendRequestsTitle}>
+                        Friend Request{friendRequestsReceived.length > 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {friendRequestsReceived.map((request) => (
+                        <View key={request.id} style={styles.friendRequestCard}>
+                          <Text style={styles.friendRequestUsername}>
+                            {request.friend_profile?.username}
+                          </Text>
+                          <Text style={styles.friendRequestEmail}>
+                            {request.friend_profile?.email}
+                          </Text>
+                          <View style={styles.friendRequestActions}>
+                            <TouchableOpacity
+                              style={styles.acceptFriendRequestButton}
+                              onPress={() => handleAcceptFriendRequest(request.id)}
+                            >
+                              <Text style={styles.friendRequestButtonText}>Accept</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.declineFriendRequestButton}
+                              onPress={() => handleDeclineFriendRequest(request.id)}
+                            >
+                              <Text style={styles.friendRequestButtonText}>Decline</Text>
                             </TouchableOpacity>
                           </View>
                         </View>
@@ -488,6 +551,69 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   invitationButtonText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  friendRequestsBanner: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 0,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  friendRequestsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  friendRequestsTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+  },
+  friendRequestCard: {
+    backgroundColor: 'rgba(26, 26, 26, 0.8)',
+    borderRadius: 8,
+    padding: 12,
+    marginRight: 12,
+    minWidth: 200,
+  },
+  friendRequestUsername: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  friendRequestEmail: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#888',
+    marginBottom: 8,
+  },
+  friendRequestActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  acceptFriendRequestButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    flex: 1,
+  },
+  declineFriendRequestButton: {
+    backgroundColor: '#ff4444',
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    flex: 1,
+  },
+  friendRequestButtonText: {
     fontSize: 12,
     fontFamily: 'Inter-Bold',
     color: '#fff',

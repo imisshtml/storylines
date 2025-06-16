@@ -20,7 +20,6 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
   const [user] = useAtom(userAtom);
   const [, signOut] = useAtom(signOutAtom);
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
-  const [imageError, setImageError] = React.useState(false);
   const slideAnim = React.useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
   const [friendRequestsReceived] = useAtom(friendRequestsReceivedAtom);
@@ -90,7 +89,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
     {
       icon: <Users size={24} color="#fff" />,
       title: 'My Characters',
-      subtitle: 'Your current 5e characters',
+      subtitle: 'View and Create 5e characters',
       onPress: () => {
         onClose();
         router.push('/characters');
@@ -107,15 +106,6 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       title: 'Join via Code',
       subtitle: 'Join an existing campaign',
       onPress: handleJoinCampaign,
-    },
-    {
-      icon: <UserPlus size={24} color="#fff" />,
-      title: 'Create Character',
-      subtitle: 'Build a new 5e character',
-      onPress: () => {
-        onClose();
-        router.push('/creation');
-      },
     },
     {
       icon: <Handshake size={24} color="#fff" />,

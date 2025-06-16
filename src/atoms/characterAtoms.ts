@@ -27,6 +27,7 @@ export type DnDSpell = {
   duration: string;
   description: string[];
   concentration: boolean;
+  classes: string[];
 };
 
 export type DnDEquipment = {
