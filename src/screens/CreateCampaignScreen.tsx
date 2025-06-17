@@ -52,10 +52,22 @@ export default function CreateCampaignScreen() {
   const [selectedTone, setSelectedTone] = useState<Tone | null>(null);
   const [excludedTags, setExcludedTags] = useState<string[]>([]);
   const [contentLevel, setContentLevel] = useState<ContentLevel>('adults');
-  const [rpFocus, setRpFocus] = useState<RPFocus>('balanced');
+  const [rpFocusValue, setRpFocusValue] = useState(2); // 0-4 scale, 2 = balanced
+  const [playerLimit, setPlayerLimit] = useState(3);
   const [isAdventureSheetVisible, setIsAdventureSheetVisible] = useState(false);
 
   const isEditing = currentCampaign !== null;
+
+  // Helper functions to convert between slider value and RPFocus enum
+  const rpFocusOptions: RPFocus[] = ['heavy_rp', 'rp_focused', 'balanced', 'combat_focused', 'heavy_combat'];
+  
+  const getRpFocusFromValue = (value: number): RPFocus => {
+    return rpFocusOptions[Math.round(value)] || 'balanced';
+  };
+  
+  const getValueFromRpFocus = (focus: RPFocus): number => {
+    return rpFocusOptions.indexOf(focus);
+  };
 
   useEffect(() => {
     if (currentCampaign && isEditing) {
@@ -65,7 +77,8 @@ export default function CreateCampaignScreen() {
       setSelectedTone(currentCampaign.tone);
       setExcludedTags(currentCampaign.exclude || []);
       setContentLevel(currentCampaign.content_level);
-      setRpFocus(currentCampaign.rp_focus);
+      setRpFocusValue(getValueFromRpFocus(currentCampaign.rp_focus));
+      setPlayerLimit(currentCampaign.limit || 3);
       // Set the selected adventure from the campaign's adventure ID
       const adventure = ADVENTURES.find((a: Adventure) => a.id === currentCampaign.adventure);
       if (adventure) {
@@ -78,7 +91,8 @@ export default function CreateCampaignScreen() {
       setSelectedTone(null);
       setExcludedTags([]);
       setContentLevel('adults');
-      setRpFocus('balanced');
+      setRpFocusValue(2); // balanced
+      setPlayerLimit(3);
       setSelectedAdventure(null);
     }
   }, [currentCampaign, isEditing]);
@@ -123,7 +137,8 @@ export default function CreateCampaignScreen() {
         invite_code: Math.random().toString(36).substring(2, 8).toUpperCase(),
         owner: user.id,
         content_level: contentLevel,
-        rp_focus: rpFocus,
+        rp_focus: getRpFocusFromValue(rpFocusValue),
+        limit: playerLimit,
       };
 
       // If editing, include the ID
@@ -194,6 +209,32 @@ export default function CreateCampaignScreen() {
           )}
         </View>
 
+        <View style={styles.section}>
+          <Text style={styles.label}>Player Limit</Text>
+          <View style={styles.playerLimitContainer}>
+            {[1, 2, 3, 4, 5, 6, 7].map(limit => (
+              <TouchableOpacity
+                key={limit}
+                style={[
+                  styles.playerLimitButton,
+                  playerLimit === limit && styles.selectedPlayerLimit
+                ]}
+                onPress={() => setPlayerLimit(limit)}
+              >
+                <Text style={[
+                  styles.playerLimitText,
+                  playerLimit === limit && styles.selectedPlayerLimitText
+                ]}>
+                  {limit}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.playerLimitDescription}>
+            Maximum number of players (including yourself) that can join this campaign.
+          </Text>
+        </View>
+
         {false && (<View style={styles.section}>
           <Text style={styles.label}>Starting Level</Text>
           <TextInput
@@ -257,24 +298,34 @@ export default function CreateCampaignScreen() {
 
         <View style={styles.section}>
           <Text style={styles.label}>Roleplay vs Combat Focus</Text>
-          <View style={styles.rpFocusContainer}>
-            {(['heavy_rp', 'rp_focused', 'balanced', 'combat_focused', 'heavy_combat'] as RPFocus[]).map(focus => (
-              <TouchableOpacity
-                key={focus}
-                style={[
-                  styles.rpFocusButton,
-                  rpFocus === focus && styles.selectedRpFocus
-                ]}
-                onPress={() => setRpFocus(focus)}
-              >
-                <Text style={[
-                  styles.rpFocusText,
-                  rpFocus === focus && styles.selectedRpFocusText
-                ]}>
-                  {rpFocusLabels[focus]}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.sliderContainer}>
+            <View style={styles.sliderLabels}>
+              <Text style={styles.sliderLabelText}>Heavy RP</Text>
+              <Text style={styles.sliderLabelText}>Heavy Combat</Text>
+            </View>
+            <View style={styles.customSlider}>
+              <View style={styles.sliderTrack}>
+                <View 
+                  style={[
+                    styles.sliderThumb, 
+                    { left: `${(rpFocusValue / 4) * 100}%` }
+                  ]} 
+                />
+                {[0, 1, 2, 3, 4].map((value) => (
+                  <TouchableOpacity
+                    key={value}
+                    style={[
+                      styles.sliderStep,
+                      { left: `${(value / 4) * 100}%` }
+                    ]}
+                    onPress={() => setRpFocusValue(value)}
+                  />
+                ))}
+              </View>
+            </View>
+            <Text style={styles.currentFocusLabel}>
+              {rpFocusLabels[getRpFocusFromValue(rpFocusValue)]}
+            </Text>
           </View>
         </View>
 
@@ -530,25 +581,87 @@ const styles = StyleSheet.create({
     marginTop: 0,
     fontFamily: 'Inter-Regular',
   },
-  rpFocusContainer: {
-    flexDirection: 'column',
-    gap: 8,
+  sliderContainer: {
+    paddingVertical: 8,
   },
-  rpFocusButton: {
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  sliderLabelText: {
+    fontSize: 12,
+    color: '#888',
+    fontFamily: 'Inter-Regular',
+  },
+  customSlider: {
+    height: 40,
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  sliderTrack: {
+    height: 4,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 2,
+    position: 'relative',
+  },
+  sliderThumb: {
+    position: 'absolute',
+    top: -8,
+    width: 20,
+    height: 20,
+    backgroundColor: '#4CAF50',
+    borderRadius: 10,
+    marginLeft: -10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  sliderStep: {
+    position: 'absolute',
+    top: -4,
+    width: 12,
+    height: 12,
+    backgroundColor: '#666',
+    borderRadius: 6,
+    marginLeft: -6,
+  },
+  currentFocusLabel: {
+    fontSize: 16,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Bold',
+    textAlign: 'center',
+  },
+  playerLimitContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  playerLimitButton: {
+    flex: 1,
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
     padding: 12,
+    marginHorizontal: 2,
     alignItems: 'center',
   },
-  selectedRpFocus: {
+  selectedPlayerLimit: {
     backgroundColor: '#4CAF50',
   },
-  rpFocusText: {
+  playerLimitText: {
     color: '#fff',
     fontSize: 14,
     fontFamily: 'Inter-Regular',
   },
-  selectedRpFocusText: {
+  selectedPlayerLimitText: {
     fontFamily: 'Inter-Bold',
+  },
+  playerLimitDescription: {
+    color: '#999',
+    fontSize: 14,
+    marginTop: 0,
+    fontFamily: 'Inter-Regular',
   },
 });
