@@ -391,6 +391,17 @@ export default function InviteFriendsScreen() {
   const handleInviteFriend = async (friend: Friendship) => {
     if (!currentCampaign || !friend.friend_profile) return;
 
+    // Check if campaign is at player limit
+    if (currentCampaign.players.length >= (currentCampaign.limit || 3)) {
+      showAlert(
+        'Campaign Full',
+        'This campaign has reached its player limit. Remove a player before inviting new ones.',
+        undefined,
+        'warning'
+      );
+      return;
+    }
+
     const friendId = friend.friend_profile.id;
     setSendingInvites(prev => new Set(prev).add(friendId));
 
@@ -667,9 +678,16 @@ export default function InviteFriendsScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Players Section */}
         <View style={styles.playersContainer}>
-          <Text style={styles.playersLabel}>
-            Players
-          </Text>
+          <View style={styles.playersHeader}>
+            <Text style={styles.playersLabel}>
+              Players ({currentCampaign.players.length}/{currentCampaign.limit || 3})
+            </Text>
+            {currentCampaign.players.length >= (currentCampaign.limit || 3) && (
+              <View style={styles.limitReachedBadge}>
+                <Text style={styles.limitReachedText}>LIMIT REACHED</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.realtimeIndicator}>
             Updates automatically when players join
           </Text>
@@ -763,6 +781,15 @@ export default function InviteFriendsScreen() {
 
           {isInviteSectionOpen && (
             <View style={styles.inviteContent}>
+              {/* Player Limit Warning */}
+              {currentCampaign.players.length >= (currentCampaign.limit || 3) && (
+                <View style={styles.limitWarning}>
+                  <Text style={styles.limitWarningText}>
+                    Campaign is full! Remove a player before inviting new ones.
+                  </Text>
+                </View>
+              )}
+              
               <View style={styles.codeContainer}>
                 <Text style={styles.codeLabel}>Invite Code</Text>
                 <View style={styles.codeBox}>
@@ -1082,6 +1109,20 @@ const styles = StyleSheet.create({
   inviteContent: {
     padding: 16,
   },
+  limitWarning: {
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff4444',
+  },
+  limitWarningText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: '#ff4444',
+    textAlign: 'center',
+  },
   codeContainer: {
     marginBottom: 16,
   },
@@ -1243,11 +1284,27 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 20,
   },
+  playersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   playersLabel: {
     fontSize: 16,
     color: '#fff',
-    marginBottom: 4,
     fontFamily: 'Inter-Bold',
+  },
+  limitReachedBadge: {
+    backgroundColor: '#ff4444',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  limitReachedText: {
+    fontSize: 10,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
   },
   realtimeIndicator: {
     fontSize: 12,
