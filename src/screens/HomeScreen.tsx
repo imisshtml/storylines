@@ -22,6 +22,7 @@ import {
 import SidebarMenu from '../components/SidebarMenu';
 import JoinCampaignModal from '../components/JoinCampaignModal';
 import { useCustomAlert } from '../components/CustomAlert';
+import { initializeNotificationListeners, requestNotificationPermissions } from '../utils/notifications';
 
 export default function HomeScreen() {
   const [campaigns] = useAtom(campaignsAtom);
@@ -52,6 +53,20 @@ export default function HomeScreen() {
       
       // Initialize real-time subscription for read status
       initializeReadStatusRealtime();
+      
+      // Initialize notification listeners
+      const cleanupNotifications = initializeNotificationListeners();
+      
+      // Request notification permissions
+      requestNotificationPermissions().catch(error => {
+        console.log('Error requesting notification permissions:', error);
+      });
+      
+      return () => {
+        if (typeof cleanupNotifications === 'function') {
+          cleanupNotifications();
+        }
+      };
     }
   }, [user, fetchCharacters, fetchCampaignReadStatus, fetchCampaignInvitations, fetchFriendRequestsReceived, initializeReadStatusRealtime]);
 
