@@ -1,11 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image, ScrollView } from 'react-native';
-import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary, Users, UserCog } from 'lucide-react-native';
+import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary, Users, UserCog, Bell } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
 import { friendRequestsReceivedAtom } from '../atoms/friendsAtoms';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
+import { sendTestNotification } from '../utils/notifications';
+import { useCustomAlert } from './CustomAlert';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.8;
@@ -24,6 +26,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
   const [friendRequestsReceived] = useAtom(friendRequestsReceivedAtom);
   const friendRequestCount = friendRequestsReceived.length;
+  const { showAlert } = useCustomAlert();
 
   React.useEffect(() => {
     if (isVisible) {
@@ -85,6 +88,51 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
     }
   };
 
+  const handleTestNotification = async () => {
+    try {
+      showAlert(
+        'Sending Test Notification',
+        'Sending a test push notification to this device...',
+        undefined,
+        'info'
+      );
+
+      const result = await sendTestNotification();
+      
+      if (result.success) {
+        showAlert(
+          'Test Notification Sent! 🎉',
+          'Check your device notifications. If you don\'t see it, make sure notifications are enabled for Storylines.',
+          undefined,
+          'success'
+        );
+      } else {
+        let errorMessage = result.error || 'Failed to send notification';
+        
+        if (result.permissionStatus === 'denied') {
+          errorMessage = 'Notification permissions are denied. Please enable notifications in your device settings for Storylines.';
+        } else if (result.permissionStatus === 'undetermined') {
+          errorMessage = 'Notification permissions not granted. Please allow notifications when prompted.';
+        }
+
+        showAlert(
+          'Notification Failed',
+          errorMessage,
+          undefined,
+          'error'
+        );
+      }
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      showAlert(
+        'Error',
+        'An unexpected error occurred while sending the test notification.',
+        undefined,
+        'error'
+      );
+    }
+  };
+
   const menuItems = [
     {
       icon: <Users size={24} color="#fff" />,
@@ -116,6 +164,12 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
         router.push('/friends');
       },
       badge: friendRequestCount > 0 ? friendRequestCount : undefined,
+    },
+    {
+      icon: <Bell size={24} color="#fff" />,
+      title: 'Test Notification',
+      subtitle: 'Send a test push notification',
+      onPress: handleTestNotification,
     },
     {
       icon: <UserCog size={24} color="#fff" />,
