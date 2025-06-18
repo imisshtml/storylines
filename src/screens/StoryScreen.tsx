@@ -776,7 +776,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: '100%',
     left: 0,
-    right: 0,
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
     marginBottom: 8,
@@ -786,6 +785,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 8,
     zIndex: 1000,
+    minWidth: 180,
   },
   inputTypeOption: {
     flexDirection: 'row',
