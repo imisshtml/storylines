@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Play, Users, Settings, Menu, Crown, UserCheck, Star, Circle, Bell, Plus, UserPlus } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, ScrollView, Image } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, Scroll, Image } from 'react-native';
 import { useAtom } from 'jotai';
 import { campaignsAtom, currentCampaignAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
@@ -22,6 +22,7 @@ import {
 import SidebarMenu from '../components/SidebarMenu';
 import JoinCampaignModal from '../components/JoinCampaignModal';
 import { useCustomAlert } from '../components/CustomAlert';
+import { initializeNotificationListeners, requestNotificationPermissions } from '../utils/notifications';
 
 export default function HomeScreen() {
   const [campaigns] = useAtom(campaignsAtom);
@@ -52,6 +53,20 @@ export default function HomeScreen() {
       
       // Initialize real-time subscription for read status
       initializeReadStatusRealtime();
+      
+      // Initialize notification listeners
+      const cleanupNotifications = initializeNotificationListeners();
+      
+      // Request notification permissions
+      requestNotificationPermissions().catch(error => {
+        console.log('Error requesting notification permissions:', error);
+      });
+      
+      return () => {
+        if (typeof cleanupNotifications === 'function') {
+          cleanupNotifications();
+        }
+      };
     }
   }, [user, fetchCharacters, fetchCampaignReadStatus, fetchCampaignInvitations, fetchFriendRequestsReceived, initializeReadStatusRealtime]);
 
