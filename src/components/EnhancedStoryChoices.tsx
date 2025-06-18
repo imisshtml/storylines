@@ -5,22 +5,19 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Animated,
+  Modal,
 } from 'react-native';
 import {
   ChevronRight,
-  ChevronDown,
   Sword,
-  Shield,
-  Zap,
-  Search,
   MessageCircle,
   Package,
+  Zap,
+  Search,
   Bed,
-  Eye,
-  Users,
   Target,
   Sparkles,
+  X,
 } from 'lucide-react-native';
 
 interface ActionChoice {
@@ -34,6 +31,7 @@ interface ActionChoice {
 }
 
 type ActionCategory = 'combat' | 'magic' | 'social' | 'exploration' | 'utility' | 'rest';
+type CompactCategory = 'combat' | 'social' | 'misc';
 
 interface CategoryConfig {
   title: string;
@@ -81,6 +79,27 @@ const CATEGORY_CONFIG: Record<ActionCategory, CategoryConfig> = {
   },
 };
 
+const COMPACT_CATEGORY_CONFIG: Record<CompactCategory, CategoryConfig> = {
+  combat: {
+    title: 'Combat',
+    icon: <Sword size={18} color="#fff" />,
+    color: '#e74c3c',
+    description: 'Attack, defend, and tactical maneuvers',
+  },
+  social: {
+    title: 'Social',
+    icon: <MessageCircle size={18} color="#fff" />,
+    color: '#2ecc71',
+    description: 'Talk, persuade, and interact with others',
+  },
+  misc: {
+    title: 'Misc',
+    icon: <Package size={18} color="#fff" />,
+    color: '#3498db',
+    description: 'Magic, exploration, items, and other actions',
+  },
+};
+
 interface EnhancedStoryChoicesProps {
   choices: string[];
   onChoiceSelect: (choice: string) => void;
@@ -92,24 +111,25 @@ export default function EnhancedStoryChoices({
   onChoiceSelect,
   disabled = false,
 }: EnhancedStoryChoicesProps) {
-  const [expandedCategories, setExpandedCategories] = useState<Set<ActionCategory>>(
-    new Set(['combat', 'magic', 'social']) // Start with some categories expanded
-  );
+  const [selectedModal, setSelectedModal] = useState<CompactCategory | null>(null);
 
   // Convert simple choices to structured actions
   const organizedActions = organizeChoicesIntoActions(choices);
-
-  const toggleCategory = (category: ActionCategory) => {
-    const newExpanded = new Set(expandedCategories);
-    if (newExpanded.has(category)) {
-      newExpanded.delete(category);
-    } else {
-      newExpanded.add(category);
-    }
-    setExpandedCategories(newExpanded);
+  
+  // Group actions into compact categories
+  const compactActions = {
+    combat: organizedActions.combat,
+    social: organizedActions.social,
+    misc: [
+      ...organizedActions.magic,
+      ...organizedActions.exploration,
+      ...organizedActions.utility,
+      ...organizedActions.rest,
+    ],
   };
 
   const handleActionSelect = (action: ActionChoice) => {
+    setSelectedModal(null);
     onChoiceSelect(action.title);
   };
 
@@ -129,110 +149,131 @@ export default function EnhancedStoryChoices({
   if (choices.length === 0) return null;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Sparkles size={20} color="#FFD700" />
-        <Text style={styles.headerTitle}>Available Actions</Text>
-        <Text style={styles.headerSubtitle}>Choose your next move</Text>
-      </View>
+    <>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerSubtitle}>Choose your next move</Text>
+        </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {Object.entries(organizedActions).map(([category, actions]) => {
-          const categoryConfig = CATEGORY_CONFIG[category as ActionCategory];
-          const isExpanded = expandedCategories.has(category as ActionCategory);
-          const hasActions = actions.length > 0;
+        <View style={styles.compactButtonsContainer}>
+          {Object.entries(compactActions).map(([category, actions]) => {
+            const categoryConfig = COMPACT_CATEGORY_CONFIG[category as CompactCategory];
+            const actionCount = actions.length;
 
-          if (!hasActions) return null;
+            if (actionCount === 0) return null;
 
-          return (
-            <View key={category} style={styles.categoryContainer}>
+            return (
               <TouchableOpacity
+                key={category}
                 style={[
-                  styles.categoryHeader,
+                  styles.compactButton,
                   { backgroundColor: categoryConfig.color },
-                  !hasActions && styles.categoryHeaderDisabled,
+                  disabled && styles.compactButtonDisabled,
                 ]}
-                onPress={() => toggleCategory(category as ActionCategory)}
-                disabled={!hasActions}
+                onPress={() => setSelectedModal(category as CompactCategory)}
+                disabled={disabled}
                 activeOpacity={0.8}
               >
-                <View style={styles.categoryHeaderLeft}>
-                  <View style={styles.categoryIcon}>
-                    {categoryConfig.icon}
+                <View style={styles.compactButtonIcon}>
+                  {categoryConfig.icon}
+                </View>
+                <Text style={styles.compactButtonTitle}>{categoryConfig.title}</Text>
+                <View style={styles.compactButtonCount}>
+                  <Text style={styles.compactButtonCountText}>{actionCount}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Action Modal */}
+      {selectedModal && (
+        <Modal
+          visible={true}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setSelectedModal(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={[
+                styles.modalHeader,
+                { backgroundColor: COMPACT_CATEGORY_CONFIG[selectedModal].color }
+              ]}>
+                <View style={styles.modalHeaderLeft}>
+                  <View style={styles.modalHeaderIcon}>
+                    {COMPACT_CATEGORY_CONFIG[selectedModal].icon}
                   </View>
-                  <View style={styles.categoryInfo}>
-                    <Text style={styles.categoryTitle}>{categoryConfig.title}</Text>
-                    <Text style={styles.categoryDescription}>
-                      {categoryConfig.description}
+                  <View>
+                    <Text style={styles.modalTitle}>
+                      {COMPACT_CATEGORY_CONFIG[selectedModal].title} Actions
+                    </Text>
+                    <Text style={styles.modalSubtitle}>
+                      {COMPACT_CATEGORY_CONFIG[selectedModal].description}
                     </Text>
                   </View>
                 </View>
-                <View style={styles.categoryHeaderRight}>
-                  <View style={styles.actionCount}>
-                    <Text style={styles.actionCountText}>{actions.length}</Text>
-                  </View>
-                  {isExpanded ? (
-                    <ChevronDown size={20} color="#fff" />
-                  ) : (
-                    <ChevronRight size={20} color="#fff" />
-                  )}
-                </View>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalCloseButton}
+                  onPress={() => setSelectedModal(null)}
+                >
+                  <X size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
 
-              {isExpanded && (
-                <View style={styles.actionsContainer}>
-                  {actions.map((action, index) => (
-                    <TouchableOpacity
-                      key={`${action.id}-${index}`}
-                      style={[
-                        styles.actionCard,
-                        disabled && styles.actionCardDisabled,
-                      ]}
-                      onPress={() => handleActionSelect(action)}
-                      disabled={disabled}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.actionHeader}>
-                        <View style={styles.actionIconContainer}>
-                          {action.icon || <Target size={16} color={categoryConfig.color} />}
-                        </View>
-                        <View style={styles.actionContent}>
-                          <Text style={styles.actionTitle}>{action.title}</Text>
-                          <Text style={styles.actionDescription}>
-                            {action.description}
-                          </Text>
-                        </View>
-                        {action.difficulty && (
-                          <View
-                            style={[
-                              styles.difficultyBadge,
-                              { backgroundColor: getDifficultyColor(action.difficulty) },
-                            ]}
-                          >
-                            <Text style={styles.difficultyText}>
-                              {action.difficulty.toUpperCase()}
-                            </Text>
-                          </View>
-                        )}
+              <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+                {compactActions[selectedModal].map((action, index) => (
+                  <TouchableOpacity
+                    key={`${action.id}-${index}`}
+                    style={[
+                      styles.modalActionCard,
+                      disabled && styles.modalActionCardDisabled,
+                    ]}
+                    onPress={() => handleActionSelect(action)}
+                    disabled={disabled}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.modalActionHeader}>
+                      <View style={styles.modalActionIconContainer}>
+                        {action.icon || <Target size={16} color={CATEGORY_CONFIG[action.category].color} />}
                       </View>
-
-                      {action.requirements && action.requirements.length > 0 && (
-                        <View style={styles.requirementsContainer}>
-                          <Text style={styles.requirementsLabel}>Requires:</Text>
-                          <Text style={styles.requirementsText}>
-                            {action.requirements.join(', ')}
+                      <View style={styles.modalActionContent}>
+                        <Text style={styles.modalActionTitle}>{action.title}</Text>
+                        <Text style={styles.modalActionDescription}>
+                          {action.description}
+                        </Text>
+                      </View>
+                      {action.difficulty && (
+                        <View
+                          style={[
+                            styles.modalDifficultyBadge,
+                            { backgroundColor: getDifficultyColor(action.difficulty) },
+                          ]}
+                        >
+                          <Text style={styles.modalDifficultyText}>
+                            {action.difficulty.toUpperCase()}
                           </Text>
                         </View>
                       )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+                    </View>
+
+                    {action.requirements && action.requirements.length > 0 && (
+                      <View style={styles.modalRequirementsContainer}>
+                        <Text style={styles.modalRequirementsLabel}>Requires:</Text>
+                        <Text style={styles.modalRequirementsText}>
+                          {action.requirements.join(', ')}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
-          );
-        })}
-      </ScrollView>
-    </View>
+          </View>
+        </Modal>
+      )}
+    </>
   );
 }
 
@@ -443,35 +484,73 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     marginTop: 4,
   },
-  scrollView: {
-    maxHeight: 400,
-  },
-  categoryContainer: {
-    marginBottom: 8,
-  },
-  categoryHeader: {
+  compactButtonsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     padding: 16,
-    marginHorizontal: 12,
-    marginTop: 12,
+    gap: 12,
+  },
+  compactButton: {
+    flex: 1,
     borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 4,
   },
-  categoryHeaderDisabled: {
+  compactButtonDisabled: {
     opacity: 0.5,
   },
-  categoryHeaderLeft: {
+  compactButtonIcon: {
+    marginBottom: 8,
+  },
+  compactButtonTitle: {
+    fontSize: 14,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  compactButtonCount: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  compactButtonCountText: {
+    fontSize: 12,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    width: '90%',
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  modalHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  categoryIcon: {
+  modalHeaderIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -480,58 +559,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  categoryInfo: {
-    flex: 1,
-  },
-  categoryTitle: {
-    fontSize: 16,
+  modalTitle: {
+    fontSize: 18,
     color: '#fff',
     fontFamily: 'Inter-Bold',
-    marginBottom: 2,
   },
-  categoryDescription: {
+  modalSubtitle: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
     fontFamily: 'Inter-Regular',
+    marginTop: 2,
   },
-  categoryHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  modalCloseButton: {
+    padding: 4,
   },
-  actionCount: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    minWidth: 24,
-    alignItems: 'center',
+  modalScrollView: {
+    padding: 20,
   },
-  actionCountText: {
-    fontSize: 12,
-    color: '#fff',
-    fontFamily: 'Inter-Bold',
-  },
-  actionsContainer: {
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-  },
-  actionCard: {
+  modalActionCard: {
     backgroundColor: '#2a2a2a',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 8,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#333',
   },
-  actionCardDisabled: {
+  modalActionCardDisabled: {
     opacity: 0.5,
   },
-  actionHeader: {
+  modalActionHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
-  actionIconContainer: {
+  modalActionIconContainer: {
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -540,33 +600,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  actionContent: {
+  modalActionContent: {
     flex: 1,
   },
-  actionTitle: {
+  modalActionTitle: {
     fontSize: 16,
     color: '#fff',
     fontFamily: 'Inter-Bold',
     marginBottom: 4,
   },
-  actionDescription: {
+  modalActionDescription: {
     fontSize: 14,
     color: '#888',
     fontFamily: 'Inter-Regular',
     lineHeight: 20,
   },
-  difficultyBadge: {
+  modalDifficultyBadge: {
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
     marginLeft: 8,
   },
-  difficultyText: {
+  modalDifficultyText: {
     fontSize: 10,
     color: '#fff',
     fontFamily: 'Inter-Bold',
   },
-  requirementsContainer: {
+  modalRequirementsContainer: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
@@ -574,13 +634,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
-  requirementsLabel: {
+  modalRequirementsLabel: {
     fontSize: 12,
     color: '#888',
     fontFamily: 'Inter-Bold',
     marginRight: 8,
   },
-  requirementsText: {
+  modalRequirementsText: {
     fontSize: 12,
     color: '#888',
     fontFamily: 'Inter-Regular',
