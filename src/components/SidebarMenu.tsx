@@ -7,7 +7,6 @@ import { router } from 'expo-router';
 import { friendRequestsReceivedAtom } from '../atoms/friendsAtoms';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
 import { sendTestNotification } from '../utils/notifications';
-import { useCustomAlert } from './CustomAlert';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.8;
@@ -26,7 +25,6 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
   const [friendRequestsReceived] = useAtom(friendRequestsReceivedAtom);
   const friendRequestCount = friendRequestsReceived.length;
-  const { showAlert } = useCustomAlert();
 
   React.useEffect(() => {
     if (isVisible) {
@@ -90,46 +88,11 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
 
   const handleTestNotification = async () => {
     try {
-      showAlert(
-        'Sending Test Notification',
-        'Sending a test push notification to this device...',
-        undefined,
-        'info'
-      );
-
-      const result = await sendTestNotification();
-      
-      if (result.success) {
-        showAlert(
-          'Test Notification Sent! 🎉',
-          'Check your device notifications. If you don\'t see it, make sure notifications are enabled for Storylines.',
-          undefined,
-          'success'
-        );
-      } else {
-        let errorMessage = result.error || 'Failed to send notification';
-        
-        if (result.permissionStatus === 'denied') {
-          errorMessage = 'Notification permissions are denied. Please enable notifications in your device settings for Storylines.';
-        } else if (result.permissionStatus === 'undetermined') {
-          errorMessage = 'Notification permissions not granted. Please allow notifications when prompted.';
-        }
-
-        showAlert(
-          'Notification Failed',
-          errorMessage,
-          undefined,
-          'error'
-        );
-      }
+      // Send the notification silently without showing any confirmation
+      await sendTestNotification();
     } catch (error) {
       console.error('Error sending test notification:', error);
-      showAlert(
-        'Error',
-        'An unexpected error occurred while sending the test notification.',
-        undefined,
-        'error'
-      );
+      // Even on error, we don't show any modal - just log it
     }
   };
 
