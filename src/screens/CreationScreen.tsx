@@ -1139,10 +1139,10 @@ export default function CreationScreen() {
                   style={[
                     styles.purchaseButton,
                     isPurchased && styles.makeSmaller,
-                    !canAfford && styles.purchaseButtonDisabled,
+                    !canAfford && !isPurchased && styles.purchaseButtonDisabled,
                   ]}
                   onPress={() => handlePurchaseEquipment(item)}
-                  disabled={!canAfford}
+                  disabled={!canAfford && !isPurchased}
                 >
                   {isPurchased ? (
                     <Text style={[styles.increaseButtonText, !canAfford && styles.notAfford]}>+</Text>

@@ -255,9 +255,51 @@ export default function InviteFriendsScreen() {
   };
 
   const getPlayerCharacter = useCallback((playerId: string): Character | null => {
+    // First, check if character info is stored in the campaign's players array
+    if (currentCampaign) {
+      const player = currentCampaign.players.find(p => p.id === playerId);
+      // Use type assertion since we know the campaign might have character data
+      const playerWithCharacter = player as any;
+      if (playerWithCharacter && playerWithCharacter.character) {
+        // Convert the stored character info back to a Character object
+        const charData = playerWithCharacter.character;
+        return {
+          id: charData.id,
+          name: charData.name,
+          class: charData.class,
+          race: charData.race,
+          level: charData.level,
+          user_id: playerId,
+          campaign_id: currentCampaign.uid,
+          // Add default values for other required Character fields
+          background: '',
+          abilities: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
+          skills: [],
+          spells: [],
+          equipment: [],
+          current_hitpoints: 0,
+          max_hitpoints: 0,
+          temp_hitpoints: 0,
+          armor_class: 10,
+          conditions: [],
+          gold: 0,
+          silver: 0,
+          copper: 0,
+          avatar: '',
+          traits: [],
+          features: [],
+          saving_throws: [],
+          proficiency: [],
+          created_at: '',
+          updated_at: '',
+        } as Character;
+      }
+    }
+    
+    // Fall back to database query
     const character = campaignCharacters.find(char => char.user_id === playerId);
     return character || null;
-  }, [campaignCharacters]);
+  }, [currentCampaign, campaignCharacters]);
 
   const getAvailableCharacters = (playerId: string): Character[] => {
     if (!user) return [];
@@ -390,6 +432,17 @@ export default function InviteFriendsScreen() {
 
   const handleInviteFriend = async (friend: Friendship) => {
     if (!currentCampaign || !friend.friend_profile) return;
+
+    // Check if campaign is at player limit
+    if (currentCampaign.players.length >= (currentCampaign.limit || 3)) {
+      showAlert(
+        'Campaign Full',
+        'This campaign has reached its player limit. Remove a player before inviting new ones.',
+        undefined,
+        'warning'
+      );
+      return;
+    }
 
     const friendId = friend.friend_profile.id;
     setSendingInvites(prev => new Set(prev).add(friendId));
@@ -667,9 +720,16 @@ export default function InviteFriendsScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Players Section */}
         <View style={styles.playersContainer}>
-          <Text style={styles.playersLabel}>
-            Players
-          </Text>
+          <View style={styles.playersHeader}>
+            <Text style={styles.playersLabel}>
+              Players ({currentCampaign.players.length}/{currentCampaign.limit || 3})
+            </Text>
+            {currentCampaign.players.length >= (currentCampaign.limit || 3) && (
+              <View style={styles.limitReachedBadge}>
+                <Text style={styles.limitReachedText}>LIMIT REACHED</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.realtimeIndicator}>
             Updates automatically when players join
           </Text>
@@ -763,6 +823,15 @@ export default function InviteFriendsScreen() {
 
           {isInviteSectionOpen && (
             <View style={styles.inviteContent}>
+              {/* Player Limit Warning */}
+              {currentCampaign.players.length >= (currentCampaign.limit || 3) && (
+                <View style={styles.limitWarning}>
+                  <Text style={styles.limitWarningText}>
+                    Campaign is full! Remove a player before inviting new ones.
+                  </Text>
+                </View>
+              )}
+              
               <View style={styles.codeContainer}>
                 <Text style={styles.codeLabel}>Invite Code</Text>
                 <View style={styles.codeBox}>
@@ -1082,6 +1151,20 @@ const styles = StyleSheet.create({
   inviteContent: {
     padding: 16,
   },
+  limitWarning: {
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff4444',
+  },
+  limitWarningText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: '#ff4444',
+    textAlign: 'center',
+  },
   codeContainer: {
     marginBottom: 16,
   },
@@ -1243,11 +1326,27 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 20,
   },
+  playersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   playersLabel: {
     fontSize: 16,
     color: '#fff',
-    marginBottom: 4,
     fontFamily: 'Inter-Bold',
+  },
+  limitReachedBadge: {
+    backgroundColor: '#ff4444',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  limitReachedText: {
+    fontSize: 10,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
   },
   realtimeIndicator: {
     fontSize: 12,

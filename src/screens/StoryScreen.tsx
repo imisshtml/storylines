@@ -33,6 +33,7 @@ import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
 import EnhancedStoryChoices from '../components/EnhancedStoryChoices';
 import PlayerActionsPanel from '../components/PlayerActionsPanel';
+import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask';
 
@@ -69,6 +70,8 @@ export default function StoryScreen() {
     'Use a healing potion to restore health',
   ]);
 
+
+
   // Input type selection
   const [selectedInputType, setSelectedInputType] = useState<InputType>('say');
   const [showInputTypeDropdown, setShowInputTypeDropdown] = useState(false);
@@ -84,6 +87,9 @@ export default function StoryScreen() {
 
   const scrollViewRef = useRef<ScrollView>(null);
   const realtimeUnsubscribeRef = useRef<(() => void) | null>(null);
+
+  // Monitor connection health
+  useConnectionMonitor();
 
   useEffect(() => {
     if (user) {
@@ -297,12 +303,19 @@ export default function StoryScreen() {
           break;
       }
 
-      // Add player message to campaign history
+      // Get current character for this campaign
+      const currentCharacter = getCurrentCharacter();
+
+      // Add player message to campaign history (without dice_roll for now)
       await addCampaignMessage({
         campaign_uid: currentCampaign.uid,
         message: formattedMessage,
         author: messageAuthor,
         message_type: messageType,
+        character_id: currentCharacter?.id,
+        character_name: currentCharacter?.name,
+        character_avatar: currentCharacter?.avatar,
+        difficulty: 10, // Default difficulty class
       });
 
       // Only send to AI for non-whisper messages or DM questions
@@ -763,7 +776,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: '100%',
     left: 0,
-    right: 0,
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
     marginBottom: 8,
@@ -773,6 +785,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 8,
     zIndex: 1000,
+    minWidth: 180,
   },
   inputTypeOption: {
     flexDirection: 'row',
