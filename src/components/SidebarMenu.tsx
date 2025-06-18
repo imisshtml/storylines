@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image, ScrollView } from 'react-native';
-import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary, Users, UserCog } from 'lucide-react-native';
+import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary, Users, UserCog, Bell } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
 import { friendRequestsReceivedAtom } from '../atoms/friendsAtoms';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
+import { sendTestNotification } from '../utils/notifications';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.8;
@@ -85,6 +86,16 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
     }
   };
 
+  const handleTestNotification = async () => {
+    try {
+      // Send the notification silently without showing any confirmation
+      await sendTestNotification();
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      // Even on error, we don't show any modal - just log it
+    }
+  };
+
   const menuItems = [
     {
       icon: <Users size={24} color="#fff" />,
@@ -116,6 +127,12 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
         router.push('/friends');
       },
       badge: friendRequestCount > 0 ? friendRequestCount : undefined,
+    },
+    {
+      icon: <Bell size={24} color="#fff" />,
+      title: 'Test Notification',
+      subtitle: 'Send a test push notification',
+      onPress: handleTestNotification,
     },
     {
       icon: <UserCog size={24} color="#fff" />,
