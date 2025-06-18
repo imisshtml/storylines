@@ -1,5 +1,6 @@
 import { atom } from 'jotai';
 import { supabase } from '../config/supabase';
+import { withConnectionRetry, checkSupabaseConnection } from '../utils/connectionUtils';
 
 export type CampaignMessage = {
   id: number;
@@ -9,6 +10,11 @@ export type CampaignMessage = {
   message_type: 'player' | 'dm' | 'system';
   timestamp: string;
   created_at: string;
+  dice_roll?: number; // Optional dice roll result
+  difficulty?: number; // Difficulty class for rolls (defaults to 10)
+  character_id?: string; // Character ID for player messages
+  character_name?: string; // Character name for display
+  character_avatar?: string; // Character avatar URL
 };
 
 // Campaign history state
@@ -51,22 +57,38 @@ export const addCampaignMessageAtom = atom(
     message: string;
     author: string;
     message_type: 'player' | 'dm' | 'system';
+    dice_roll?: number;
+    difficulty?: number;
+    character_id?: string;
+    character_name?: string;
+    character_avatar?: string;
   }) => {
     try {
-      const { data, error } = await supabase
-        .from('campaign_history')
-        .insert(messageData)
-        .select()
-        .single();
+      // Check connection first
+      const isConnected = await checkSupabaseConnection();
+      if (!isConnected) {
+        throw new Error('Connection to server lost. Please check your internet connection.');
+      }
 
-      if (error) throw error;
+      // Use retry logic for the database operation
+      const data = await withConnectionRetry(async () => {
+        const { data, error } = await supabase
+          .from('campaign_history')
+          .insert(messageData)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      });
 
       // Don't update local state here - let real-time subscription handle it
       // This prevents duplicate messages when real-time is working
       return data;
     } catch (error) {
-      set(campaignHistoryErrorAtom, (error as Error).message);
-      throw error;
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+      set(campaignHistoryErrorAtom, errorMessage);
+      throw new Error(errorMessage);
     }
   }
 );

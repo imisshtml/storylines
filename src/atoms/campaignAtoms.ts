@@ -14,6 +14,7 @@ export type Campaign = {
   owner: string;
   content_level: 'kids' | 'teens' | 'adults';
   rp_focus: 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heavy_combat';
+  limit?: number; // Player limit for the campaign
   created_at?: string;
   uid: string;
   // Add fields for notification tracking
@@ -242,8 +243,7 @@ export const initializeRealtimeAtom = atom(
         async (payload) => {
           // Re-fetch campaigns to update notification status
           try {
-            const { fetchCampaignsAtom } = await import('./campaignAtoms');
-            set(fetchCampaignsAtom, null);
+            set(fetchCampaignsAtom);
           } catch (error) {
             console.error('Error re-fetching campaigns after real-time update:', error);
           }
@@ -259,8 +259,7 @@ export const initializeRealtimeAtom = atom(
         async (payload) => {
           // When new messages are added, update campaign notification status
           try {
-            const { fetchCampaignsAtom } = await import('./campaignAtoms');
-            set(fetchCampaignsAtom, null);
+            set(fetchCampaignsAtom);
           } catch (error) {
             console.error('Error re-fetching campaigns after message update:', error);
           }
