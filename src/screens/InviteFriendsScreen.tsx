@@ -255,9 +255,51 @@ export default function InviteFriendsScreen() {
   };
 
   const getPlayerCharacter = useCallback((playerId: string): Character | null => {
+    // First, check if character info is stored in the campaign's players array
+    if (currentCampaign) {
+      const player = currentCampaign.players.find(p => p.id === playerId);
+      // Use type assertion since we know the campaign might have character data
+      const playerWithCharacter = player as any;
+      if (playerWithCharacter && playerWithCharacter.character) {
+        // Convert the stored character info back to a Character object
+        const charData = playerWithCharacter.character;
+        return {
+          id: charData.id,
+          name: charData.name,
+          class: charData.class,
+          race: charData.race,
+          level: charData.level,
+          user_id: playerId,
+          campaign_id: currentCampaign.uid,
+          // Add default values for other required Character fields
+          background: '',
+          abilities: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
+          skills: [],
+          spells: [],
+          equipment: [],
+          current_hitpoints: 0,
+          max_hitpoints: 0,
+          temp_hitpoints: 0,
+          armor_class: 10,
+          conditions: [],
+          gold: 0,
+          silver: 0,
+          copper: 0,
+          avatar: '',
+          traits: [],
+          features: [],
+          saving_throws: [],
+          proficiency: [],
+          created_at: '',
+          updated_at: '',
+        } as Character;
+      }
+    }
+    
+    // Fall back to database query
     const character = campaignCharacters.find(char => char.user_id === playerId);
     return character || null;
-  }, [campaignCharacters]);
+  }, [currentCampaign, campaignCharacters]);
 
   const getAvailableCharacters = (playerId: string): Character[] => {
     if (!user) return [];

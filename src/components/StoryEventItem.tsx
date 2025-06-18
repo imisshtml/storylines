@@ -1,21 +1,66 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import { User, Crown, Info } from 'lucide-react-native';
 import { CampaignMessage } from '../atoms/campaignHistoryAtoms';
+import { getCharacterAvatarUrl } from '../utils/avatarStorage';
+import DiceRoll from './DiceRoll';
 
 interface StoryEventItemProps {
   message: CampaignMessage;
 }
 
 export default function StoryEventItem({ message }: StoryEventItemProps) {
+
+  // Generate consistent dice roll based on message ID (for testing)
+  const getTestDiceRoll = () => {
+    if (message.dice_roll) return message.dice_roll;
+    if (message.message_type === 'player') {
+      // Use message ID as seed for consistent random number
+      const seed = message.id;
+      return ((seed * 9301 + 49297) % 233280) % 20 + 1;
+    }
+    return null;
+  };
+
+  const testDiceRoll = getTestDiceRoll();
+
   const getEventIcon = () => {
     switch (message.message_type) {
       case 'dm':
-        return <Crown size={16} color="#FFD700" />;
+        return <Crown size={24} color="#FFD700" />;
       case 'player':
-        return <User size={16} color="#4CAF50" />;
+        // Show character avatar if available, otherwise default user icon
+        if (message.character_avatar && message.character_avatar.trim() !== '') {
+          console.log('📸 Showing avatar for character:', message.character_name, message.character_avatar);
+          
+          // Create a mock character object to use with getCharacterAvatarUrl
+          const mockCharacter = {
+            avatar: message.character_avatar,
+            name: message.character_name,
+          };
+          
+          const avatarSource = getCharacterAvatarUrl(mockCharacter as any);
+          
+          return (
+            <View style={styles.avatarContainer}>
+              <Image 
+                source={avatarSource} 
+                style={styles.characterAvatar}
+                onError={(error) => {
+                  console.error('Avatar load error:', error);
+                  console.log('Failed avatar URL:', message.character_avatar);
+                }}
+                onLoad={() => console.log('✅ Avatar loaded successfully')}
+                onLoadStart={() => console.log('🔄 Avatar loading started')}
+                resizeMode="cover"
+              />
+            </View>
+          );
+        }
+        console.log('👤 No avatar found for character:', message.character_name || 'unknown', 'character_id:', message.character_id);
+        return <User size={24} color="#4CAF50" />;
       case 'system':
-        return <Info size={16} color="#2196F3" />;
+        return <Info size={24} color="#2196F3" />;
       default:
         return null;
     }
@@ -58,7 +103,7 @@ export default function StoryEventItem({ message }: StoryEventItemProps) {
         {getEventIcon()}
         <Text style={styles.headerText}>
           {message.message_type === 'dm' ? 'Dungeon Master' : 
-           message.message_type === 'player' ? message.author : 
+           message.message_type === 'player' ? (message.character_name || message.author) : 
            'System'}
         </Text>
         <Text style={styles.timestamp}>
@@ -68,9 +113,21 @@ export default function StoryEventItem({ message }: StoryEventItemProps) {
           })}
         </Text>
       </View>
-      <Text style={[styles.content, eventStyles.text]}>
-        {message.message}
-      </Text>
+      <View style={styles.contentContainer}>
+        <Text style={[styles.content, eventStyles.text]}>
+          {message.message}
+        </Text>
+        {testDiceRoll && (
+          <View style={styles.diceContainer}>
+            <DiceRoll 
+              rollResult={testDiceRoll} 
+              size={100} 
+              isRolling={false} // For now, always show result immediately for testing
+              difficulty={message.difficulty || 10}
+            />
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -93,6 +150,20 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     borderBottomWidth: 1,
   },
+  avatarContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    overflow: 'hidden',
+  },
+  characterAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
   headerText: {
     fontSize: 14,
     fontFamily: 'Inter-Bold',
@@ -104,10 +175,18 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     opacity: 0.7,
   },
+  contentContainer: {
+    gap: 12,
+  },
   content: {
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     lineHeight: 24,
+  },
+  diceContainer: {
+    alignItems: 'center',
+    marginTop: 16,
+    width: '100%',
   },
   // DM styles
   dmContainer: {
