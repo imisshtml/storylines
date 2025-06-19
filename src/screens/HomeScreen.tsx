@@ -183,8 +183,8 @@ export default function HomeScreen() {
   };
 
   const getCharacterAvatar = (character: Character) => {
-    // Try to get avatar from character_data
-    const avatarUrl = character.character_data?.avatar;
+    // Try to get avatar from character
+    const avatarUrl = character.avatar;
 
     if (avatarUrl && typeof avatarUrl === 'string') {
       // Check if it's a default avatar reference
@@ -265,6 +265,43 @@ export default function HomeScreen() {
         <View style={styles.contentContainer}>
           <View style={styles.campaignsContainer}>
             <ScrollView style={styles.campaignsScrollView} showsVerticalScrollIndicator={false}>
+              {/* Characters Section */}
+              {characters.length > 0 && (
+                <View style={styles.charactersSection}>
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.charactersScrollContent}
+                  >
+                    {characters.map(character => (
+                      <TouchableOpacity
+                        key={character.id}
+                        style={styles.characterCard}
+                        onPress={() => handleCharacterPress(character)}
+                      >
+                        <View style={styles.characterAvatarContainer}>
+                          <Image
+                            source={getCharacterAvatar(character)}
+                            style={styles.characterAvatar}
+                          />
+                          <View style={styles.characterLevelBadge}>
+                            <Star size={8} color="#fff" fill="#fff" />
+                            <Text style={styles.characterLevel}>
+                              {character.level || 1}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.characterInfo}>
+                          <Text style={styles.characterName} numberOfLines={1}>
+                            {character.name || 'Unnamed'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
                {/* Campaign Invitations Banner */}
                 {campaignInvitations.length > 0 && (
                   <View style={styles.invitationsBanner}>
@@ -642,6 +679,9 @@ const styles = StyleSheet.create({
     flex: 1,
     marginBottom: 20,
   },
+  charactersSection: {
+    marginBottom: 20,
+  },
   charactersContainer: {
     flex: 0.30,
     paddingBottom: 5,
@@ -782,10 +822,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   characterCard: {
-    backgroundColor: 'rgba(42, 42, 42, 0.8)',
+    //backgroundColor: 'rgba(42, 42, 42, 0.8)',
     borderRadius: 12,
     padding: 12,
-    width: 120,
+    width: 100,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -795,7 +835,7 @@ const styles = StyleSheet.create({
   characterAvatarContainer: {
     position: 'relative',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   characterAvatar: {
     width: 60,
@@ -929,7 +969,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   charactersScrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
   },
   logoImg: {
     width: 300,
