@@ -36,7 +36,7 @@ export default function RootLayout() {
     onConnectionRestored: () => {
       console.log('Global connection restored');
     },
-    checkInterval: 60000 // Check every minute
+    checkInterval: 120000 // Check every 2 minutes (less aggressive)
   });
 
   useEffect(() => {

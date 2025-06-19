@@ -354,7 +354,7 @@ export default function CharacterViewScreen() {
     const campaign = campaigns.find(c => c.uid === character.campaign_id);
     console.log('Found campaign:', campaign);
     
-    const isStarted = campaign?.status === 'in_progress';
+    const isStarted = campaign?.status !== 'creation';
     console.log('Campaign is started:', isStarted);
     
     return isStarted;
