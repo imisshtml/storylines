@@ -75,6 +75,7 @@ export default function CharacterViewScreen() {
   const [expandedTraits, setExpandedTraits] = useState<Set<string>>(new Set());
   const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set());
   const [characterFeatures, setCharacterFeatures] = useState<any[]>([]);
+  const [characterTraits, setCharacterTraits] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'stats' | 'traits' | 'spells' | 'equipment'>('stats');
 
   useEffect(() => {
@@ -106,6 +107,7 @@ export default function CharacterViewScreen() {
   useEffect(() => {
     if (character) {
       loadCharacterFeatures();
+      loadCharacterTraits();
     }
   }, [character]);
 
@@ -176,6 +178,26 @@ export default function CharacterViewScreen() {
     } catch (error) {
       console.error('Error loading features:', error);
       setCharacterFeatures([]);
+    }
+  };
+
+  const loadCharacterTraits = async () => {
+    if (!character) return;
+    
+    try {
+      // Load racial traits based on character's race
+      const { data: traits, error } = await supabase
+        .from('traits')
+        .select('*')
+        .eq('race_index', character.race.toLowerCase())
+        .order('name');
+
+      if (error) throw error;
+      setCharacterTraits(traits || []);
+    } catch (error) {
+      console.error('Error loading traits:', error);
+      // Fallback to character's stored traits if database fails
+      setCharacterTraits(character.traits || []);
     }
   };
 
@@ -1122,13 +1144,12 @@ export default function CharacterViewScreen() {
           {activeTab === 'traits' && (
             <View>
               {/* Racial Traits */}
-              {character.traits && character.traits.length > 0 && (
+              {characterTraits.length > 0 && (
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Racial Traits</Text>
                   <View style={styles.traitsList}>
-                    {character.traits.map((trait, index) => {
-                      const traitKey = typeof trait === 'object' ? trait.index || trait.name || `trait-${index}` : `trait-${index}`;
-                      const traitName = typeof trait === 'object' ? trait.name : trait;
+                    {characterTraits.map((trait, index) => {
+                      const traitKey = trait.index || `trait-${index}`;
                       const isExpanded = expandedTraits.has(traitKey);
 
                       return (
@@ -1138,14 +1159,14 @@ export default function CharacterViewScreen() {
                           onPress={() => toggleTraitExpanded(traitKey)}
                         >
                           <View style={styles.traitHeader}>
-                            <Text style={styles.traitName}>{traitName}</Text>
+                            <Text style={styles.traitName}>{trait.name}</Text>
                             {isExpanded ? (
                               <ChevronUp size={20} color="#4CAF50" />
                             ) : (
                               <ChevronDown size={20} color="#4CAF50" />
                             )}
                           </View>
-                          {isExpanded && typeof trait === 'object' && trait.description && (
+                          {isExpanded && trait.description && (
                             <View style={styles.traitDetails}>
                               {Array.isArray(trait.description) 
                                 ? trait.description.map((desc: string, i: number) => (
