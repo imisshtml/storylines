@@ -61,8 +61,8 @@ const getLatestMessageId = async (campaignUid: string): Promise<number | null> =
 
 // Helper function to check if campaign has unread messages
 const hasUnreadMessages = (
-  campaignUid: string, 
-  latestMessageId: number | null, 
+  campaignUid: string,
+  latestMessageId: number | null,
   readStatuses: Record<string, any>
 ): boolean => {
   const readStatus = readStatuses[campaignUid];
@@ -224,12 +224,36 @@ export const upsertCampaignAtom = atom(
 
 export const currentCampaignAtom = atom<Campaign | null>(null);
 
+// Track the active campaign subscription
+let activeCampaignSubscription: any = null;
+let activeCampaignUserId: string | null = null;
+
 // Initialize Supabase real-time subscription
 export const initializeRealtimeAtom = atom(
   null,
   async (get, set) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      return;
+    }
+
+    // If we already have an active subscription for this user, return the existing cleanup
+    if (activeCampaignSubscription && activeCampaignUserId === user.id) {
+      return () => {
+        if (activeCampaignSubscription) {
+          activeCampaignSubscription.unsubscribe();
+          activeCampaignSubscription = null;
+          activeCampaignUserId = null;
+        }
+      };
+    }
+
+    // Clean up any existing subscription for a different user
+    if (activeCampaignSubscription) {
+      activeCampaignSubscription.unsubscribe();
+      activeCampaignSubscription = null;
+      activeCampaignUserId = null;
+    }
 
     const subscription = supabase
       .channel('campaigns')
@@ -267,8 +291,16 @@ export const initializeRealtimeAtom = atom(
       )
       .subscribe();
 
+    // Store the subscription and user ID
+    activeCampaignSubscription = subscription;
+    activeCampaignUserId = user.id;
+
     return () => {
-      subscription.unsubscribe();
+      if (activeCampaignSubscription) {
+        activeCampaignSubscription.unsubscribe();
+        activeCampaignSubscription = null;
+        activeCampaignUserId = null;
+      }
     };
   }
 );

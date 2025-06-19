@@ -8,9 +8,7 @@ import {
   SafeAreaView,
   TextInput,
   ActivityIndicator,
-  Image,
   Modal,
-  Alert,
   Platform,
   StatusBar,
 } from 'react-native';
@@ -23,9 +21,6 @@ import {
   Check,
   X,
   Trash2,
-  Send,
-  Mail,
-  Calendar,
   ChevronRight,
   UserCheck,
   Clock,
@@ -54,8 +49,6 @@ import {
   sendCampaignInvitationAtom,
   respondToCampaignInvitationAtom,
   type Friendship,
-  type CampaignInvitation,
-  type UserProfile,
 } from '../atoms/friendsAtoms';
 import { useCustomAlert } from '../components/CustomAlert';
 import { supabase } from '../config/supabase';
@@ -84,7 +77,7 @@ export default function FriendsScreen() {
   const [, respondToCampaignInvitation] = useAtom(respondToCampaignInvitationAtom);
   const [, setUserSearchResults] = useAtom(userSearchResultsAtom);
 
-  const { showAlert, hideAlert } = useCustomAlert();
+  const { showAlert } = useCustomAlert();
 
   const [activeTab, setActiveTab] = useState<TabType>('friends');
   const [searchQuery, setSearchQuery] = useState('');
@@ -237,10 +230,10 @@ export default function FriendsScreen() {
         undefined,
         'success'
       );
-      
+
       // Refresh sent invitations to update pending status
       fetchSentInvitations();
-      
+
       setShowCampaignInviteModal(false);
       setSelectedFriend(null);
     } catch (error) {
@@ -254,7 +247,7 @@ export default function FriendsScreen() {
     try {
       setIsLoading(true);
       await respondToCampaignInvitation({ invitationId, response });
-      
+
       if (response === 'accepted') {
         showAlert(
           'Campaign Invitation Accepted',
@@ -279,8 +272,8 @@ export default function FriendsScreen() {
 
   const getSharedCampaigns = (friend: Friendship) => {
     if (!friend.friend_profile) return [];
-    
-    return campaigns.filter(campaign => 
+
+    return campaigns.filter(campaign =>
       campaign.players.some((player: any) => player.id === friend.friend_profile!.id) &&
       campaign.players.some((player: any) => player.id === user?.id)
     );
@@ -288,7 +281,7 @@ export default function FriendsScreen() {
 
   // Check if a friend has a pending invitation to a specific campaign
   const hasPendingInvitation = (friendId: string, campaignId: string) => {
-    return sentInvitations.some(invitation => 
+    return sentInvitations.some(invitation =>
       invitation.campaign_id === campaignId &&
       invitation.invitee_id === friendId &&
       invitation.status === 'pending'
@@ -297,16 +290,16 @@ export default function FriendsScreen() {
 
   const getAvailableCampaigns = () => {
     if (!selectedFriend?.friend_profile) return [];
-    
+
     return campaigns.filter(campaign => {
       // Must be owned by current user and in creation phase
       const isOwned = campaign.owner === user?.id && campaign.status === 'creation';
-      
+
       // Friend must not already be in the campaign
-      const isNotInCampaign = !campaign.players.some((player: any) => 
+      const isNotInCampaign = !campaign.players.some((player: any) =>
         player.id === selectedFriend.friend_profile!.id
       );
-      
+
       return isOwned && isNotInCampaign;
     });
   };
@@ -396,7 +389,7 @@ export default function FriendsScreen() {
       {/* Received Requests */}
       {friendRequestsReceived.length > 0 && (
         <>
-          <Text style={styles.sectionTitle}>Received Requests</Text>
+          <Text style={styles.sectionTitle}>{'Received Requests'}</Text>
           {friendRequestsReceived.map((request) => (
             <View key={request.id} style={styles.requestCard}>
               <View style={styles.friendInfo}>
@@ -435,7 +428,7 @@ export default function FriendsScreen() {
       {/* Sent Requests */}
       {friendRequestsSent.length > 0 && (
         <>
-          <Text style={styles.sectionTitle}>Sent Requests</Text>
+          <Text style={styles.sectionTitle}>{'Sent Requests'}</Text>
           {friendRequestsSent.map((request) => (
             <View key={request.id} style={styles.requestCard}>
               <View style={styles.friendInfo}>
@@ -454,7 +447,7 @@ export default function FriendsScreen() {
               </View>
               <View style={styles.pendingIndicator}>
                 <Clock size={16} color="#FFA726" />
-                <Text style={styles.pendingText}>Pending</Text>
+                <Text style={styles.pendingText}>{'Pending'}</Text>
               </View>
             </View>
           ))}
@@ -464,9 +457,9 @@ export default function FriendsScreen() {
       {friendRequestsReceived.length === 0 && friendRequestsSent.length === 0 && (
         <View style={styles.emptyState}>
           <UserCheck size={48} color="#666" />
-          <Text style={styles.emptyStateTitle}>No Friend Requests</Text>
+          <Text style={styles.emptyStateTitle}>{'No Friend Requests'}</Text>
           <Text style={styles.emptyStateText}>
-            You don't have any pending friend requests.
+            {"You don't have any pending friend requests."}
           </Text>
         </View>
       )}
@@ -478,9 +471,9 @@ export default function FriendsScreen() {
       {campaignInvitations.length === 0 ? (
         <View style={styles.emptyState}>
           <Crown size={48} color="#666" />
-          <Text style={styles.emptyStateTitle}>No Campaign Invitations</Text>
+          <Text style={styles.emptyStateTitle}>{'No Campaign Invitations'}</Text>
           <Text style={styles.emptyStateText}>
-            You don't have any pending campaign invitations.
+            {"You don't have any pending campaign invitations."}
           </Text>
         </View>
       ) : (
@@ -542,7 +535,7 @@ export default function FriendsScreen() {
             <UserX size={48} color="#666" />
             <Text style={styles.emptyStateTitle}>No Users Found</Text>
             <Text style={styles.emptyStateText}>
-              Try searching with a different username or email.
+              {'Try searching with a different username or email.'}
             </Text>
           </View>
         ) : (
@@ -617,17 +610,17 @@ export default function FriendsScreen() {
               {getAvailableCampaigns().length === 0 ? (
                 <View style={styles.emptyState}>
                   <Crown size={48} color="#666" />
-                  <Text style={styles.emptyStateTitle}>No Available Campaigns</Text>
+                  <Text style={styles.emptyStateTitle}>{'No Available Campaigns'}</Text>
                   <Text style={styles.emptyStateText}>
-                    You don't have any campaigns in creation phase to invite friends to.
+                    {"You don't have any campaigns in creation phase to invite friends to."}
                   </Text>
                 </View>
               ) : (
                 getAvailableCampaigns().map((campaign) => {
-                  const isPending = selectedFriend?.friend_profile ? 
-                    hasPendingInvitation(selectedFriend.friend_profile.id, campaign.uid) : 
+                  const isPending = selectedFriend?.friend_profile ?
+                    hasPendingInvitation(selectedFriend.friend_profile.id, campaign.uid) :
                     false;
-                  
+
                   return (
                     <TouchableOpacity
                       key={campaign.id}
@@ -645,7 +638,7 @@ export default function FriendsScreen() {
                       {isPending ? (
                         <View style={styles.pendingIndicator}>
                           <Clock size={16} color="#FFA726" />
-                          <Text style={styles.pendingText}>Pending</Text>
+                          <Text style={styles.pendingText}>{'Pending'}</Text>
                         </View>
                       ) : (
                         <ChevronRight size={20} color="#4CAF50" />
