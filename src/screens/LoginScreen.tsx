@@ -1,9 +1,11 @@
 import { router } from 'expo-router';
 import { LogIn, UserPlus, Eye, EyeOff, Phone, Zap } from 'lucide-react-native';
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, ActivityIndicator, Image } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, Image } from 'react-native';
 import { useAtom } from 'jotai';
 import { signInAtom, signUpAtom, authLoadingAtom, authErrorAtom } from '../atoms/authAtoms';
+import ActivityIndicator from '../components/ActivityIndicator';
+import { useLoading } from '../hooks/useLoading';
 
 export default function LoginScreen() {
   const [emailOrUsername, setEmailOrUsername] = useState('');
@@ -15,8 +17,9 @@ export default function LoginScreen() {
 
   const [, signIn] = useAtom(signInAtom);
   const [, signUp] = useAtom(signUpAtom);
-  const [isLoading] = useAtom(authLoadingAtom);
+  const [isAuthLoading] = useAtom(authLoadingAtom);
   const [error] = useAtom(authErrorAtom);
+  const { isLoading, withLoading } = useLoading();
 
   const isValidEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -41,23 +44,27 @@ export default function LoginScreen() {
   }, [emailOrUsername, password, username, phone, isSignUp]);
 
   const handleAuth = async () => {
-    if (!isValid()) return;
+    if (!isValid() || isAuthLoading || isLoading('auth')) return;
 
     try {
       if (isSignUp) {
-        await signUp({
-          email: emailOrUsername,
-          password,
-          username,
-          phone: phone || undefined
-        });
-        // After successful signup, switch to sign in mode
-        setIsSignUp(false);
-        setPassword('');
-        setPhone('');
+        await withLoading(async () => {
+          await signUp({
+            email: emailOrUsername,
+            password,
+            username,
+            phone: phone || undefined
+          });
+          // After successful signup, switch to sign in mode
+          setIsSignUp(false);
+          setPassword('');
+          setPhone('');
+        }, 'auth')();
       } else {
-        await signIn({ emailOrUsername, password });
-        router.replace('/home');
+        await withLoading(async () => {
+          await signIn({ emailOrUsername, password });
+          router.replace('/home');
+        }, 'auth')();
       }
     } catch (err) {
       console.error('Authentication error:', err);
@@ -83,161 +90,161 @@ export default function LoginScreen() {
       style={styles.container}
       imageStyle={styles.backgroundImage}
     >
-      <View style={styles.overlay}>
-        <View style={styles.content}>
-          <TouchableOpacity
-            onPress={handleTitlePress}
-            disabled={!__DEV__}
-          >
-            <Image source={require('../../assets/images/sl_logo_small.png')} style={styles.logoImg} resizeMode='contain' />
-          </TouchableOpacity>
+      <ActivityIndicator 
+        isLoading={isAuthLoading || isLoading('auth')} 
+        fullScreen 
+        text={isSignUp ? "Creating your account..." : "Logging in..."}
+      >
+        <View style={styles.overlay}>
+          <View style={styles.content}>
+            <TouchableOpacity
+              onPress={handleTitlePress}
+              disabled={!__DEV__}
+            >
+              <Image source={require('../../assets/images/sl_logo_small.png')} style={styles.logoImg} resizeMode='contain' />
+            </TouchableOpacity>
 
-          <View style={styles.form}>
-            {error && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            )}
-
-            {isSignUp && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Username</Text>
-                <TextInput
-                  style={styles.input}
-                  value={username}
-                  onChangeText={setUsername}
-                  placeholder="Choose a username"
-                  placeholderTextColor="#666"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                {username.length > 0 && username.length < 3 && (
-                  <Text style={styles.validationError}>
-                    Username must be at least 3 characters
-                  </Text>
-                )}
-              </View>
-            )}
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={styles.input}
-                value={emailOrUsername}
-                onChangeText={setEmailOrUsername}
-                placeholder="Enter your email"
-                placeholderTextColor="#666"
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-              />
-              {emailOrUsername.length > 0 && (
-                isSignUp ? (
-                  !isValidEmail(emailOrUsername) && (
-                    <Text style={styles.validationError}>
-                      Please enter a valid email address
-                    </Text>
-                  )
-                ) : (
-                  emailOrUsername.length < 3 && (
-                    <Text style={styles.validationError}>
-                      Must be at least 3 characters
-                    </Text>
-                  )
-                )
+            <View style={styles.form}>
+              {error && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
               )}
-            </View>
 
-            {isSignUp && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Phone Number (Optional)</Text>
-                <View style={styles.phoneContainer}>
-                  <Phone size={20} color="#666" style={styles.phoneIcon} />
+              {isSignUp && (
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Username</Text>
                   <TextInput
-                    style={styles.phoneInput}
-                    value={phone}
-                    onChangeText={setPhone}
-                    placeholder="Enter phone number"
+                    style={styles.input}
+                    value={username}
+                    onChangeText={setUsername}
+                    placeholder="Choose a username"
                     placeholderTextColor="#666"
-                    keyboardType="phone-pad"
+                    autoCapitalize="none"
                     autoCorrect={false}
                   />
+                  {username.length > 0 && username.length < 3 && (
+                    <Text style={styles.validationError}>
+                      Username must be at least 3 characters
+                    </Text>
+                  )}
                 </View>
-                {phone.length > 0 && !isValidPhone(phone) && (
+              )}
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  value={emailOrUsername}
+                  onChangeText={setEmailOrUsername}
+                  placeholder="Enter your email"
+                  placeholderTextColor="#666"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                />
+                {emailOrUsername.length > 0 && (
+                  isSignUp ? (
+                    !isValidEmail(emailOrUsername) && (
+                      <Text style={styles.validationError}>
+                        Please enter a valid email address
+                      </Text>
+                    )
+                  ) : (
+                    emailOrUsername.length < 3 && (
+                      <Text style={styles.validationError}>
+                        Must be at least 3 characters
+                      </Text>
+                    )
+                  )
+                )}
+              </View>
+
+              {isSignUp && (
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Phone Number (Optional)</Text>
+                  <View style={styles.phoneContainer}>
+                    <Phone size={20} color="#666" style={styles.phoneIcon} />
+                    <TextInput
+                      style={styles.phoneInput}
+                      value={phone}
+                      onChangeText={setPhone}
+                      placeholder="Enter phone number"
+                      placeholderTextColor="#666"
+                      keyboardType="phone-pad"
+                      autoCorrect={false}
+                    />
+                  </View>
+                  {phone.length > 0 && !isValidPhone(phone) && (
+                    <Text style={styles.validationError}>
+                      Please enter a valid phone number
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Password</Text>
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Enter password"
+                    placeholderTextColor="#666"
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeButton}
+                    onPress={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={20} color="#666" />
+                    ) : (
+                      <Eye size={20} color="#666" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+                {password.length > 0 && password.length < 8 && (
                   <Text style={styles.validationError}>
-                    Please enter a valid phone number
+                    Password must be at least 8 characters
                   </Text>
                 )}
               </View>
-            )}
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Password</Text>
-              <View style={styles.passwordContainer}>
-                <TextInput
-                  style={styles.passwordInput}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="Enter password"
-                  placeholderTextColor="#666"
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <TouchableOpacity
-                  style={styles.eyeButton}
-                  onPress={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff size={20} color="#666" />
-                  ) : (
-                    <Eye size={20} color="#666" />
-                  )}
-                </TouchableOpacity>
-              </View>
-              {password.length > 0 && password.length < 8 && (
-                <Text style={styles.validationError}>
-                  Password must be at least 8 characters
+              <TouchableOpacity
+                style={[styles.authButton, (!isValid() || isAuthLoading || isLoading('auth')) && styles.authButtonDisabled]}
+                onPress={handleAuth}
+                disabled={!isValid() || isAuthLoading || isLoading('auth')}
+              >
+                {isSignUp ? (
+                  <UserPlus size={20} color="#fff" />
+                ) : (
+                  <LogIn size={20} color="#fff" />
+                )}
+                <Text style={styles.buttonText}>
+                  {isSignUp ? 'Sign Up' : 'Login'}
                 </Text>
-              )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.toggleButton}
+                onPress={toggleMode}
+                disabled={isAuthLoading || isLoading('auth')}
+              >
+                <Text style={styles.toggleText}>
+                  {isSignUp
+                    ? 'Already have an account? Sign In'
+                    : "Don't have an account? Sign Up"
+                  }
+                </Text>
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={[styles.authButton, (!isValid() || isLoading) && styles.authButtonDisabled]}
-              onPress={handleAuth}
-              disabled={!isValid() || isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  {isSignUp ? (
-                    <UserPlus size={20} color="#fff" />
-                  ) : (
-                    <LogIn size={20} color="#fff" />
-                  )}
-                  <Text style={styles.buttonText}>
-                    {isSignUp ? 'Sign Up' : 'Login'}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.toggleButton}
-              onPress={toggleMode}
-              disabled={isLoading}
-            >
-              <Text style={styles.toggleText}>
-                {isSignUp
-                  ? 'Already have an account? Sign In'
-                  : "Don't have an account? Sign Up"
-                }
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </ActivityIndicator>
 
       {/* Fixed Footer */}
       <View style={styles.footer}>
