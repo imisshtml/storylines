@@ -197,6 +197,37 @@ export const cleanupExpiredActionsAtom = atom(
   }
 );
 
+// AI-generated choices persistence
+export const aiChoicesAtom = atom<Record<string, string[]>>({});
+
+export const setAiChoicesAtom = atom(
+  null,
+  (get, set, { campaignUid, choices }: { campaignUid: string; choices: string[] }) => {
+    const currentChoices = get(aiChoicesAtom);
+    set(aiChoicesAtom, {
+      ...currentChoices,
+      [campaignUid]: choices
+    });
+  }
+);
+
+export const getAiChoicesAtom = atom((get) => {
+  return (campaignUid: string): string[] => {
+    const choices = get(aiChoicesAtom);
+    return choices[campaignUid] || [];
+  };
+});
+
+export const clearAiChoicesAtom = atom(
+  null,
+  (get, set, campaignUid: string) => {
+    const currentChoices = get(aiChoicesAtom);
+    const updatedChoices = { ...currentChoices };
+    delete updatedChoices[campaignUid];
+    set(aiChoicesAtom, updatedChoices);
+  }
+);
+
 // Get actions filtered by current game mode
 export const getActionsByModeAtom = atom(
   null,
