@@ -70,6 +70,19 @@ export type Equipment = {
   updated_at?: string;
 };
 
+export type EquippedItems = {
+  armor?: Equipment;
+  leftHand?: Equipment;
+  rightHand?: Equipment;
+  rings?: Equipment[];
+  head?: Equipment;
+  necklace?: Equipment;
+  boots?: Equipment;
+  gloves?: Equipment;
+};
+
+export type EquipmentSlot = 'armor' | 'leftHand' | 'rightHand' | 'rings' | 'head' | 'necklace' | 'boots' | 'gloves';
+
 export type Character = {
   id: string;
   user_id: string;
@@ -83,6 +96,7 @@ export type Character = {
   skills: string[]; // Changed to string[] to match actual usage
   spells: DnDSpell[];
   equipment: Equipment[]; // Changed to Equipment[] to match actual usage
+  equipped_items?: EquippedItems; // New field for equipped items
   current_hitpoints: number;
   max_hitpoints: number;
   temp_hitpoints: number;
@@ -541,3 +555,147 @@ export const removeEquipmentAtom = atom(
     set(purchasedEquipmentAtom, purchasedEquipment.filter(item => item.id !== equipment.id));
   }
 );
+
+// Calculate AC based on equipped armor and dexterity
+export const calculateArmorClass = (equippedItems: EquippedItems, dexterity: number): number => {
+  const dexModifier = Math.floor((dexterity - 10) / 2);
+  
+  if (!equippedItems.armor) {
+    // No armor: 10 + Dex modifier
+    return 10 + dexModifier;
+  }
+  
+  const armor = equippedItems.armor;
+  let baseAC = armor.armor_class_base || 10;
+  
+  if (armor.armor_class_dex_bonus) {
+    // Light armor: AC + full Dex modifier
+    // Medium armor: AC + Dex modifier (max 2)
+    let dexBonus = dexModifier;
+    
+    if (armor.armor_category === 'Medium Armor') {
+      dexBonus = Math.min(dexModifier, 2);
+    }
+    
+    baseAC += dexBonus;
+  }
+  // Heavy armor: no dex bonus
+  
+  return baseAC;
+};
+
+// Check if an item can be equipped in a specific slot
+export const canEquipInSlot = (equipment: Equipment, slot: EquipmentSlot): boolean => {
+  const itemName = equipment.name.toLowerCase();
+  const category = equipment.equipment_category;
+  const armorCategory = equipment.armor_category;
+  
+  switch (slot) {
+    case 'armor':
+      // Check for armor category or armor in the name
+      return category === 'Armor' || 
+             (armorCategory && ['Light Armor', 'Medium Armor', 'Heavy Armor'].includes(armorCategory)) ||
+             itemName.includes('armor') || 
+             itemName.includes('mail') || 
+             itemName.includes('leather') ||
+             itemName.includes('chain') ||
+             itemName.includes('plate') ||
+             itemName.includes('scale') ||
+             itemName.includes('studded') ||
+             itemName.includes('breastplate') ||
+             itemName.includes('hide') ||
+             itemName.includes('padded') ||
+             itemName.includes('splint');
+    case 'leftHand':
+    case 'rightHand':
+      // Weapons and shields - be very permissive
+      return category === 'Weapon' || 
+             category === 'Weapons' ||
+             (category === 'Armor' && armorCategory === 'Shield') ||
+             itemName.includes('sword') ||
+             itemName.includes('axe') ||
+             itemName.includes('bow') ||
+             itemName.includes('crossbow') ||
+             itemName.includes('dagger') ||
+             itemName.includes('mace') ||
+             itemName.includes('spear') ||
+             itemName.includes('staff') ||
+             itemName.includes('wand') ||
+             itemName.includes('club') ||
+             itemName.includes('hammer') ||
+             itemName.includes('javelin') ||
+             itemName.includes('trident') ||
+             itemName.includes('shield') ||
+             itemName.includes('weapon') ||
+             // Add more weapon types
+             itemName.includes('rapier') ||
+             itemName.includes('scimitar') ||
+             itemName.includes('shortsword') ||
+             itemName.includes('longsword') ||
+             itemName.includes('greatsword') ||
+             itemName.includes('battleaxe') ||
+             itemName.includes('handaxe') ||
+             itemName.includes('greataxe') ||
+             itemName.includes('glaive') ||
+             itemName.includes('halberd') ||
+             itemName.includes('lance') ||
+             itemName.includes('pike') ||
+             itemName.includes('maul') ||
+             itemName.includes('warhammer') ||
+             itemName.includes('flail') ||
+             itemName.includes('morningstar') ||
+             itemName.includes('whip') ||
+             itemName.includes('net') ||
+             itemName.includes('dart') ||
+             itemName.includes('sling') ||
+             itemName.includes('shortbow') ||
+             itemName.includes('longbow') ||
+             itemName.includes('light crossbow') ||
+             itemName.includes('heavy crossbow') ||
+             itemName.includes('blowgun');
+    case 'rings':
+      return itemName.includes('ring');
+    case 'head':
+      return itemName.includes('helmet') || 
+             itemName.includes('hat') ||
+             itemName.includes('crown') ||
+             itemName.includes('circlet') ||
+             itemName.includes('cap') ||
+             itemName.includes('hood') ||
+             itemName.includes('coif');
+    case 'necklace':
+      return itemName.includes('amulet') || 
+             itemName.includes('necklace') ||
+             itemName.includes('pendant') ||
+             itemName.includes('chain') ||
+             itemName.includes('collar') ||
+             itemName.includes('torque');
+    case 'boots':
+      return itemName.includes('boots') || 
+             itemName.includes('shoes') ||
+             itemName.includes('sandals') ||
+             itemName.includes('slippers');
+    case 'gloves':
+      return itemName.includes('gloves') || 
+             itemName.includes('gauntlets') ||
+             itemName.includes('mittens') ||
+             itemName.includes('bracers');
+    default:
+      return false;
+  }
+};
+
+// Get display name for equipment slot
+export const getSlotDisplayName = (slot: EquipmentSlot): string => {
+  switch (slot) {
+    case 'armor': return 'Armor';
+    case 'leftHand': return 'Left Hand';
+    case 'rightHand': return 'Right Hand';
+    case 'rings': return 'Rings';
+    case 'head': return 'Head';
+    case 'necklace': return 'Necklace';
+    case 'boots': return 'Boots';
+    case 'gloves': return 'Gloves';
+    default: return slot;
+  }
+};
