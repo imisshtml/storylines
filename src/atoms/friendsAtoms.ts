@@ -41,6 +41,7 @@ export type UserProfile = {
   id: string;
   username: string;
   email: string;
+  searchMatchType?: 'username' | 'email';
 };
 
 // Friends state
@@ -216,21 +217,52 @@ export const searchUsersAtom = atom(
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const searchPattern = `%${query}%`;
-      const { data: users, error } = await supabase
-        .from('profiles')
-        .select('id, username, email')
-        .neq('id', user.id) // Exclude current user
-        .or(`username.ilike.${searchPattern},email.ilike.${searchPattern}`)
-        .limit(10);
-
-      if (error) {
-        console.error('Search error:', error);
-        throw error;
+      // Check if query is an exact email address
+      const isExactEmail = query.includes('@');
+      
+      let users: UserProfile[] = [];
+      
+      if (isExactEmail) {
+        // Exact email match search
+        const { data: emailUsers, error: emailError } = await supabase
+          .from('profiles')
+          .select('id, username, email')
+          .neq('id', user.id) // Exclude current user
+          .ilike('email', query.toLowerCase());
+        
+        if (emailError) {
+          console.error('Email search error:', emailError);
+          throw emailError;
+        }
+        
+        // Mark these results as email matches
+        users = (emailUsers || []).map(user => ({
+          ...user,
+          searchMatchType: 'email' as const
+        }));
+      } else {
+        // Username fuzzy search
+        const searchPattern = `%${query}%`;
+        const { data: usernameUsers, error: usernameError } = await supabase
+          .from('profiles')
+          .select('id, username, email')
+          .neq('id', user.id) // Exclude current user
+          .ilike('username', searchPattern);
+        
+        if (usernameError) {
+          console.error('Username search error:', usernameError);
+          throw usernameError;
+        }
+        
+        // Mark these results as username matches
+        users = (usernameUsers || []).map(user => ({
+          ...user,
+          searchMatchType: 'username' as const
+        }));
       }
 
       console.log('Search results:', users); // Debug log
-      set(userSearchResultsAtom, users || []);
+      set(userSearchResultsAtom, users);
     } catch (error) {
       console.error('Error searching users:', error);
       set(userSearchResultsAtom, []);
