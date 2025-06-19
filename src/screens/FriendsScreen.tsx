@@ -49,6 +49,7 @@ import {
   sendCampaignInvitationAtom,
   respondToCampaignInvitationAtom,
   type Friendship,
+  type UserProfile,
 } from '../atoms/friendsAtoms';
 import { useCustomAlert } from '../components/CustomAlert';
 import { supabase } from '../config/supabase';
@@ -519,7 +520,7 @@ export default function FriendsScreen() {
           style={styles.searchInput}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholder="Search by username or email..."
+          placeholder="Search by username or exact email..."
           placeholderTextColor="#666"
         />
       </View>
@@ -535,7 +536,9 @@ export default function FriendsScreen() {
             <UserX size={48} color="#666" />
             <Text style={styles.emptyStateTitle}>No Users Found</Text>
             <Text style={styles.emptyStateText}>
-              {'Try searching with a different username or email.'}
+              {searchQuery.includes('@') 
+                ? 'No exact match found for this email address.' 
+                : 'Try searching with a different username.'}
             </Text>
           </View>
         ) : (
@@ -548,8 +551,11 @@ export default function FriendsScreen() {
                   </Text>
                 </View>
                 <View style={styles.friendDetails}>
-                  <Text style={styles.friendName}>{userProfile.username}</Text>
-                  <Text style={styles.friendEmail}>{userProfile.email}</Text>
+                  {userProfile.searchMatchType === 'username' ? (
+                    <Text style={styles.friendName}>{userProfile.username}</Text>
+                  ) : (
+                    <Text style={styles.friendEmail}>{userProfile.email}</Text>
+                  )}
                 </View>
               </View>
               <TouchableOpacity
