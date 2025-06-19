@@ -23,6 +23,8 @@ import SidebarMenu from '../components/SidebarMenu';
 import JoinCampaignModal from '../components/JoinCampaignModal';
 import { useCustomAlert } from '../components/CustomAlert';
 import { initializeNotificationListeners, requestNotificationPermissions } from '../utils/notifications';
+import ActivityIndicator from '../components/ActivityIndicator';
+import { useLoading } from '../hooks/useLoading';
 
 export default function HomeScreen() {
   const [campaigns] = useAtom(campaignsAtom);
@@ -42,14 +44,25 @@ export default function HomeScreen() {
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
   const { showAlert } = useCustomAlert();
+  const { isLoading, withLoading } = useLoading();
 
   // Fetch characters and read status when component mounts or user changes
   useEffect(() => {
     if (user) {
-      fetchCharacters();
-      fetchCampaignReadStatus();
-      fetchCampaignInvitations();
-      fetchFriendRequestsReceived();
+      const loadInitialData = async () => {
+        try {
+          await Promise.all([
+            fetchCharacters(),
+            fetchCampaignReadStatus(),
+            fetchCampaignInvitations(),
+            fetchFriendRequestsReceived(),
+          ]);
+        } catch (error) {
+          console.error('Error loading initial data:', error);
+        }
+      };
+
+      withLoading(loadInitialData, 'initialLoad')();
 
       // Initialize real-time subscription for read status
       initializeReadStatusRealtime();
@@ -68,7 +81,7 @@ export default function HomeScreen() {
         }
       };
     }
-  }, [user, fetchCharacters, fetchCampaignReadStatus, fetchCampaignInvitations, fetchFriendRequestsReceived, initializeReadStatusRealtime]);
+  }, [user, fetchCharacters, fetchCampaignReadStatus, fetchCampaignInvitations, fetchFriendRequestsReceived, initializeReadStatusRealtime, withLoading]);
 
   const handleCampaignPress = async (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
@@ -241,242 +254,248 @@ export default function HomeScreen() {
       style={styles.container}
       imageStyle={styles.backgroundImage}
     >
-      <View style={styles.overlay}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={toggleSidebar} style={styles.menuButton}>
-            <Menu size={24} color="#fff" />
-          </TouchableOpacity>
-
-          <View style={styles.titleContainer}>
-            <TouchableOpacity
-              onPress={handleTitlePress}
-              disabled={!__DEV__}
-            >
-              <Image source={require('../../assets/images/sl_logo_small.png')} style={styles.logoImg} resizeMode='contain' />
+      <ActivityIndicator 
+        isLoading={isLoading('initialLoad')} 
+        fullScreen 
+        text="Loading your adventures..."
+      >
+        <View style={styles.overlay}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={toggleSidebar} style={styles.menuButton}>
+              <Menu size={24} color="#fff" />
             </TouchableOpacity>
-            {user && (
-              <Text style={styles.welcomeText}>
-                Welcome back, {user.username || user.email}!
-              </Text>
-            )}
-          </View>
-        </View>
 
-        <View style={styles.contentContainer}>
-          <View style={styles.campaignsContainer}>
-            <ScrollView style={styles.campaignsScrollView} showsVerticalScrollIndicator={false}>
-              {/* Characters Section */}
-              {characters.length > 0 && (
-                <View style={styles.charactersSection}>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.charactersScrollContent}
-                  >
-                    {characters.map(character => (
-                      <TouchableOpacity
-                        key={character.id}
-                        style={styles.characterCard}
-                        onPress={() => handleCharacterPress(character)}
-                      >
-                        <View style={styles.characterAvatarContainer}>
-                          <Image
-                            source={getCharacterAvatar(character)}
-                            style={styles.characterAvatar}
-                          />
-                          <View style={styles.characterLevelBadge}>
-                            <Star size={8} color="#fff" fill="#fff" />
-                            <Text style={styles.characterLevel}>
-                              {character.level || 1}
+            <View style={styles.titleContainer}>
+              <TouchableOpacity
+                onPress={handleTitlePress}
+                disabled={!__DEV__}
+              >
+                <Image source={require('../../assets/images/sl_logo_small.png')} style={styles.logoImg} resizeMode='contain' />
+              </TouchableOpacity>
+              {user && (
+                <Text style={styles.welcomeText}>
+                  Welcome back, {user.username || user.email}!
+                </Text>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.contentContainer}>
+            <View style={styles.campaignsContainer}>
+              <ScrollView style={styles.campaignsScrollView} showsVerticalScrollIndicator={false}>
+                {/* Characters Section */}
+                {characters.length > 0 && (
+                  <View style={styles.charactersSection}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.charactersScrollContent}
+                    >
+                      {characters.map(character => (
+                        <TouchableOpacity
+                          key={character.id}
+                          style={styles.characterCard}
+                          onPress={() => handleCharacterPress(character)}
+                        >
+                          <View style={styles.characterAvatarContainer}>
+                            <Image
+                              source={getCharacterAvatar(character)}
+                              style={styles.characterAvatar}
+                            />
+                            <View style={styles.characterLevelBadge}>
+                              <Star size={8} color="#fff" fill="#fff" />
+                              <Text style={styles.characterLevel}>
+                                {character.level || 1}
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={styles.characterInfo}>
+                            <Text style={styles.characterName} numberOfLines={1}>
+                              {character.name || 'Unnamed'}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {/* Campaign Invitations Banner */}
+                {campaignInvitations.length > 0 && (
+                  <View style={styles.invitationsBanner}>
+                    <View style={styles.invitationsHeader}>
+                      <Bell size={20} color="#FFD700" />
+                      <Text style={styles.invitationsTitle}>
+                        Campaign Invitation{campaignInvitations.length > 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {campaignInvitations.map((invitation) => (
+                        <View key={invitation.id} style={styles.invitationCard}>
+                          <Text style={styles.invitationCampaignName}>
+                            {invitation.campaign?.name}
+                          </Text>
+                          <Text style={styles.invitationFrom}>
+                            From {invitation.inviter_profile?.username}
+                          </Text>
+                          <View style={styles.invitationActions}>
+                            <TouchableOpacity
+                              style={styles.acceptInvitationButton}
+                              onPress={() => handleAcceptCampaignInvitation(invitation.id)}
+                            >
+                              <Text style={styles.invitationButtonText}>Accept</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.declineInvitationButton}
+                              onPress={() => handleDeclineCampaignInvitation(invitation.id)}
+                            >
+                              <Text style={styles.invitationButtonText}>Decline</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {/* Friend Requests Banner */}
+                {friendRequestsReceived.length > 0 && (
+                  <View style={styles.friendRequestsBanner}>
+                    <View style={styles.friendRequestsHeader}>
+                      <UserPlus size={20} color="#4CAF50" />
+                      <Text style={styles.friendRequestsTitle}>
+                        Friend Request{friendRequestsReceived.length > 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {friendRequestsReceived.map((request) => (
+                        <View key={request.id} style={styles.friendRequestCard}>
+                          <Text style={styles.friendRequestUsername}>
+                            {request.friend_profile?.username}
+                          </Text>
+                          <Text style={styles.friendRequestEmail}>
+                            {request.friend_profile?.email}
+                          </Text>
+                          <View style={styles.friendRequestActions}>
+                            <TouchableOpacity
+                              style={styles.acceptFriendRequestButton}
+                              onPress={() => handleAcceptFriendRequest(request.id)}
+                            >
+                              <Text style={styles.friendRequestButtonText}>Accept</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.declineFriendRequestButton}
+                              onPress={() => handleDeclineFriendRequest(request.id)}
+                            >
+                              <Text style={styles.friendRequestButtonText}>Decline</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+                {campaigns
+                  .filter(campaign =>
+                    // Double-check: only show campaigns where user is owner or player
+                    isOwner(campaign) ||
+                    (campaign.players && campaign.players.some((player: any) => player.id === user?.id))
+                  )
+                  .map(campaign => (
+                    <View key={campaign.id} style={styles.campaignCard}>
+                      {/* Notification dot positioned absolutely in top-right corner */}
+                      {campaign.has_unread && (
+                        <View style={styles.notificationDot}>
+                          <Circle size={8} color="#4CAF50" fill="#4CAF50" />
+                        </View>
+                      )}
+
+                      <View style={styles.campaignHeader}>
+                        <View style={styles.campaignTitleRow}>
+                          <Text style={styles.campaignTitle}>{campaign.name}</Text>
+                          <View style={styles.roleContainer}>
+                            {isOwner(campaign) ? (
+                              <Crown size={16} color="#FFD700" />
+                            ) : (
+                              <UserCheck size={16} color="#4CAF50" />
+                            )}
+                            <Text style={[
+                              styles.roleText,
+                              isOwner(campaign) ? styles.ownerText : styles.playerText
+                            ]}>
+                              {getUserRole(campaign)}
                             </Text>
                           </View>
                         </View>
-                        <View style={styles.characterInfo}>
-                          <Text style={styles.characterName} numberOfLines={1}>
-                            {character.name || 'Unnamed'}
-                          </Text>
-                        </View>
+                        {campaign.status === 'creation' && isOwner(campaign) && (
+                          <TouchableOpacity
+                            style={styles.settingsButton}
+                            onPress={() => handleSettingsPress(campaign.id)}
+                          >
+                            <Settings size={20} color="#888" />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <Text style={styles.campaignDetails}>
+                        {campaign.status === 'creation'
+                          ? 'In Creation'
+                          : `Players: ${campaign.players.length} • ${campaign.status === 'waiting' ? 'Waiting' : 'In Progress'}`
+                        }
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.continueButton}
+                        onPress={() => handleCampaignPress(campaign.id)}
+                      >
+                        {campaign.status === 'creation' ? (
+                          <>
+                            <Users size={20} color="#fff" />
+                            <Text style={styles.buttonText}>
+                              {isOwner(campaign) ? 'Invite Friends' : 'Waiting for Start'}
+                            </Text>
+                          </>
+                        ) : (
+                          <>
+                            <Play size={20} color="#fff" />
+                            <Text style={styles.buttonText}>Continue Story</Text>
+                          </>
+                        )}
                       </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-
-              {/* Campaign Invitations Banner */}
-              {campaignInvitations.length > 0 && (
-                <View style={styles.invitationsBanner}>
-                  <View style={styles.invitationsHeader}>
-                    <Bell size={20} color="#FFD700" />
-                    <Text style={styles.invitationsTitle}>
-                      Campaign Invitation{campaignInvitations.length > 1 ? 's' : ''}
-                    </Text>
-                  </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {campaignInvitations.map((invitation) => (
-                      <View key={invitation.id} style={styles.invitationCard}>
-                        <Text style={styles.invitationCampaignName}>
-                          {invitation.campaign?.name}
-                        </Text>
-                        <Text style={styles.invitationFrom}>
-                          From {invitation.inviter_profile?.username}
-                        </Text>
-                        <View style={styles.invitationActions}>
-                          <TouchableOpacity
-                            style={styles.acceptInvitationButton}
-                            onPress={() => handleAcceptCampaignInvitation(invitation.id)}
-                          >
-                            <Text style={styles.invitationButtonText}>Accept</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.declineInvitationButton}
-                            onPress={() => handleDeclineCampaignInvitation(invitation.id)}
-                          >
-                            <Text style={styles.invitationButtonText}>Decline</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-
-              {/* Friend Requests Banner */}
-              {friendRequestsReceived.length > 0 && (
-                <View style={styles.friendRequestsBanner}>
-                  <View style={styles.friendRequestsHeader}>
-                    <UserPlus size={20} color="#4CAF50" />
-                    <Text style={styles.friendRequestsTitle}>
-                      Friend Request{friendRequestsReceived.length > 1 ? 's' : ''}
-                    </Text>
-                  </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {friendRequestsReceived.map((request) => (
-                      <View key={request.id} style={styles.friendRequestCard}>
-                        <Text style={styles.friendRequestUsername}>
-                          {request.friend_profile?.username}
-                        </Text>
-                        <Text style={styles.friendRequestEmail}>
-                          {request.friend_profile?.email}
-                        </Text>
-                        <View style={styles.friendRequestActions}>
-                          <TouchableOpacity
-                            style={styles.acceptFriendRequestButton}
-                            onPress={() => handleAcceptFriendRequest(request.id)}
-                          >
-                            <Text style={styles.friendRequestButtonText}>Accept</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.declineFriendRequestButton}
-                            onPress={() => handleDeclineFriendRequest(request.id)}
-                          >
-                            <Text style={styles.friendRequestButtonText}>Decline</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-              {campaigns
-                .filter(campaign =>
-                  // Double-check: only show campaigns where user is owner or player
-                  isOwner(campaign) ||
-                  (campaign.players && campaign.players.some((player: any) => player.id === user?.id))
-                )
-                .map(campaign => (
-                  <View key={campaign.id} style={styles.campaignCard}>
-                    {/* Notification dot positioned absolutely in top-right corner */}
-                    {campaign.has_unread && (
-                      <View style={styles.notificationDot}>
-                        <Circle size={8} color="#4CAF50" fill="#4CAF50" />
-                      </View>
-                    )}
-
-                    <View style={styles.campaignHeader}>
-                      <View style={styles.campaignTitleRow}>
-                        <Text style={styles.campaignTitle}>{campaign.name}</Text>
-                        <View style={styles.roleContainer}>
-                          {isOwner(campaign) ? (
-                            <Crown size={16} color="#FFD700" />
-                          ) : (
-                            <UserCheck size={16} color="#4CAF50" />
-                          )}
-                          <Text style={[
-                            styles.roleText,
-                            isOwner(campaign) ? styles.ownerText : styles.playerText
-                          ]}>
-                            {getUserRole(campaign)}
-                          </Text>
-                        </View>
-                      </View>
-                      {campaign.status === 'creation' && isOwner(campaign) && (
-                        <TouchableOpacity
-                          style={styles.settingsButton}
-                          onPress={() => handleSettingsPress(campaign.id)}
-                        >
-                          <Settings size={20} color="#888" />
-                        </TouchableOpacity>
-                      )}
                     </View>
-                    <Text style={styles.campaignDetails}>
-                      {campaign.status === 'creation'
-                        ? 'In Creation'
-                        : `Players: ${campaign.players.length} • ${campaign.status === 'waiting' ? 'Waiting' : 'In Progress'}`
-                      }
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.continueButton}
-                      onPress={() => handleCampaignPress(campaign.id)}
-                    >
-                      {campaign.status === 'creation' ? (
-                        <>
-                          <Users size={20} color="#fff" />
-                          <Text style={styles.buttonText}>
-                            {isOwner(campaign) ? 'Invite Friends' : 'Waiting for Start'}
-                          </Text>
-                        </>
-                      ) : (
-                        <>
-                          <Play size={20} color="#fff" />
-                          <Text style={styles.buttonText}>Continue Story</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                ))}
+                  ))}
 
-              {campaigns.length === 0 && (
-                <>
-                  <View style={styles.noCampaignsContainer}>
-                    <Text style={styles.noCampaigns}>No active campaigns</Text>
-                    <Text style={styles.noCampaignsSubtext}>
-                      Create a new campaign or join an existing one!
-                    </Text>
-                  </View>
-                  <View style={styles.campaignActionButtons}>
-                    <TouchableOpacity
-                      style={styles.createButton}
-                      onPress={handleCreateCampaign}
-                    >
-                      <Plus size={20} color="#fff" />
-                      <Text style={styles.buttonText}>Create Campaign</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.campaignActionButtons}>
-                    <TouchableOpacity
-                      style={styles.joinButton}
-                      onPress={handleJoinCampaign}
-                    >
-                      <Users size={20} color="#fff" />
-                      <Text style={styles.buttonText}>Join via Code</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
-            </ScrollView>
+                {campaigns.length === 0 && (
+                  <>
+                    <View style={styles.noCampaignsContainer}>
+                      <Text style={styles.noCampaigns}>No active campaigns</Text>
+                      <Text style={styles.noCampaignsSubtext}>
+                        Create a new campaign or join an existing one!
+                      </Text>
+                    </View>
+                    <View style={styles.campaignActionButtons}>
+                      <TouchableOpacity
+                        style={styles.createButton}
+                        onPress={handleCreateCampaign}
+                      >
+                        <Plus size={20} color="#fff" />
+                        <Text style={styles.buttonText}>Create Campaign</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.campaignActionButtons}>
+                      <TouchableOpacity
+                        style={styles.joinButton}
+                        onPress={handleJoinCampaign}
+                      >
+                        <Users size={20} color="#fff" />
+                        <Text style={styles.buttonText}>Join via Code</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+              </ScrollView>
+            </View>
           </View>
         </View>
-      </View>
+      </ActivityIndicator>
 
       <SidebarMenu
         isVisible={isSidebarVisible}
