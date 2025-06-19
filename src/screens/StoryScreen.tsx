@@ -32,7 +32,6 @@ import { updateCampaignReadStatusAtom } from '../atoms/campaignReadStatusAtoms';
 import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
 import EnhancedStoryChoices from '../components/EnhancedStoryChoices';
-import PlayerActionsPanel from '../components/PlayerActionsPanel';
 import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask';
@@ -165,6 +164,128 @@ export default function StoryScreen() {
       });
     }
   }, [campaignHistory, currentCampaign, updateCampaignReadStatus]);
+
+  // Add new useEffect to generate initial story when campaign has no history
+  useEffect(() => {
+    const generateInitialStory = async () => {
+      console.log('🔍 generateInitialStory called with:', {
+        currentCampaign: currentCampaign?.name,
+        user: user?.username,
+        campaignHistoryLength: campaignHistory.length,
+        isLoading,
+        campaignStatus: currentCampaign?.status
+      });
+
+      if (!currentCampaign || !user || campaignHistory.length > 0 || isLoading) {
+        console.log('🚫 Early return from generateInitialStory:', {
+          hasCurrentCampaign: !!currentCampaign,
+          hasUser: !!user,
+          campaignHistoryLength: campaignHistory.length,
+          isLoading
+        });
+        return;
+      }
+
+      // Generate initial story for campaigns in 'creation', 'waiting' or 'in_progress' status
+      if (currentCampaign.status !== 'creation' && currentCampaign.status !== 'waiting' && currentCampaign.status !== 'in_progress') {
+        console.log('🚫 Campaign status not eligible for initial story:', currentCampaign.status);
+        return;
+      }
+
+      console.log('🎭 Generating initial story for campaign:', currentCampaign.name);
+
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // If campaign is still in 'creation' status, transition it to 'waiting'
+        if (currentCampaign.status === 'creation') {
+          console.log('🔄 Transitioning campaign from creation to waiting status');
+          // Import upsertCampaignAtom dynamically to avoid circular dependency
+          const { upsertCampaignAtom } = await import('../atoms/campaignAtoms');
+          const [, upsertCampaign] = await import('jotai').then(jotai => [null, jotai.useSetAtom(upsertCampaignAtom)]);
+
+          // Note: We can't use useSetAtom in useEffect, so we'll make the API call directly
+          // This will be handled by the supabase update and the real-time subscription will update our state
+          const { supabase } = await import('../config/supabase');
+          await supabase
+            .from('campaigns')
+            .update({ status: 'waiting' })
+            .eq('uid', currentCampaign.uid);
+        }
+
+        // Prepare context for the initial story generation
+        const context = {
+          campaign: currentCampaign,
+          storyHistory: [], // Empty history for initial story
+        };
+
+        console.log('📡 Making API request to /api/story with:', {
+          campaignId: currentCampaign.uid,
+          playerId: user.id,
+          message: 'Generate initial story introduction',
+          playerAction: 'INITIAL_STORY_GENERATION'
+        });
+
+        // Send request to generate initial story
+        const response = await fetch('/api/story', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            campaignId: currentCampaign.uid,
+            playerId: user.id,
+            message: 'Generate initial story introduction',
+            context,
+            playerAction: 'INITIAL_STORY_GENERATION',
+          }),
+        });
+
+        console.log('📡 API response status:', response.status, response.statusText);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ API error response:', errorText);
+          throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('📡 API response data:', data);
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to generate initial story');
+        }
+
+        console.log('✅ Successfully generated initial story, adding message to campaign');
+
+        // Add the initial story as a DM message
+        await addCampaignMessage({
+          campaign_uid: currentCampaign.uid,
+          message: data.response,
+          author: 'DM',
+          message_type: 'dm',
+        });
+
+        // Set the choices from the initial story
+        setCurrentChoices(data.choices || []);
+
+        console.log('✅ Initial story generation completed successfully');
+
+      } catch (error) {
+        console.error('❌ Error generating initial story:', error);
+        // Don't show error to user for initial story generation failure
+        // Just let them start with the welcome message
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Add a small delay to ensure all other useEffects have run
+    const timeoutId = setTimeout(generateInitialStory, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [currentCampaign, user, campaignHistory.length, isLoading, addCampaignMessage]);
 
   useEffect(() => {
     // Show error alert if there's an error
@@ -452,9 +573,6 @@ export default function StoryScreen() {
 
           <View style={styles.headerTitle}>
             <Text style={styles.title}>{currentCampaign.name}</Text>
-            <Text style={styles.subtitle}>
-              {campaignHistory.length > 0 ? 'Adventure in Progress' : 'Chapter 1: The Beginning'}
-            </Text>
           </View>
 
           <TouchableOpacity onPress={handleCharacterPress} style={styles.headerButton}>
@@ -676,12 +794,6 @@ const styles = StyleSheet.create({
     color: '#2a2a2a',
     fontFamily: 'Inter-Bold',
     textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#2a2a2a',
-    fontFamily: 'Inter-Regular',
-    marginTop: 2,
   },
   content: {
     flex: 1,

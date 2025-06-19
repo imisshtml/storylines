@@ -122,6 +122,11 @@ export async function POST(request: Request) {
 function inferActionType(message: string): string {
   const lowerMessage = message.toLowerCase();
 
+  // Handle initial story generation
+  if (message === 'INITIAL_STORY_GENERATION' || lowerMessage.includes('initial story') || lowerMessage.includes('generate initial')) {
+    return 'initial_story';
+  }
+
   if (lowerMessage.includes('attack') || lowerMessage.includes('strike') || lowerMessage.includes('hit')) {
     return 'attack';
   }
