@@ -6,12 +6,13 @@ import { useAtom } from 'jotai';
 import { initializeAuthAtom } from '../src/atoms/authAtoms'
 import { initializeRealtimeAtom } from '../src/atoms/campaignAtoms';
 import { initializeCampaignReadStatusRealtimeAtom } from '../src/atoms/campaignReadStatusAtoms';
+import { initializeFriendshipsRealtimeAtom } from '../src/atoms/friendsAtoms';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { useConnectionMonitor } from '../src/hooks/useConnectionMonitor';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import { CustomAlertProvider } from '../src/components/CustomAlert';
 
 // Prevent splash screen from auto-hiding
@@ -27,6 +28,7 @@ export default function RootLayout() {
   const [, initializeAuth] = useAtom(initializeAuthAtom);
   const [, initializeRealtime] = useAtom(initializeRealtimeAtom);
   const [, initializeReadStatusRealtime] = useAtom(initializeCampaignReadStatusRealtimeAtom);
+  const [, initializeFriendshipsRealtime] = useAtom(initializeFriendshipsRealtimeAtom);
 
   // Global connection monitoring - runs once and persists across all navigation
   useConnectionMonitor({
@@ -42,15 +44,19 @@ export default function RootLayout() {
   useEffect(() => {
     // Initialize authentication and real-time subscriptions
     const initialize = async () => {
-      await initializeAuth();
-      // Initialize real-time subscription after auth is ready
-      await initializeRealtime();
-      // Initialize read status real-time subscription
-      await initializeReadStatusRealtime();
+      try {
+        await initializeAuth();
+        await initializeRealtime();
+        await initializeReadStatusRealtime();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await initializeFriendshipsRealtime();
+      } catch (error) {
+        console.error(`[${Platform.OS}] [App Layout] Initialization error:`, error);
+      }
     };
-    
+
     initialize();
-  }, [initializeAuth, initializeRealtime, initializeReadStatusRealtime]);
+  }, [initializeAuth, initializeRealtime, initializeReadStatusRealtime, initializeFriendshipsRealtime]);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
@@ -78,8 +84,8 @@ export default function RootLayout() {
               <Stack.Screen name="invite" />
               <Stack.Screen name="create" />
               <Stack.Screen name="characters" />
-              <Stack.Screen 
-                name="story" 
+              <Stack.Screen
+                name="story"
                 options={{
                   presentation: 'fullScreenModal',
                   animation: 'fade',
