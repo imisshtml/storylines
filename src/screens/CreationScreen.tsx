@@ -59,6 +59,7 @@ import { pickAndUploadAvatar, getRandomFantasyPortrait, getDefaultAvatar } from 
 import { raceDesc, classDesc, skillsDesc, skillsStat } from '../data/characterData';
 import { DEFAULT_AVATARS, getAvatarById } from '../data/defaultAvatars';
 import { useCustomAlert } from '../components/CustomAlert';
+import { supabase } from '../config/supabase';
 
 const CREATION_STEPS = [
   { id: 0, title: 'Info', icon: User },
@@ -122,6 +123,10 @@ export default function CreationScreen() {
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [expandedSpells, setExpandedSpells] = useState<Set<string>>(new Set());
   const [selectedSpellLevel, setSelectedSpellLevel] = useState<'cantrips' | 'level1'>('cantrips');
+  const [classFeatures, setClassFeatures] = useState<any[]>([]);
+  const [raceTraits, setRaceTraits] = useState<any[]>([]);
+  const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set());
+  const [expandedTraits, setExpandedTraits] = useState<Set<string>>(new Set());
 
   const currStepRef = useRef<ScrollView>();
 
@@ -364,6 +369,61 @@ export default function CreationScreen() {
       newExpandedSpells.add(spellIndex);
     }
     setExpandedSpells(newExpandedSpells);
+  };
+
+  const toggleFeatureExpanded = (featureIndex: string) => {
+    const newExpandedFeatures = new Set(expandedFeatures);
+    if (newExpandedFeatures.has(featureIndex)) {
+      newExpandedFeatures.delete(featureIndex);
+    } else {
+      newExpandedFeatures.add(featureIndex);
+    }
+    setExpandedFeatures(newExpandedFeatures);
+  };
+
+  const toggleTraitExpanded = (traitIndex: string) => {
+    const newExpandedTraits = new Set(expandedTraits);
+    if (newExpandedTraits.has(traitIndex)) {
+      newExpandedTraits.delete(traitIndex);
+    } else {
+      newExpandedTraits.add(traitIndex);
+    }
+    setExpandedTraits(newExpandedTraits);
+  };
+
+  const loadClassFeatures = async (classIndex: string) => {
+    try {
+      const { data: features, error } = await supabase
+        .from('features')
+        .select('*')
+        .eq('class_index', classIndex)
+        .order('level')
+        .order('name');
+
+      if (error) throw error;
+      setClassFeatures(features || []);
+    } catch (error) {
+      console.error('Error loading class features:', error);
+      setClassFeatures([]);
+    }
+  };
+
+  const loadRaceTraits = async (race: Race) => {
+    try {
+      // Load traits from database based on race
+      const { data: traits, error } = await supabase
+        .from('traits')
+        .select('*')
+        .eq('race_index', race.index)
+        .order('name');
+
+      if (error) throw error;
+      setRaceTraits(traits || []);
+    } catch (error) {
+      console.error('Error loading race traits:', error);
+      // Fallback to traits from race object if database fails
+      setRaceTraits(race.traits || []);
+    }
   };
 
   const getAbilityBonus = (abilityName: string) => {
@@ -657,7 +717,10 @@ export default function CreationScreen() {
               </View>
               <TouchableOpacity
                 style={styles.detailsButton}
-                onPress={() => setShowClassDetails(cls)}
+                onPress={() => {
+                  setShowClassDetails(cls);
+                  loadClassFeatures(cls.index);
+                }}
               >
                 <BookOpen size={20} color={selectedClass?.index === cls.index ? '#fff' : '#4CAF50'} />
               </TouchableOpacity>
@@ -708,7 +771,10 @@ export default function CreationScreen() {
             </View>
             <TouchableOpacity
               style={styles.detailsButton}
-              onPress={() => setShowRaceDetails(race)}
+              onPress={() => {
+                setShowRaceDetails(race);
+                loadRaceTraits(race);
+              }}
             >
               <BookOpen size={20} color={selectedRace?.index === race.index ? '#fff' : '#4CAF50'} />
             </TouchableOpacity>
@@ -1505,6 +1571,45 @@ export default function CreationScreen() {
                   </Text>
                 </>
               )}
+
+              {/* Class Features */}
+              <Text style={styles.modalSectionTitle}>Features</Text>
+              {classFeatures.length > 0 ? (
+                classFeatures.map((feature) => (
+                  <TouchableOpacity
+                    key={feature.index}
+                    style={styles.featureCard}
+                    onPress={() => toggleFeatureExpanded(feature.index)}
+                  >
+                    <View style={styles.featureHeader}>
+                      <Text style={styles.featureName}>
+                        {feature.name} (Level {feature.level})
+                      </Text>
+                      {expandedFeatures.has(feature.index) ? (
+                        <ChevronUp size={16} color="#4CAF50" />
+                      ) : (
+                        <ChevronDown size={16} color="#4CAF50" />
+                      )}
+                    </View>
+                    {expandedFeatures.has(feature.index) && (
+                      <View style={styles.featureDetails}>
+                        {feature.prerequisites && feature.prerequisites.length > 0 && (
+                          <View style={styles.featurePrerequisites}>
+                            <Text style={styles.modalText}>
+                              Prerequisites: {feature.prerequisites.join(', ')}
+                            </Text>
+                          </View>
+                        )}
+                        {feature.description && feature.description.map((desc: string, i: number) => (
+                          <Text key={i} style={styles.modalText}>{desc}</Text>
+                        ))}
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text style={styles.modalText}>Loading features...</Text>
+              )}
             </ScrollView>
           </View>
         </View>
@@ -1552,13 +1657,39 @@ export default function CreationScreen() {
                 <Text key={index} style={styles.modalText}>• {trait.name}</Text>
               ))}
 
-              {false && showRaceDetails?.subraces && showRaceDetails.subraces.length > 0 && (
-                <>
-                  <Text style={styles.modalSectionTitle}>Subraces</Text>
-                  {showRaceDetails.subraces.map((subrace, index) => (
-                    <Text key={index} style={styles.modalText}>• {subrace.name}</Text>
-                  ))}
-                </>
+              {/* Racial Traits with Details */}
+              <Text style={styles.modalSectionTitle}>Trait Details</Text>
+              {raceTraits.length > 0 ? (
+                raceTraits.map((trait, index) => (
+                  <TouchableOpacity
+                    key={trait.index || index}
+                    style={styles.featureCard}
+                    onPress={() => toggleTraitExpanded(trait.index || `trait-${index}`)}
+                  >
+                    <View style={styles.featureHeader}>
+                      <Text style={styles.featureName}>
+                        {trait.name}
+                      </Text>
+                      {expandedTraits.has(trait.index || `trait-${index}`) ? (
+                        <ChevronUp size={16} color="#4CAF50" />
+                      ) : (
+                        <ChevronDown size={16} color="#4CAF50" />
+                      )}
+                    </View>
+                    {expandedTraits.has(trait.index || `trait-${index}`) && trait.description && (
+                      <View style={styles.featureDetails}>
+                        {Array.isArray(trait.description) 
+                          ? trait.description.map((desc: string, i: number) => (
+                              <Text key={i} style={styles.modalText}>{desc}</Text>
+                            ))
+                          : <Text style={styles.modalText}>{trait.description}</Text>
+                        }
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text style={styles.modalText}>Loading trait details...</Text>
               )}
             </ScrollView>
           </View>
@@ -2635,5 +2766,33 @@ const styles = StyleSheet.create({
   },
   notAfford: {
     color: '#666',
-  }
+  },
+  featureCard: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  featureHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  featureName: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  featureDetails: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#3a3a3a',
+  },
+  featurePrerequisites: {
+    marginBottom: 8,
+  },
 });
