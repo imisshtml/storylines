@@ -29,10 +29,17 @@ import {
   addCampaignMessageAtom
 } from '../atoms/campaignHistoryAtoms';
 import { updateCampaignReadStatusAtom } from '../atoms/campaignReadStatusAtoms';
+import {
+  sortedPlayerActionsAtom,
+  fetchPlayerActionsAtom,
+  initializePlayerActionsRealtimeAtom,
+  getAiChoicesAtom,
+  setAiChoicesAtom,
+  clearAiChoicesAtom
+} from '../atoms/playerActionsAtoms';
 import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
 import EnhancedStoryChoices from '../components/EnhancedStoryChoices';
-import PlayerActionsPanel from '../components/PlayerActionsPanel';
 import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask';
@@ -55,20 +62,7 @@ export default function StoryScreen() {
   const [showChoices, setShowChoices] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentChoices, setCurrentChoices] = useState<string[]>([
-    'Explore deeper into the forest',
-    'Search for signs of civilization',
-    'Set up camp for the night',
-    'Listen carefully for any sounds',
-    'Cast a detection spell to sense magic',
-    'Use your rope to climb the nearby tree',
-    'Talk to your companions about the situation',
-    'Attack the suspicious rustling in the bushes',
-    'Carefully examine the strange markings on the ground',
-    'Rest here and recover your strength',
-    'Intimidate any potential threats with a show of force',
-    'Use a healing potion to restore health',
-  ]);
+
 
 
 
@@ -85,8 +79,19 @@ export default function StoryScreen() {
   const [, addCampaignMessage] = useAtom(addCampaignMessageAtom);
   const [, updateCampaignReadStatus] = useAtom(updateCampaignReadStatusAtom);
 
+  // Player actions atoms
+  const [playerActions] = useAtom(sortedPlayerActionsAtom);
+  const [, fetchPlayerActions] = useAtom(fetchPlayerActionsAtom);
+  const [, initializePlayerActionsRealtime] = useAtom(initializePlayerActionsRealtimeAtom);
+
+  // AI choices persistence atoms
+  const [getAiChoices] = useAtom(getAiChoicesAtom);
+  const [, setAiChoices] = useAtom(setAiChoicesAtom);
+  const [, clearAiChoices] = useAtom(clearAiChoicesAtom);
+
   const scrollViewRef = useRef<ScrollView>(null);
   const realtimeUnsubscribeRef = useRef<(() => void) | null>(null);
+  const playerActionsUnsubscribeRef = useRef<(() => void) | null>(null);
 
   // Monitor connection health
   useConnectionMonitor();
@@ -144,6 +149,53 @@ export default function StoryScreen() {
     };
   }, [currentCampaign?.uid, fetchCampaignHistory, initializeRealtimeSubscription, clearCampaignHistory, updateCampaignReadStatus]);
 
+  // Load player actions when campaign and user are available
+  useEffect(() => {
+    if (!currentCampaign || !user) return;
+
+    console.log('📋 Loading player actions for campaign:', currentCampaign.uid, 'user:', user.id);
+
+    // Fetch player actions from database
+    fetchPlayerActions({ campaignUid: currentCampaign.uid, userId: user.id });
+
+    // Initialize real-time subscription for player actions
+    const initializePlayerActionsSubscription = async () => {
+      try {
+        // Clean up any existing subscription first
+        if (playerActionsUnsubscribeRef.current) {
+          playerActionsUnsubscribeRef.current();
+          playerActionsUnsubscribeRef.current = null;
+        }
+
+        const unsubscribe = await initializePlayerActionsRealtime({
+          campaignUid: currentCampaign.uid,
+          userId: user.id
+        });
+        playerActionsUnsubscribeRef.current = unsubscribe;
+      } catch (error) {
+        console.error('Error initializing player actions realtime:', error);
+      }
+    };
+
+    initializePlayerActionsSubscription();
+
+    // Log current AI choices for debugging
+    const existingAiChoices = getAiChoices(currentCampaign.uid);
+    console.log('🎯 Existing AI choices for campaign:', existingAiChoices);
+
+    // Cleanup function
+    return () => {
+      if (playerActionsUnsubscribeRef.current) {
+        try {
+          playerActionsUnsubscribeRef.current();
+          playerActionsUnsubscribeRef.current = null;
+        } catch (error) {
+          console.error('Error during player actions subscription cleanup:', error);
+        }
+      }
+    };
+  }, [currentCampaign?.uid, user?.id, fetchPlayerActions, initializePlayerActionsRealtime, getAiChoices]);
+
   useEffect(() => {
     // Auto-scroll to bottom when new messages are added
     if (scrollViewRef.current && campaignHistory.length > 0) {
@@ -165,6 +217,127 @@ export default function StoryScreen() {
       });
     }
   }, [campaignHistory, currentCampaign, updateCampaignReadStatus]);
+
+  // Add new useEffect to generate initial story when campaign has no history
+  useEffect(() => {
+    const generateInitialStory = async () => {
+      console.log('🔍 generateInitialStory called with:', {
+        currentCampaign: currentCampaign?.name,
+        user: user?.username,
+        campaignHistoryLength: campaignHistory.length,
+        isLoading,
+        campaignStatus: currentCampaign?.status
+      });
+
+      if (!currentCampaign || !user || campaignHistory.length > 0 || isLoading) {
+        console.log('🚫 Early return from generateInitialStory:', {
+          hasCurrentCampaign: !!currentCampaign,
+          hasUser: !!user,
+          campaignHistoryLength: campaignHistory.length,
+          isLoading
+        });
+        return;
+      }
+
+      // Generate initial story for campaigns in 'creation', 'waiting' or 'in_progress' status
+      if (currentCampaign.status !== 'creation' && currentCampaign.status !== 'waiting' && currentCampaign.status !== 'in_progress') {
+        console.log('🚫 Campaign status not eligible for initial story:', currentCampaign.status);
+        return;
+      }
+
+      console.log('🎭 Generating initial story for campaign:', currentCampaign.name);
+
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // If campaign is still in 'creation' status, transition it to 'waiting'
+        if (currentCampaign.status === 'creation') {
+          console.log('🔄 Transitioning campaign from creation to waiting status');
+
+          // Update campaign status directly using Supabase
+          // The real-time subscription will update our state
+          const { supabase } = await import('../config/supabase');
+          await supabase
+            .from('campaigns')
+            .update({ status: 'waiting' })
+            .eq('uid', currentCampaign.uid);
+        }
+
+        // Prepare context for the initial story generation
+        const context = {
+          campaign: currentCampaign,
+          storyHistory: [], // Empty history for initial story
+        };
+
+        console.log('📡 Making API request to /api/story with:', {
+          campaignId: currentCampaign.uid,
+          playerId: user.id,
+          message: 'Generate initial story introduction',
+          playerAction: 'INITIAL_STORY_GENERATION'
+        });
+
+        // Send request to generate initial story
+        const response = await fetch('/api/story', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            campaignId: currentCampaign.uid,
+            playerId: user.id,
+            message: 'Generate initial story introduction',
+            context,
+            playerAction: 'INITIAL_STORY_GENERATION',
+          }),
+        });
+
+        console.log('📡 API response status:', response.status, response.statusText);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ API error response:', errorText);
+          throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('📡 API response data:', data);
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to generate initial story');
+        }
+
+        console.log('✅ Successfully generated initial story, adding message to campaign');
+
+        // Add the initial story as a DM message
+        await addCampaignMessage({
+          campaign_uid: currentCampaign.uid,
+          message: data.response,
+          author: 'DM',
+          message_type: 'dm',
+        });
+
+        // Set the choices from the initial story
+        if (currentCampaign) {
+          setAiChoices({ campaignUid: currentCampaign.uid, choices: data.choices || [] });
+        }
+
+        console.log('✅ Initial story generation completed successfully');
+
+      } catch (error) {
+        console.error('❌ Error generating initial story:', error);
+        // Don't show error to user for initial story generation failure
+        // Just let them start with the welcome message
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Add a small delay to ensure all other useEffects have run
+    const timeoutId = setTimeout(generateInitialStory, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [currentCampaign, user, campaignHistory.length, isLoading, addCampaignMessage]);
 
   useEffect(() => {
     // Show error alert if there's an error
@@ -277,7 +450,10 @@ export default function StoryScreen() {
 
     setIsLoading(true);
     setError(null);
-    setCurrentChoices([]); // Clear choices while loading
+    // Clear choices while loading
+    if (currentCampaign) {
+      clearAiChoices(currentCampaign.uid);
+    }
 
     try {
       // Determine message type based on input type
@@ -362,13 +538,19 @@ export default function StoryScreen() {
           message_type: 'dm',
         });
 
-        setCurrentChoices(data.choices || []); // Use choices from AI response
+        // Use choices from AI response
+        if (currentCampaign) {
+          setAiChoices({ campaignUid: currentCampaign.uid, choices: data.choices || [] });
+        }
       }
 
     } catch (error) {
       console.error('Error sending player action:', error);
       setError(error instanceof Error ? error.message : 'Failed to get DM response');
-      setCurrentChoices([]); // Clear choices on error
+      // Clear choices on error
+      if (currentCampaign) {
+        clearAiChoices(currentCampaign.uid);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -426,15 +608,34 @@ export default function StoryScreen() {
     );
   }
 
-  // Use dynamic choices from AI or fallback to default choices
-  const choicesToShow = currentChoices.length > 0
-    ? currentChoices
-    : [
-      'Explore deeper into the forest',
-      'Search for signs of civilization',
-      'Set up camp for the night',
-      'Listen carefully for any sounds',
-    ];
+  // Use dynamic choices from AI, database actions, or fallback to defaults
+  const getDatabaseActionChoices = () => {
+    if (!playerActions || playerActions.length === 0) {
+      console.log('🎬 No player actions available');
+      return [];
+    }
+
+    // Filter for current game mode (exploration by default)
+    const currentGameMode = 'exploration';
+    const modeActions = playerActions.filter(action => action.game_mode === currentGameMode);
+
+    // Convert action data to choice strings
+    return modeActions.map(action => action.action_data.title);
+  };
+
+  const databaseChoices = getDatabaseActionChoices();
+  const aiChoices = currentCampaign ? getAiChoices(currentCampaign.uid) : [];
+
+  const choicesToShow = aiChoices.length > 0
+    ? aiChoices // Use AI-generated choices first
+    : databaseChoices.length > 0
+      ? databaseChoices // Use database actions second
+      : [
+        'Explore deeper into the forest',
+        'Search for signs of civilization',
+        'Set up camp for the night',
+        'Listen carefully for any sounds',
+      ]; // Fallback to defaults last
 
   const currentCharacter = getCurrentCharacter();
   const currentInputOption = getCurrentInputOption();
@@ -452,9 +653,6 @@ export default function StoryScreen() {
 
           <View style={styles.headerTitle}>
             <Text style={styles.title}>{currentCampaign.name}</Text>
-            <Text style={styles.subtitle}>
-              {campaignHistory.length > 0 ? 'Adventure in Progress' : 'Chapter 1: The Beginning'}
-            </Text>
           </View>
 
           <TouchableOpacity onPress={handleCharacterPress} style={styles.headerButton}>
@@ -676,12 +874,6 @@ const styles = StyleSheet.create({
     color: '#2a2a2a',
     fontFamily: 'Inter-Bold',
     textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#2a2a2a',
-    fontFamily: 'Inter-Regular',
-    marginTop: 2,
   },
   content: {
     flex: 1,
