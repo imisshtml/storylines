@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Shield, Swords, Brain, Heart, Footprints, Star, Package, BookOpen, Medal, Scroll, Sword, Sparkles, Zap } from 'lucide-react-native';
-import { Character, type DnDAbilities } from '../atoms/characterAtoms';
+import { Shield, Swords, Brain, Heart, Footprints, Star, Package, BookOpen, Medal, Scroll, Sword, Sparkles, Zap, ChevronUp, ChevronDown } from 'lucide-react-native';
+import { Character, type DnDAbilities, isTwoHandedWeapon } from '../atoms/characterAtoms';
+import { supabase } from '../config/supabase';
 
 type CoreStat = {
   name: string;
@@ -61,6 +62,78 @@ interface CharacterViewProps {
 export default function CharacterView({ character }: CharacterViewProps) {
   const [activeTab, setActiveTab] = useState<'stats' | 'features' | 'inventory' | 'spells' | 'equipment'>('stats');
   const [expandedSpell, setExpandedSpell] = useState<string | null>(null);
+  const [expandedTraits, setExpandedTraits] = useState<Set<string>>(new Set());
+  const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set());
+  const [characterFeatures, setCharacterFeatures] = useState<any[]>([]);
+  const [characterTraits, setCharacterTraits] = useState<any[]>([]);
+
+  // Load character features when character changes
+  useEffect(() => {
+    if (character) {
+      loadCharacterFeatures();
+      loadCharacterTraits();
+    }
+  }, [character]);
+
+  const loadCharacterFeatures = async () => {
+    if (!character) return;
+    
+    try {
+      // Load class features based on character's class and level
+      const { data: features, error } = await supabase
+        .from('features')
+        .select('*')
+        .eq('class_index', character.class.toLowerCase())
+        .order('level')
+        .order('name');
+
+      if (error) throw error;
+      setCharacterFeatures(features || []);
+    } catch (error) {
+      console.error('Error loading features:', error);
+      setCharacterFeatures([]);
+    }
+  };
+
+  const loadCharacterTraits = async () => {
+    if (!character) return;
+    
+    try {
+      // Load racial traits based on character's race
+      const { data: traits, error } = await supabase
+        .from('traits')
+        .select('*')
+        .eq('race_index', character.race.toLowerCase())
+        .order('name');
+
+      if (error) throw error;
+      setCharacterTraits(traits || []);
+    } catch (error) {
+      console.error('Error loading traits:', error);
+      // Fallback to character's stored traits if database fails
+      setCharacterTraits(character.traits || []);
+    }
+  };
+
+  const toggleTraitExpanded = (traitKey: string) => {
+    const newExpandedTraits = new Set(expandedTraits);
+    if (newExpandedTraits.has(traitKey)) {
+      newExpandedTraits.delete(traitKey);
+    } else {
+      newExpandedTraits.add(traitKey);
+    }
+    setExpandedTraits(newExpandedTraits);
+  };
+
+  const toggleFeatureExpanded = (featureIndex: string) => {
+    const newExpandedFeatures = new Set(expandedFeatures);
+    if (newExpandedFeatures.has(featureIndex)) {
+      newExpandedFeatures.delete(featureIndex);
+    } else {
+      newExpandedFeatures.add(featureIndex);
+    }
+    setExpandedFeatures(newExpandedFeatures);
+  };
 
   // If no character is provided, show placeholder message
   if (!character) {
@@ -80,6 +153,108 @@ export default function CharacterView({ character }: CharacterViewProps) {
   const getFinalAbilityScore = (ability: keyof DnDAbilities) => {
     // Abilities are now stored with racial bonuses already applied
     return character.abilities?.[ability] || 10;
+  };
+
+  // Get equipped items from character
+  const getEquippedItems = () => {
+    if (!character?.equipped_items) return [];
+    
+    const equipped = character.equipped_items;
+    const items = [];
+    
+    // Add equipped items from all slots
+    if (equipped.armor) items.push({ ...equipped.armor, slot: 'Armor' });
+    
+    // Handle hand slots - check for two-handed weapons
+    if (equipped.rightHand && isTwoHandedWeapon(equipped.rightHand)) {
+      // Two-handed weapon - show as "Two-Handed Weapon"
+      items.push({ ...equipped.rightHand, slot: 'Two-Handed Weapon' });
+    } else {
+      // Separate hand slots
+      if (equipped.leftHand) items.push({ ...equipped.leftHand, slot: 'Left Hand' });
+      if (equipped.rightHand) items.push({ ...equipped.rightHand, slot: 'Right Hand' });
+    }
+    
+    if (equipped.head) items.push({ ...equipped.head, slot: 'Head' });
+    if (equipped.necklace) items.push({ ...equipped.necklace, slot: 'Necklace' });
+    if (equipped.boots) items.push({ ...equipped.boots, slot: 'Boots' });
+    if (equipped.gloves) items.push({ ...equipped.gloves, slot: 'Gloves' });
+    if (equipped.rings && equipped.rings.length > 0) {
+      equipped.rings.forEach((ring, index) => {
+        if (ring) items.push({ ...ring, slot: `Ring ${index + 1}` });
+      });
+    }
+    
+    return items;
+  };
+
+  // Get attack actions from equipped weapons
+  const getAttackActions = () => {
+    if (!character?.equipped_items) return [];
+    
+    const attacks = [];
+    const equipped = character.equipped_items;
+    const strModifier = getAbilityModifier(getFinalAbilityScore('strength'));
+    const dexModifier = getAbilityModifier(getFinalAbilityScore('dexterity'));
+    const proficiencyBonus = Math.ceil(character.level / 4) + 1;
+    
+    // Check for two-handed weapon first
+    if (equipped.rightHand && equipped.rightHand.weapon_category && isTwoHandedWeapon(equipped.rightHand)) {
+      const weapon = equipped.rightHand;
+      const isFinesse = weapon.properties?.some((prop: any) => 
+        typeof prop === 'string' ? prop.toLowerCase() === 'finesse' : prop.name?.toLowerCase() === 'finesse'
+      );
+      const modifier = isFinesse ? Math.max(strModifier, dexModifier) : strModifier;
+      
+      attacks.push({
+        name: weapon.name,
+        damage: weapon.damage_dice || '1d4',
+        damageType: weapon.damage_type || 'bludgeoning',
+        attackBonus: modifier + proficiencyBonus,
+        damageBonus: modifier,
+        range: weapon.range_normal ? `${weapon.range_normal}/${weapon.range_long || weapon.range_normal} ft` : 'Melee',
+        properties: weapon.properties || []
+      });
+    } else {
+      // Check individual hand weapons only if no two-handed weapon
+      if (equipped.leftHand && equipped.leftHand.weapon_category) {
+        const weapon = equipped.leftHand;
+        const isFinesse = weapon.properties?.some((prop: any) => 
+          typeof prop === 'string' ? prop.toLowerCase() === 'finesse' : prop.name?.toLowerCase() === 'finesse'
+        );
+        const modifier = isFinesse ? Math.max(strModifier, dexModifier) : strModifier;
+        
+        attacks.push({
+          name: weapon.name,
+          damage: weapon.damage_dice || '1d4',
+          damageType: weapon.damage_type || 'bludgeoning',
+          attackBonus: modifier + proficiencyBonus,
+          damageBonus: modifier,
+          range: weapon.range_normal ? `${weapon.range_normal}/${weapon.range_long || weapon.range_normal} ft` : 'Melee',
+          properties: weapon.properties || []
+        });
+      }
+      
+      if (equipped.rightHand && equipped.rightHand.weapon_category) {
+        const weapon = equipped.rightHand;
+        const isFinesse = weapon.properties?.some((prop: any) => 
+          typeof prop === 'string' ? prop.toLowerCase() === 'finesse' : prop.name?.toLowerCase() === 'finesse'
+        );
+        const modifier = isFinesse ? Math.max(strModifier, dexModifier) : strModifier;
+        
+        attacks.push({
+          name: weapon.name,
+          damage: weapon.damage_dice || '1d4',
+          damageType: weapon.damage_type || 'bludgeoning',
+          attackBonus: modifier + proficiencyBonus,
+          damageBonus: modifier,
+          range: weapon.range_normal ? `${weapon.range_normal}/${weapon.range_long || weapon.range_normal} ft` : 'Melee',
+          properties: weapon.properties || []
+        });
+      }
+    }
+    
+    return attacks;
   };
 
   // Build combat stats from character data
@@ -208,15 +383,118 @@ export default function CharacterView({ character }: CharacterViewProps) {
 
   const renderFeatures = () => (
     <View style={styles.featuresList}>
-      {features.map((feature, index) => (
-        <View key={index} style={styles.featureItem}>
-          <View style={styles.featureHeader}>
-            <Text style={styles.featureName}>{feature.name}</Text>
-            <Text style={styles.featureSource}>{feature.source}</Text>
+      {/* Racial Traits */}
+      {characterTraits.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Racial Traits</Text>
+          <View style={styles.traitsList}>
+            {characterTraits.map((trait, index) => {
+              const traitKey = trait.index || `trait-${index}`;
+              const isExpanded = expandedTraits.has(traitKey);
+
+              return (
+                <TouchableOpacity
+                  key={traitKey}
+                  style={styles.traitItem}
+                  onPress={() => toggleTraitExpanded(traitKey)}
+                >
+                  <View style={styles.traitHeader}>
+                    <Text style={styles.traitName}>{trait.name}</Text>
+                    {isExpanded ? (
+                      <ChevronUp size={20} color="#4CAF50" />
+                    ) : (
+                      <ChevronDown size={20} color="#4CAF50" />
+                    )}
+                  </View>
+                  {isExpanded && trait.description && (
+                    <View style={styles.traitDetails}>
+                      {Array.isArray(trait.description) 
+                        ? trait.description.map((desc: string, i: number) => (
+                            <Text key={i} style={styles.traitDescription}>{desc}</Text>
+                          ))
+                        : <Text style={styles.traitDescription}>{trait.description}</Text>
+                      }
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
-          <Text style={styles.featureDescription}>{feature.description}</Text>
         </View>
-      ))}
+      )}
+
+      {/* Class Features */}
+      {characterFeatures.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Class Features</Text>
+          <View style={styles.classFeaturesList}>
+            {characterFeatures.map((feature, index) => {
+              const isExpanded = expandedFeatures.has(feature.index);
+              const isAvailable = feature.level <= character.level;
+
+              return (
+                <TouchableOpacity
+                  key={feature.index}
+                  style={[
+                    styles.featureItem,
+                    !isAvailable && styles.featureItemDisabled
+                  ]}
+                  onPress={() => toggleFeatureExpanded(feature.index)}
+                >
+                  <View style={styles.featureHeader}>
+                    <View style={styles.featureHeaderLeft}>
+                      <Text style={[
+                        styles.featureName,
+                        !isAvailable && styles.featureNameDisabled
+                      ]}>
+                        {feature.name}
+                      </Text>
+                      <Text style={[
+                        styles.featureLevel,
+                        !isAvailable && styles.featureLevelDisabled
+                      ]}>
+                        Level {feature.level}{!isAvailable ? ' (Not Available)' : ''}
+                      </Text>
+                    </View>
+                    {isExpanded ? (
+                      <ChevronUp size={20} color={isAvailable ? "#4CAF50" : "#666"} />
+                    ) : (
+                      <ChevronDown size={20} color={isAvailable ? "#4CAF50" : "#666"} />
+                    )}
+                  </View>
+                  {isExpanded && (
+                    <View style={styles.featureDetails}>
+                      {feature.prerequisites && feature.prerequisites.length > 0 && (
+                        <View style={styles.featurePrerequisites}>
+                          <Text style={styles.featurePrerequisitesTitle}>Prerequisites:</Text>
+                          {feature.prerequisites.map((req: string, i: number) => (
+                            <Text key={i} style={styles.featurePrerequisite}>• {req}</Text>
+                          ))}
+                        </View>
+                      )}
+                      {feature.description && feature.description.map((desc: string, i: number) => (
+                        <Text key={i} style={[
+                          styles.featureDescription,
+                          !isAvailable && styles.featureDescriptionDisabled
+                        ]}>
+                          {desc}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {/* Show message if no features loaded */}
+      {characterFeatures.length === 0 && (!character.traits || character.traits.length === 0) && (
+        <View style={styles.emptySection}>
+          <Text style={styles.emptySectionText}>No traits or features available</Text>
+        </View>
+      )}
     </View>
   );
 
@@ -261,32 +539,123 @@ export default function CharacterView({ character }: CharacterViewProps) {
     </View>
   );
 
-  const renderEquipment = () => (
-    <View style={styles.equipmentList}>
-      {equipment.length === 0 ? (
-        <View style={styles.emptySection}>
-          <Text style={styles.emptySectionText}>No equipment</Text>
-        </View>
-      ) : (
-        equipment.map((item, index) => (
-          <View key={index} style={styles.equipmentItem}>
-            <View style={styles.equipmentHeader}>
-              <Text style={styles.equipmentName}>{item.name}</Text>
-              {item.equipped && <Text style={styles.equippedBadge}>Equipped</Text>}
-            </View>
-            <View style={styles.equipmentStats}>
-              {Object.entries(item.stats).map(([key, value]) => (
-                <Text key={key} style={styles.equipmentStat}>
-                  {key}: {value}
-                </Text>
+  const renderEquipment = () => {
+    const equippedItems = getEquippedItems();
+    const attackActions = getAttackActions();
+
+    return (
+      <View style={styles.equipmentList}>
+        {/* Attack Actions */}
+        {attackActions.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Attack Actions</Text>
+            <View style={styles.attacksList}>
+              {attackActions.map((attack, index) => (
+                <View key={index} style={styles.attackItem}>
+                  <Text style={styles.attackName}>{attack.name}</Text>
+                  <View style={styles.attackStats}>
+                    <Text style={styles.attackBonus}>
+                      Attack: +{attack.attackBonus}
+                    </Text>
+                    <Text style={styles.attackDamage}>
+                      Damage: {attack.damage}{attack.damageBonus > 0 ? ` + ${attack.damageBonus}` : ''} {attack.damageType}
+                    </Text>
+                  </View>
+                  <Text style={styles.attackRange}>Range: {attack.range}</Text>
+                  {attack.properties.length > 0 && (
+                    <Text style={styles.attackProperties}>
+                      Properties: {attack.properties.map(prop => 
+                        typeof prop === 'string' ? prop : prop.name || 'Unknown'
+                      ).join(', ')}
+                    </Text>
+                  )}
+                </View>
               ))}
             </View>
-            <Text style={styles.equipmentDescription}>{item.description}</Text>
           </View>
-        ))
-      )}
-    </View>
-  );
+        )}
+
+        {/* Equipped Items */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Equipped Items</Text>
+          {equippedItems.length === 0 ? (
+            <View style={styles.emptySection}>
+              <Text style={styles.emptySectionText}>No items equipped</Text>
+            </View>
+          ) : (
+            <View style={styles.equippedItemsList}>
+              {equippedItems.map((item, index) => (
+                <View key={index} style={styles.equippedItemCard}>
+                  <View style={styles.equippedItemHeader}>
+                    <Text style={styles.equippedItemName}>{item.name}</Text>
+                    <Text style={styles.equippedItemSlot}>{item.slot}</Text>
+                  </View>
+                  
+                  {/* Show armor details */}
+                  {item.armor_class_base && (
+                    <View style={styles.itemDetails}>
+                      <Text style={styles.itemProperty}>
+                        AC: {item.armor_class_base}{item.armor_class_dex_bonus ? ' + Dex' : ''}
+                      </Text>
+                      {item.armor_category && (
+                        <Text style={styles.itemProperty}>Type: {item.armor_category}</Text>
+                      )}
+                      {item.str_minimum && (
+                        <Text style={styles.itemProperty}>Str Req: {item.str_minimum}</Text>
+                      )}
+                      {item.stealth_disadvantage && (
+                        <Text style={styles.itemProperty}>Stealth Disadvantage</Text>
+                      )}
+                    </View>
+                  )}
+                  
+                  {/* Show weapon details */}
+                  {item.weapon_category && (
+                    <View style={styles.itemDetails}>
+                      <Text style={styles.itemProperty}>
+                        Damage: {item.damage_dice || '1d4'} {item.damage_type || 'bludgeoning'}
+                      </Text>
+                      <Text style={styles.itemProperty}>Type: {item.weapon_category}</Text>
+                      {item.range_normal && (
+                        <Text style={styles.itemProperty}>
+                          Range: {item.range_normal}/{item.range_long || item.range_normal} ft
+                        </Text>
+                      )}
+                      {item.properties && item.properties.length > 0 && (
+                        <Text style={styles.itemProperty}>
+                          Properties: {item.properties.map(prop => 
+                            typeof prop === 'string' ? prop : prop.name || 'Unknown'
+                          ).join(', ')}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  
+                  {/* Show other item details */}
+                  {!item.armor_class_base && !item.weapon_category && (
+                    <View style={styles.itemDetails}>
+                      <Text style={styles.itemProperty}>
+                        {item.equipment_category || 'Accessory'}
+                      </Text>
+                      {item.weight && (
+                        <Text style={styles.itemProperty}>Weight: {item.weight} lb</Text>
+                      )}
+                    </View>
+                  )}
+                  
+                  {item.description && item.description.length > 0 && (
+                    <Text style={styles.itemDescription} numberOfLines={2}>
+                      {Array.isArray(item.description) ? item.description[0] : item.description}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
 
   const renderSpells = () => (
     <View style={styles.spellsList}>
@@ -515,6 +884,51 @@ const styles = StyleSheet.create({
   featuresList: {
     gap: 12,
   },
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
+  traitsList: {
+    gap: 12,
+  },
+  traitItem: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  traitHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  traitName: {
+    fontSize: 16,
+    color: '#1a1a1a',
+    fontFamily: 'Inter-Bold',
+  },
+  traitDetails: {
+    marginTop: 8,
+  },
+  traitDescription: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Inter-Regular',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  classFeaturesList: {
+    gap: 12,
+  },
   featureItem: {
     backgroundColor: 'white',
     padding: 16,
@@ -524,21 +938,51 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
+  featureItemDisabled: {
+    backgroundColor: '#f0f0f0',
+  },
   featureHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
+  featureHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   featureName: {
     fontSize: 16,
     color: '#1a1a1a',
     fontFamily: 'Inter-Bold',
-    flex: 1,
   },
-  featureSource: {
+  featureNameDisabled: {
+    color: '#666',
+  },
+  featureLevel: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Inter-Regular',
+  },
+  featureLevelDisabled: {
+    color: '#999',
+  },
+  featureDetails: {
+    marginTop: 8,
+  },
+  featurePrerequisites: {
+    marginBottom: 8,
+  },
+  featurePrerequisitesTitle: {
     fontSize: 14,
     color: '#4CAF50',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  featurePrerequisite: {
+    fontSize: 14,
+    color: '#666',
     fontFamily: 'Inter-Regular',
   },
   featureDescription: {
@@ -546,6 +990,9 @@ const styles = StyleSheet.create({
     color: '#666',
     fontFamily: 'Inter-Regular',
     lineHeight: 20,
+  },
+  featureDescriptionDisabled: {
+    color: '#999',
   },
   inventoryList: {
     gap: 8,
@@ -577,7 +1024,8 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   itemDetails: {
-    alignItems: 'flex-end',
+    marginTop: 8,
+    gap: 4,
   },
   itemWeight: {
     fontSize: 13,
@@ -617,7 +1065,10 @@ const styles = StyleSheet.create({
   equipmentList: {
     gap: 12,
   },
-  equipmentItem: {
+  attacksList: {
+    gap: 12,
+  },
+  attackItem: {
     backgroundColor: 'white',
     padding: 16,
     borderRadius: 12,
@@ -626,46 +1077,76 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  equipmentHeader: {
+  attackName: {
+    fontSize: 16,
+    color: '#1a1a1a',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
+  attackStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  attackBonus: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Bold',
+  },
+  attackDamage: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Inter-Regular',
+  },
+  attackRange: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Inter-Regular',
+  },
+  attackProperties: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Inter-Regular',
+  },
+  equippedItemsList: {
+    gap: 12,
+  },
+  equippedItemCard: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  equippedItemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  equipmentName: {
+  equippedItemName: {
     fontSize: 16,
     color: '#1a1a1a',
     fontFamily: 'Inter-Bold',
   },
-  equippedBadge: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontFamily: 'Inter-Bold',
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  equipmentStats: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  equipmentStat: {
-    fontSize: 13,
-    color: '#666',
-    fontFamily: 'Inter-Regular',
-    backgroundColor: '#f5f5f5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    textTransform: 'capitalize',
-  },
-  equipmentDescription: {
+  equippedItemSlot: {
     fontSize: 14,
     color: '#666',
     fontFamily: 'Inter-Regular',
+  },
+  itemProperty: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Inter-Regular',
+  },
+  itemDescription: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Inter-Regular',
+    marginTop: 8,
+    lineHeight: 20,
   },
   spellsList: {
     gap: 12,
