@@ -25,6 +25,8 @@ import {
   type Equipment,
   type EquippedItems,
   type EquipmentSlot,
+  type SpellSlots,
+  type AbilityUses,
   equipmentAtom,
   fetchEquipmentAtom,
   canAffordEquipment,
@@ -36,12 +38,20 @@ import {
   isTwoHandedWeapon,
   canEquipInSlotWithTwoHanded,
   getItemsToUnequipForTwoHanded,
+  getSpellSlotsUsed,
+  getSpellSlotsMax,
+  getSpellSlotsRemaining,
+  canCastSpell,
+  getAbilityUses,
+  canUseAbility,
+  getAbilityUsesRemaining,
+  needsShortRest,
+  needsLongRest,
 } from '../atoms/characterAtoms';
 import { campaignsAtom, fetchCampaignsAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import { supabase } from '../config/supabase';
 import { withConnectionHandling } from '../utils/connectionUtils';
-import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 import AvatarSelector from '../components/AvatarSelector';
 import { useCustomAlert } from '../components/CustomAlert';
@@ -87,17 +97,6 @@ export default function CharacterViewScreen() {
       }
     }
   }, [characters, characterId]);
-
-  // Set up connection monitoring
-  useConnectionMonitor({
-    onConnectionLost: () => {
-      console.log('Connection lost in CharacterViewScreen');
-    },
-    onConnectionRestored: () => {
-      console.log('Connection restored in CharacterViewScreen');
-    },
-    checkInterval: 60000 // Check every minute
-  });
 
   useEffect(() => {
     fetchCharacters();
