@@ -1,11 +1,31 @@
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { checkSupabaseConnection, refreshSupabaseConnection } from '../utils/connectionUtils';
+import { 
+  checkSupabaseConnection, 
+  refreshSupabaseConnection, 
+  startConnectionMonitoring, 
+  stopConnectionMonitoring,
+  isConnectionError 
+} from '../utils/connectionUtils';
 
-export const useConnectionMonitor = () => {
+interface ConnectionMonitorOptions {
+  onConnectionLost?: () => void;
+  onConnectionRestored?: () => void;
+  checkInterval?: number; // in milliseconds
+  backgroundThreshold?: number; // time in ms before checking connection when app comes to foreground
+}
+
+export const useConnectionMonitor = (options: ConnectionMonitorOptions = {}) => {
+  const {
+    onConnectionLost,
+    onConnectionRestored,
+    checkInterval = 60000, // 1 minute default
+    backgroundThreshold = 30000 // 30 seconds default
+  } = options;
+
   const appState = useRef(AppState.currentState);
   const lastConnectionCheck = useRef(Date.now());
-  const connectionCheckInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isConnected = useRef(true);
 
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
@@ -13,17 +33,37 @@ export const useConnectionMonitor = () => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         console.log('App came to foreground, checking connection...');
         
-        // Check if we've been in background for more than 30 seconds
+        // Check if we've been in background for more than the threshold
         const timeSinceLastCheck = Date.now() - lastConnectionCheck.current;
-        if (timeSinceLastCheck > 30000) {
+        if (timeSinceLastCheck > backgroundThreshold) {
           try {
-            const isConnected = await checkSupabaseConnection();
-            if (!isConnected) {
+            const connectionStatus = await checkSupabaseConnection();
+            
+            if (!connectionStatus && isConnected.current) {
+              // Connection lost
+              isConnected.current = false;
               console.log('Connection lost, attempting to refresh...');
+              onConnectionLost?.();
+              
               await refreshSupabaseConnection();
+              
+              // Check again after refresh
+              const reconnectionStatus = await checkSupabaseConnection();
+              if (reconnectionStatus) {
+                isConnected.current = true;
+                onConnectionRestored?.();
+              }
+            } else if (connectionStatus && !isConnected.current) {
+              // Connection restored
+              isConnected.current = true;
+              onConnectionRestored?.();
             }
           } catch (error) {
             console.error('Error checking/refreshing connection:', error);
+            if (isConnectionError(error)) {
+              isConnected.current = false;
+              onConnectionLost?.();
+            }
           }
         }
         
@@ -33,32 +73,23 @@ export const useConnectionMonitor = () => {
       appState.current = nextAppState;
     };
 
-    // Periodic connection check every 5 minutes when app is active
-    const startPeriodicCheck = () => {
-      connectionCheckInterval.current = setInterval(async () => {
-        if (AppState.currentState === 'active') {
-          try {
-            const isConnected = await checkSupabaseConnection();
-            if (!isConnected) {
-              console.log('Periodic check: Connection lost, attempting to refresh...');
-              await refreshSupabaseConnection();
-            }
-            lastConnectionCheck.current = Date.now();
-          } catch (error) {
-            console.error('Error in periodic connection check:', error);
-          }
-        }
-      }, 5 * 60 * 1000); // 5 minutes
-    };
+    // Start monitoring when hook mounts
+    startConnectionMonitoring(checkInterval);
 
+    // Set up app state change listener
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-    startPeriodicCheck();
 
+    // Cleanup function
     return () => {
       subscription?.remove();
-      if (connectionCheckInterval.current) {
-        clearInterval(connectionCheckInterval.current);
-      }
+      stopConnectionMonitoring();
     };
-  }, []);
+  }, [checkInterval, backgroundThreshold, onConnectionLost, onConnectionRestored]);
+
+  // Return connection utilities for manual use
+  return {
+    checkConnection: checkSupabaseConnection,
+    refreshConnection: refreshSupabaseConnection,
+    isConnectionError
+  };
 }; 

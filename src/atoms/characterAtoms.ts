@@ -556,6 +556,76 @@ export const removeEquipmentAtom = atom(
   }
 );
 
+// Check if a weapon is two-handed
+export const isTwoHandedWeapon = (equipment: Equipment): boolean => {
+  if (!equipment.properties) return false;
+  
+  return equipment.properties.some((prop: any) => {
+    const propName = typeof prop === 'string' ? prop : prop.name || '';
+    return propName.toLowerCase() === 'two-handed';
+  });
+};
+
+// Check if an item can be equipped in a specific slot, considering two-handed weapons
+export const canEquipInSlotWithTwoHanded = (equipment: Equipment, slot: EquipmentSlot, currentEquipped: EquippedItems): { canEquip: boolean; conflictingItems: string[] } => {
+  // First check basic slot compatibility
+  if (!canEquipInSlot(equipment, slot)) {
+    return { canEquip: false, conflictingItems: [] };
+  }
+
+  // If it's not a hand slot, no two-handed conflicts
+  if (slot !== 'leftHand' && slot !== 'rightHand') {
+    return { canEquip: true, conflictingItems: [] };
+  }
+
+  const conflictingItems: string[] = [];
+  const isTwoHanded = isTwoHandedWeapon(equipment);
+
+  if (isTwoHanded) {
+    // Two-handed weapon conflicts with anything in either hand
+    if (currentEquipped.leftHand) {
+      conflictingItems.push(`${currentEquipped.leftHand.name} (Left Hand)`);
+    }
+    if (currentEquipped.rightHand) {
+      conflictingItems.push(`${currentEquipped.rightHand.name} (Right Hand)`);
+    }
+  } else {
+    // One-handed weapon/item
+    if (slot === 'leftHand') {
+      // Check if right hand has a two-handed weapon
+      if (currentEquipped.rightHand && isTwoHandedWeapon(currentEquipped.rightHand)) {
+        conflictingItems.push(`${currentEquipped.rightHand.name} (Right Hand)`);
+      }
+    } else if (slot === 'rightHand') {
+      // Check if left hand has a two-handed weapon
+      if (currentEquipped.leftHand && isTwoHandedWeapon(currentEquipped.leftHand)) {
+        conflictingItems.push(`${currentEquipped.leftHand.name} (Left Hand)`);
+      }
+    }
+  }
+
+  return { canEquip: true, conflictingItems };
+};
+
+// Get items that would be unequipped when equipping a two-handed weapon
+export const getItemsToUnequipForTwoHanded = (equipment: Equipment, slot: EquipmentSlot, currentEquipped: EquippedItems): Equipment[] => {
+  const itemsToUnequip: Equipment[] = [];
+  
+  if (!isTwoHandedWeapon(equipment) || (slot !== 'leftHand' && slot !== 'rightHand')) {
+    return itemsToUnequip;
+  }
+
+  // Two-handed weapon unequips both hands
+  if (currentEquipped.leftHand) {
+    itemsToUnequip.push(currentEquipped.leftHand);
+  }
+  if (currentEquipped.rightHand) {
+    itemsToUnequip.push(currentEquipped.rightHand);
+  }
+
+  return itemsToUnequip;
+};
+
 // Calculate AC based on equipped armor and dexterity
 export const calculateArmorClass = (equippedItems: EquippedItems, dexterity: number): number => {
   const dexModifier = Math.floor((dexterity - 10) / 2);
