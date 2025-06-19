@@ -8,6 +8,7 @@ import { initializeRealtimeAtom } from '../src/atoms/campaignAtoms';
 import { initializeCampaignReadStatusRealtimeAtom } from '../src/atoms/campaignReadStatusAtoms';
 import { initializeFriendshipsRealtimeAtom } from '../src/atoms/friendsAtoms';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+import { useConnectionMonitor } from '../src/hooks/useConnectionMonitor';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
@@ -28,6 +29,17 @@ export default function RootLayout() {
   const [, initializeRealtime] = useAtom(initializeRealtimeAtom);
   const [, initializeReadStatusRealtime] = useAtom(initializeCampaignReadStatusRealtimeAtom);
   const [, initializeFriendshipsRealtime] = useAtom(initializeFriendshipsRealtimeAtom);
+
+  // Global connection monitoring - runs once and persists across all navigation
+  useConnectionMonitor({
+    onConnectionLost: () => {
+      console.log('Global connection lost - this will persist across all screens');
+    },
+    onConnectionRestored: () => {
+      console.log('Global connection restored');
+    },
+    checkInterval: 120000 // Check every 2 minutes (less aggressive)
+  });
 
   useEffect(() => {
     // Initialize authentication and real-time subscriptions
