@@ -154,6 +154,12 @@ export default function CreationScreen() {
   useEffect(() => {
     if (selectedClass) {
       setStartingWealth();
+      
+      // Clear spells when changing to a class that doesn't get spells at level 1
+      const spellcastingInfo = getSpellcastingInfo();
+      if (!spellcastingInfo || (spellcastingInfo.cantripsKnown === 0 && spellcastingInfo.spellsKnown === 0)) {
+        setSelectedSpells([]);
+      }
     }
   }, [selectedClass, setStartingWealth]);
 
@@ -476,6 +482,12 @@ export default function CreationScreen() {
       case 'wizard':
         spellcastingInfo.cantripsKnown = 3;
         spellcastingInfo.spellsKnown = 6;
+        break;
+      case 'paladin':
+      case 'ranger':
+        // Half-casters don't get spells until level 2
+        spellcastingInfo.cantripsKnown = 0;
+        spellcastingInfo.spellsKnown = 0;
         break;
       default:
         spellcastingInfo.cantripsKnown = 2;
@@ -972,7 +984,7 @@ export default function CreationScreen() {
       return (
         <View style={styles.stepContent}>
           <Text style={styles.stepTitle}>Spells</Text>
-          <Text style={styles.subtitle}>This class doesn't have spellcasting abilities.</Text>
+          <Text style={styles.subtitle}>This class doesn&apos;t have spellcasting abilities.</Text>
           <View style={styles.noSpellsContainer}>
             <Text style={styles.noSpellsText}>
               {selectedClass?.name} is a martial class that relies on physical prowess rather than magic.
@@ -982,57 +994,118 @@ export default function CreationScreen() {
       );
     }
 
-    const currentSpells = selectedSpellLevel === 'cantrips' ? cantrips : level1Spells;
-    const currentSelectedSpells = selectedSpellLevel === 'cantrips' ? selectedCantrips : selectedLevel1Spells;
-    const remainingCount = selectedSpellLevel === 'cantrips' ? cantripsRemaining : spellsRemaining;
-    const maxSpells = selectedSpellLevel === 'cantrips'
-      ? (spellcastingInfo?.cantripsKnown || 0)
-      : (spellcastingInfo?.spellsKnown || 0);
+    // Check if this class gets spells at level 1
+    const spellcastingInfo = getSpellcastingInfo();
+    if (!spellcastingInfo || (spellcastingInfo.cantripsKnown === 0 && spellcastingInfo.spellsKnown === 0)) {
+      const isHalfCaster = selectedClass.index === 'paladin' || selectedClass.index === 'ranger';
+      
+      return (
+        <View style={styles.stepContent}>
+          <Text style={styles.stepTitle}>Spells</Text>
+          <Text style={styles.subtitle}>
+            {isHalfCaster 
+              ? `${selectedClass.name}s gain spellcasting at level 2.` 
+              : 'This class doesn&apos;t have spellcasting abilities at level 1.'
+            }
+          </Text>
+          <View style={styles.noSpellsContainer}>
+            <Text style={styles.noSpellsText}>
+              {isHalfCaster
+                ? `${selectedClass.name}s are half-casters who begin their magical journey at 2nd level. They focus on martial prowess in their early training.`
+                : `${selectedClass?.name} doesn&apos;t gain spellcasting abilities during character creation.`
+              }
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    // Determine which spells to show based on what the class gets
+    let currentSpells, currentSelectedSpells, remainingCount, maxSpells;
+    
+    if (spellcastingInfo.cantripsKnown > 0 && spellcastingInfo.spellsKnown > 0) {
+      // Class gets both cantrips and spells - use tab selection
+      currentSpells = selectedSpellLevel === 'cantrips' ? cantrips : level1Spells;
+      currentSelectedSpells = selectedSpellLevel === 'cantrips' ? selectedCantrips : selectedLevel1Spells;
+      remainingCount = selectedSpellLevel === 'cantrips' ? cantripsRemaining : spellsRemaining;
+      maxSpells = selectedSpellLevel === 'cantrips'
+        ? spellcastingInfo.cantripsKnown
+        : spellcastingInfo.spellsKnown;
+    } else if (spellcastingInfo.cantripsKnown > 0) {
+      // Class only gets cantrips
+      currentSpells = cantrips;
+      currentSelectedSpells = selectedCantrips;
+      remainingCount = cantripsRemaining;
+      maxSpells = spellcastingInfo.cantripsKnown;
+    } else {
+      // Class only gets 1st level spells
+      currentSpells = level1Spells;
+      currentSelectedSpells = selectedLevel1Spells;
+      remainingCount = spellsRemaining;
+      maxSpells = spellcastingInfo.spellsKnown;
+    }
 
     return (
       <View style={styles.stepContent}>
         <Text style={styles.stepTitle}>Choose Spells</Text>
         <Text style={styles.subtitle}>Select your starting spells</Text>
 
-        {/* Spell Level Tabs */}
-        <View style={styles.spellTabs}>
-          <TouchableOpacity
-            style={[
-              styles.spellTab,
-              selectedSpellLevel === 'cantrips' && styles.spellTabActive,
-            ]}
-            onPress={() => setSelectedSpellLevel('cantrips')}
-          >
-            <Text style={[
-              styles.spellTabText,
-              selectedSpellLevel === 'cantrips' && styles.spellTabTextActive,
-            ]}>
-              Cantrips ({selectedCantrips.length}/{spellcastingInfo?.cantripsKnown || 0})
+        {/* Spell Level Tabs - Only show if the class gets both cantrips and spells */}
+        {spellcastingInfo.cantripsKnown > 0 && spellcastingInfo.spellsKnown > 0 && (
+          <View style={styles.spellTabs}>
+            <TouchableOpacity
+              style={[
+                styles.spellTab,
+                selectedSpellLevel === 'cantrips' && styles.spellTabActive,
+              ]}
+              onPress={() => setSelectedSpellLevel('cantrips')}
+            >
+              <Text style={[
+                styles.spellTabText,
+                selectedSpellLevel === 'cantrips' && styles.spellTabTextActive,
+              ]}>
+                Cantrips ({selectedCantrips.length}/{spellcastingInfo?.cantripsKnown || 0})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.spellTab,
+                selectedSpellLevel === 'level1' && styles.spellTabActive,
+              ]}
+              onPress={() => setSelectedSpellLevel('level1')}
+            >
+              <Text style={[
+                styles.spellTabText,
+                selectedSpellLevel === 'level1' && styles.spellTabTextActive,
+              ]}>
+                1st Level ({selectedLevel1Spells.length}/{spellcastingInfo?.spellsKnown || 0})
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Single spell type display for classes that only get one type */}
+        {(spellcastingInfo.cantripsKnown === 0 || spellcastingInfo.spellsKnown === 0) && (
+          <View style={styles.singleSpellTypeHeader}>
+            <Text style={styles.spellSectionTitle}>
+              {spellcastingInfo.cantripsKnown > 0 ? 'Cantrips' : '1st Level Spells'}
+              {spellcastingInfo.cantripsKnown > 0 
+                ? ` (${selectedCantrips.length}/${spellcastingInfo.cantripsKnown})`
+                : ` (${selectedLevel1Spells.length}/${spellcastingInfo.spellsKnown})`
+              }
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.spellTab,
-              selectedSpellLevel === 'level1' && styles.spellTabActive,
-            ]}
-            onPress={() => setSelectedSpellLevel('level1')}
-          >
-            <Text style={[
-              styles.spellTabText,
-              selectedSpellLevel === 'level1' && styles.spellTabTextActive,
-            ]}>
-              1st Level ({selectedLevel1Spells.length}/{spellcastingInfo?.spellsKnown || 0})
-            </Text>
-          </TouchableOpacity>
-        </View>
+          </View>
+        )}
 
         {/* Spell List */}
         <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
           <View style={styles.spellSection}>
-            <Text style={styles.spellSectionTitle}>
-              {selectedSpellLevel === 'cantrips' ? 'Cantrips' : '1st Level Spells'}
-              {remainingCount !== null && ` (${remainingCount} remaining)`}
-            </Text>
+            {spellcastingInfo.cantripsKnown > 0 && spellcastingInfo.spellsKnown > 0 && (
+              <Text style={styles.spellSectionTitle}>
+                {selectedSpellLevel === 'cantrips' ? 'Cantrips' : '1st Level Spells'}
+                {remainingCount !== null && ` (${remainingCount} remaining)`}
+              </Text>
+            )}
             {currentSpells.map((spell) => (
               <TouchableOpacity
                 key={spell.index}
@@ -1410,6 +1483,9 @@ export default function CreationScreen() {
 
         const spellcastingInfo = getSpellcastingInfo();
         if (!spellcastingInfo) return true;
+
+        // If class doesn't get spells at level 1 (like Paladin/Ranger), allow proceeding
+        if (spellcastingInfo.cantripsKnown === 0 && spellcastingInfo.spellsKnown === 0) return true;
 
         const selectedCantrips = selectedSpells.filter(spell => spell.level === 0);
         const selectedLevel1Spells = selectedSpells.filter(spell => spell.level === 1);
@@ -2526,6 +2602,9 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontFamily: 'Inter-Bold',
     marginBottom: 12,
+  },
+  singleSpellTypeHeader: {
+    marginBottom: 20,
   },
   spellCard: {
     backgroundColor: '#2a2a2a',
