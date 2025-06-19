@@ -3,7 +3,7 @@ import { Play, Users, Settings, Menu, Crown, UserCheck, Star, Circle, Bell, Plus
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, ScrollView, Image } from 'react-native';
 import { useAtom } from 'jotai';
-import { campaignsAtom, currentCampaignAtom } from '../atoms/campaignAtoms';
+import { campaignsAtom, currentCampaignAtom, fetchCampaignsAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import {
@@ -32,6 +32,7 @@ export default function HomeScreen() {
   const [campaignInvitations] = useAtom(campaignInvitationsAtom);
   const [friendRequestsReceived] = useAtom(friendRequestsReceivedAtom);
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
+  const [, fetchCampaigns] = useAtom(fetchCampaignsAtom);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
   const [, fetchCampaignReadStatus] = useAtom(fetchCampaignReadStatusAtom);
   const [, updateCampaignReadStatus] = useAtom(updateCampaignReadStatusAtom);
@@ -52,6 +53,7 @@ export default function HomeScreen() {
       const loadInitialData = async () => {
         try {
           await Promise.all([
+            fetchCampaigns(),
             fetchCharacters(),
             fetchCampaignReadStatus(),
             fetchCampaignInvitations(),
@@ -81,7 +83,7 @@ export default function HomeScreen() {
         }
       };
     }
-  }, [user, fetchCharacters, fetchCampaignReadStatus, fetchCampaignInvitations, fetchFriendRequestsReceived, initializeReadStatusRealtime, withLoading]);
+  }, [user, fetchCampaigns, fetchCharacters, fetchCampaignReadStatus, fetchCampaignInvitations, fetchFriendRequestsReceived, initializeReadStatusRealtime, withLoading]);
 
   const handleCampaignPress = async (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
