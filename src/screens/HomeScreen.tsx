@@ -41,7 +41,7 @@ export default function HomeScreen() {
   const [user] = useAtom(userAtom);
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
-  const { showAlert, hideAlert } = useCustomAlert();
+  const { showAlert } = useCustomAlert();
 
   // Fetch characters and read status when component mounts or user changes
   useEffect(() => {
@@ -50,18 +50,18 @@ export default function HomeScreen() {
       fetchCampaignReadStatus();
       fetchCampaignInvitations();
       fetchFriendRequestsReceived();
-      
+
       // Initialize real-time subscription for read status
       initializeReadStatusRealtime();
-      
+
       // Initialize notification listeners
       const cleanupNotifications = initializeNotificationListeners();
-      
+
       // Request notification permissions
       requestNotificationPermissions().catch(error => {
         console.log('Error requesting notification permissions:', error);
       });
-      
+
       return () => {
         if (typeof cleanupNotifications === 'function') {
           cleanupNotifications();
@@ -268,8 +268,8 @@ export default function HomeScreen() {
               {/* Characters Section */}
               {characters.length > 0 && (
                 <View style={styles.charactersSection}>
-                  <ScrollView 
-                    horizontal 
+                  <ScrollView
+                    horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.charactersScrollContent}
                   >
@@ -302,81 +302,81 @@ export default function HomeScreen() {
                 </View>
               )}
 
-               {/* Campaign Invitations Banner */}
-                {campaignInvitations.length > 0 && (
-                  <View style={styles.invitationsBanner}>
-                    <View style={styles.invitationsHeader}>
-                      <Bell size={20} color="#FFD700" />
-                      <Text style={styles.invitationsTitle}>
-                        Campaign Invitation{campaignInvitations.length > 1 ? 's' : ''}
-                      </Text>
-                    </View>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      {campaignInvitations.map((invitation) => (
-                        <View key={invitation.id} style={styles.invitationCard}>
-                          <Text style={styles.invitationCampaignName}>
-                            {invitation.campaign?.name}
-                          </Text>
-                          <Text style={styles.invitationFrom}>
-                            From {invitation.inviter_profile?.username}
-                          </Text>
-                          <View style={styles.invitationActions}>
-                            <TouchableOpacity
-                              style={styles.acceptInvitationButton}
-                              onPress={() => handleAcceptCampaignInvitation(invitation.id)}
-                            >
-                              <Text style={styles.invitationButtonText}>Accept</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={styles.declineInvitationButton}
-                              onPress={() => handleDeclineCampaignInvitation(invitation.id)}
-                            >
-                              <Text style={styles.invitationButtonText}>Decline</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      ))}
-                    </ScrollView>
+              {/* Campaign Invitations Banner */}
+              {campaignInvitations.length > 0 && (
+                <View style={styles.invitationsBanner}>
+                  <View style={styles.invitationsHeader}>
+                    <Bell size={20} color="#FFD700" />
+                    <Text style={styles.invitationsTitle}>
+                      Campaign Invitation{campaignInvitations.length > 1 ? 's' : ''}
+                    </Text>
                   </View>
-                )}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {campaignInvitations.map((invitation) => (
+                      <View key={invitation.id} style={styles.invitationCard}>
+                        <Text style={styles.invitationCampaignName}>
+                          {invitation.campaign?.name}
+                        </Text>
+                        <Text style={styles.invitationFrom}>
+                          From {invitation.inviter_profile?.username}
+                        </Text>
+                        <View style={styles.invitationActions}>
+                          <TouchableOpacity
+                            style={styles.acceptInvitationButton}
+                            onPress={() => handleAcceptCampaignInvitation(invitation.id)}
+                          >
+                            <Text style={styles.invitationButtonText}>Accept</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.declineInvitationButton}
+                            onPress={() => handleDeclineCampaignInvitation(invitation.id)}
+                          >
+                            <Text style={styles.invitationButtonText}>Decline</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
 
-                {/* Friend Requests Banner */}
-                {friendRequestsReceived.length > 0 && (
-                  <View style={styles.friendRequestsBanner}>
-                    <View style={styles.friendRequestsHeader}>
-                      <UserPlus size={20} color="#4CAF50" />
-                      <Text style={styles.friendRequestsTitle}>
-                        Friend Request{friendRequestsReceived.length > 1 ? 's' : ''}
-                      </Text>
-                    </View>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      {friendRequestsReceived.map((request) => (
-                        <View key={request.id} style={styles.friendRequestCard}>
-                          <Text style={styles.friendRequestUsername}>
-                            {request.friend_profile?.username}
-                          </Text>
-                          <Text style={styles.friendRequestEmail}>
-                            {request.friend_profile?.email}
-                          </Text>
-                          <View style={styles.friendRequestActions}>
-                            <TouchableOpacity
-                              style={styles.acceptFriendRequestButton}
-                              onPress={() => handleAcceptFriendRequest(request.id)}
-                            >
-                              <Text style={styles.friendRequestButtonText}>Accept</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={styles.declineFriendRequestButton}
-                              onPress={() => handleDeclineFriendRequest(request.id)}
-                            >
-                              <Text style={styles.friendRequestButtonText}>Decline</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      ))}
-                    </ScrollView>
+              {/* Friend Requests Banner */}
+              {friendRequestsReceived.length > 0 && (
+                <View style={styles.friendRequestsBanner}>
+                  <View style={styles.friendRequestsHeader}>
+                    <UserPlus size={20} color="#4CAF50" />
+                    <Text style={styles.friendRequestsTitle}>
+                      Friend Request{friendRequestsReceived.length > 1 ? 's' : ''}
+                    </Text>
                   </View>
-                )}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {friendRequestsReceived.map((request) => (
+                      <View key={request.id} style={styles.friendRequestCard}>
+                        <Text style={styles.friendRequestUsername}>
+                          {request.friend_profile?.username}
+                        </Text>
+                        <Text style={styles.friendRequestEmail}>
+                          {request.friend_profile?.email}
+                        </Text>
+                        <View style={styles.friendRequestActions}>
+                          <TouchableOpacity
+                            style={styles.acceptFriendRequestButton}
+                            onPress={() => handleAcceptFriendRequest(request.id)}
+                          >
+                            <Text style={styles.friendRequestButtonText}>Accept</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.declineFriendRequestButton}
+                            onPress={() => handleDeclineFriendRequest(request.id)}
+                          >
+                            <Text style={styles.friendRequestButtonText}>Decline</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
               {campaigns
                 .filter(campaign =>
                   // Double-check: only show campaigns where user is owner or player
@@ -446,14 +446,14 @@ export default function HomeScreen() {
                 ))}
 
               {campaigns.length === 0 && (
-              <>
-                <View style={styles.noCampaignsContainer}>
-                  <Text style={styles.noCampaigns}>No active campaigns</Text>
-                  <Text style={styles.noCampaignsSubtext}>
-                    Create a new campaign or join an existing one!
-                  </Text>
-                </View>
-                <View style={styles.campaignActionButtons}>
+                <>
+                  <View style={styles.noCampaignsContainer}>
+                    <Text style={styles.noCampaigns}>No active campaigns</Text>
+                    <Text style={styles.noCampaignsSubtext}>
+                      Create a new campaign or join an existing one!
+                    </Text>
+                  </View>
+                  <View style={styles.campaignActionButtons}>
                     <TouchableOpacity
                       style={styles.createButton}
                       onPress={handleCreateCampaign}
@@ -461,8 +461,8 @@ export default function HomeScreen() {
                       <Plus size={20} color="#fff" />
                       <Text style={styles.buttonText}>Create Campaign</Text>
                     </TouchableOpacity>
-                </View>
-                <View style={styles.campaignActionButtons}>
+                  </View>
+                  <View style={styles.campaignActionButtons}>
                     <TouchableOpacity
                       style={styles.joinButton}
                       onPress={handleJoinCampaign}
@@ -471,7 +471,7 @@ export default function HomeScreen() {
                       <Text style={styles.buttonText}>Join via Code</Text>
                     </TouchableOpacity>
                   </View>
-              </>
+                </>
               )}
             </ScrollView>
           </View>
@@ -685,7 +685,7 @@ const styles = StyleSheet.create({
   charactersContainer: {
     flex: 0.30,
     paddingBottom: 5,
-    marginBottom:5,
+    marginBottom: 5,
   },
   sectionTitle: {
     fontSize: 20,

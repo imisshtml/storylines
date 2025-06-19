@@ -77,7 +77,7 @@ export const updateCampaignReadStatusAtom = atom(
           .eq('campaign_uid', campaignUid)
           .select()
           .single();
-        
+
         data = result.data;
         error = result.error;
       } else {
@@ -91,7 +91,7 @@ export const updateCampaignReadStatusAtom = atom(
           })
           .select()
           .single();
-        
+
         data = result.data;
         error = result.error;
       }
@@ -158,12 +158,37 @@ export const hasUnreadMessagesAtom = atom(
   }
 );
 
+// Track the active read status subscription
+let activeReadStatusSubscription: any = null;
+let activeReadStatusUserId: string | null = null;
+
 // Initialize real-time subscription for read status updates
 export const initializeCampaignReadStatusRealtimeAtom = atom(
   null,
   async (get, set) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      console.log('No user found for read status subscription');
+      return;
+    }
+
+    // If we already have an active subscription for this user, return the existing cleanup
+    if (activeReadStatusSubscription && activeReadStatusUserId === user.id) {
+      return () => {
+        if (activeReadStatusSubscription) {
+          activeReadStatusSubscription.unsubscribe();
+          activeReadStatusSubscription = null;
+          activeReadStatusUserId = null;
+        }
+      };
+    }
+
+    // Clean up any existing subscription for a different user
+    if (activeReadStatusSubscription) {
+      activeReadStatusSubscription.unsubscribe();
+      activeReadStatusSubscription = null;
+      activeReadStatusUserId = null;
+    }
 
     const subscription = supabase
       .channel(`campaign_read_status:${user.id}`)
@@ -177,7 +202,7 @@ export const initializeCampaignReadStatusRealtimeAtom = atom(
         },
         (payload) => {
           const currentStatuses = get(campaignReadStatusAtom);
-          
+
           if (payload.eventType === 'DELETE') {
             const { [payload.old.campaign_uid]: deleted, ...rest } = currentStatuses;
             set(campaignReadStatusAtom, rest);
@@ -192,8 +217,16 @@ export const initializeCampaignReadStatusRealtimeAtom = atom(
       )
       .subscribe();
 
+    // Store the subscription and user ID
+    activeReadStatusSubscription = subscription;
+    activeReadStatusUserId = user.id;
+
     return () => {
-      subscription.unsubscribe();
+      if (activeReadStatusSubscription) {
+        activeReadStatusSubscription.unsubscribe();
+        activeReadStatusSubscription = null;
+        activeReadStatusUserId = null;
+      }
     };
   }
 );

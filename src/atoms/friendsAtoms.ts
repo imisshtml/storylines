@@ -1,6 +1,7 @@
-import { atom , set } from 'jotai';
+import { atom } from 'jotai';
 import { supabase } from '../config/supabase';
 import { currentCampaignAtom } from './campaignAtoms';
+import { Platform } from 'react-native';
 
 export type Friendship = {
   id: string;
@@ -40,6 +41,7 @@ export type UserProfile = {
   id: string;
   username: string;
   email: string;
+  searchMatchType?: 'username' | 'email';
 };
 
 // Friends state
@@ -81,8 +83,8 @@ export const fetchFriendsAtom = atom(
       // Transform data to include friend profile
       const transformedFriends = (friendships || []).map(friendship => ({
         ...friendship,
-        friend_profile: friendship.requester_id === user.id 
-          ? friendship.addressee 
+        friend_profile: friendship.requester_id === user.id
+          ? friendship.addressee
           : friendship.requester
       }));
 
@@ -102,7 +104,12 @@ export const fetchFriendRequestsReceivedAtom = atom(
   async (get, set) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log(`[${Platform.OS}] [fetchFriendRequestsReceived] No user found`);
+        return;
+      }
+
+      console.log(`[${Platform.OS}] [fetchFriendRequestsReceived] Fetching friend requests for user:`, user.id);
 
       const { data: requests, error } = await supabase
         .from('friendships')
@@ -113,7 +120,12 @@ export const fetchFriendRequestsReceivedAtom = atom(
         .eq('addressee_id', user.id)
         .eq('status', 'pending');
 
-      if (error) throw error;
+      if (error) {
+        console.error(`[${Platform.OS}] [fetchFriendRequestsReceived] Error:`, error);
+        throw error;
+      }
+
+      console.log(`[${Platform.OS}] [fetchFriendRequestsReceived] Raw requests data:`, requests);
 
       const transformedRequests = (requests || []).map(request => ({
         ...request,
@@ -122,7 +134,7 @@ export const fetchFriendRequestsReceivedAtom = atom(
 
       set(friendRequestsReceivedAtom, transformedRequests);
     } catch (error) {
-      console.error('Error fetching friend requests received:', error);
+      console.error(`[${Platform.OS}] [fetchFriendRequestsReceived] Error fetching friend requests received:`, error);
     }
   }
 );
@@ -205,21 +217,52 @@ export const searchUsersAtom = atom(
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const searchPattern = `%${query}%`;
-      const { data: users, error } = await supabase
-        .from('profiles')
-        .select('id, username, email')
-        .neq('id', user.id) // Exclude current user
-        .or(`username.ilike.${searchPattern},email.ilike.${searchPattern}`)
-        .limit(10);
-
-      if (error) {
-        console.error('Search error:', error);
-        throw error;
+      // Check if query is an exact email address
+      const isExactEmail = query.includes('@');
+      
+      let users: UserProfile[] = [];
+      
+      if (isExactEmail) {
+        // Exact email match search
+        const { data: emailUsers, error: emailError } = await supabase
+          .from('profiles')
+          .select('id, username, email')
+          .neq('id', user.id) // Exclude current user
+          .ilike('email', query.toLowerCase());
+        
+        if (emailError) {
+          console.error('Email search error:', emailError);
+          throw emailError;
+        }
+        
+        // Mark these results as email matches
+        users = (emailUsers || []).map(user => ({
+          ...user,
+          searchMatchType: 'email' as const
+        }));
+      } else {
+        // Username fuzzy search
+        const searchPattern = `%${query}%`;
+        const { data: usernameUsers, error: usernameError } = await supabase
+          .from('profiles')
+          .select('id, username, email')
+          .neq('id', user.id) // Exclude current user
+          .ilike('username', searchPattern);
+        
+        if (usernameError) {
+          console.error('Username search error:', usernameError);
+          throw usernameError;
+        }
+        
+        // Mark these results as username matches
+        users = (usernameUsers || []).map(user => ({
+          ...user,
+          searchMatchType: 'username' as const
+        }));
       }
 
       console.log('Search results:', users); // Debug log
-      set(userSearchResultsAtom, users || []);
+      set(userSearchResultsAtom, users);
     } catch (error) {
       console.error('Error searching users:', error);
       set(userSearchResultsAtom, []);
@@ -233,10 +276,8 @@ export const searchUsersAtom = atom(
 export const sendFriendRequestAtom = atom(
   null,
   async (get, set, targetUserId: string) => {
-    console.log('[sendFriendRequestAtom] called with targetUserId:', targetUserId);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      console.log('[sendFriendRequestAtom] current user:', user);
       if (!user) throw new Error('Not authenticated');
 
       const { error } = await supabase
@@ -246,14 +287,12 @@ export const sendFriendRequestAtom = atom(
           addressee_id: targetUserId,
           status: 'pending'
         });
-      console.log('[sendFriendRequestAtom] insert error:', error);
       if (error) throw error;
 
       // Refresh friend requests sent
-      set(fetchFriendRequestsSentAtom, null);
-      console.log('[sendFriendRequestAtom] friend request sent and atom refreshed');
+      set(fetchFriendRequestsSentAtom);
     } catch (error) {
-      console.error('[sendFriendRequestAtom] error:', error);
+      console.error(`[${Platform.OS}] [sendFriendRequestAtom] error:`, error);
       throw error;
     }
   }
@@ -263,21 +302,18 @@ export const sendFriendRequestAtom = atom(
 export const respondToFriendRequestAtom = atom(
   null,
   async (get, set, { friendshipId, response }: { friendshipId: string; response: 'accepted' | 'rejected' }) => {
-    console.log('[respondToFriendRequestAtom] called with', { friendshipId, response });
     try {
       const { error } = await supabase
         .from('friendships')
         .update({ status: response })
         .eq('id', friendshipId);
-      console.log('[respondToFriendRequestAtom] update error:', error);
       if (error) throw error;
 
       // Refresh all friend data
-      set(fetchFriendsAtom, null);
-      set(fetchFriendRequestsReceivedAtom, null);
-      console.log('[respondToFriendRequestAtom] friend data refreshed');
+      set(fetchFriendsAtom);
+      set(fetchFriendRequestsReceivedAtom);
     } catch (error) {
-      console.error('[respondToFriendRequestAtom] error:', error);
+      console.error(`[${Platform.OS}] [respondToFriendRequestAtom] error:`, error);
       throw error;
     }
   }
@@ -297,10 +333,129 @@ export const removeFriendAtom = atom(
 
       // Refresh friends list
       const { fetchFriendsAtom } = await import('./friendsAtoms');
-      set(fetchFriendsAtom, null);
+      set(fetchFriendsAtom);
     } catch (error) {
       throw error;
     }
+  }
+);
+
+// Track the active subscription
+let activeSubscription: any = null;
+let activeUserId: string | null = null;
+
+// Initialize real-time subscription for friendships
+export const initializeFriendshipsRealtimeAtom = atom(
+  null,
+  async (get, set) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return;
+    }
+
+    // If we already have an active subscription for this user, return the existing cleanup
+    if (activeSubscription && activeUserId === user.id) {
+      return () => {
+        if (activeSubscription) {
+          activeSubscription.unsubscribe();
+          activeSubscription = null;
+          activeUserId = null;
+        }
+      };
+    }
+
+    // Clean up any existing subscription for a different user
+    if (activeSubscription) {
+      activeSubscription.unsubscribe();
+      activeSubscription = null;
+      activeUserId = null;
+    }
+
+    const subscription = supabase
+      .channel(`friendships:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'friendships',
+          filter: `requester_id=eq.${user.id}`,
+        },
+        () => {
+          // Re-fetch all friend data to ensure consistency
+          setTimeout(() => {
+            set(fetchFriendsAtom);
+            set(fetchFriendRequestsReceivedAtom);
+            set(fetchFriendRequestsSentAtom);
+          }, 100);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'friendships',
+          filter: `addressee_id=eq.${user.id}`,
+        },
+        () => {
+          // Re-fetch all friend data to ensure consistency
+          setTimeout(() => {
+            set(fetchFriendsAtom);
+            set(fetchFriendRequestsReceivedAtom);
+            set(fetchFriendRequestsSentAtom);
+          }, 100);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'campaign_invitations',
+          filter: `inviter_id=eq.${user.id}`,
+        },
+        () => {
+          // Re-fetch campaign invitations
+          setTimeout(() => {
+            set(fetchCampaignInvitationsAtom);
+          }, 100);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'campaign_invitations',
+          filter: `invitee_id=eq.${user.id}`,
+        },
+        () => {
+          // Re-fetch campaign invitations
+          setTimeout(() => {
+            set(fetchCampaignInvitationsAtom);
+          }, 100);
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.error(`[${Platform.OS}] [Friendships Realtime] Subscription error occurred`);
+        } else if (status === 'TIMED_OUT') {
+          console.error(`[${Platform.OS}] [Friendships Realtime] Subscription timed out`);
+        }
+      });
+
+    // Store the subscription and user ID
+    activeSubscription = subscription;
+    activeUserId = user.id;
+
+    return () => {
+      if (activeSubscription) {
+        activeSubscription.unsubscribe();
+        activeSubscription = null;
+        activeUserId = null;
+      }
+    };
   }
 );
 
@@ -308,10 +463,8 @@ export const removeFriendAtom = atom(
 export const sendCampaignInvitationAtom = atom(
   null,
   async (get, set, { campaignId, friendId }: { campaignId: string; friendId: string }) => {
-    console.log('[sendCampaignInvitationAtom] called with', { campaignId, friendId });
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      console.log('[sendCampaignInvitationAtom] current user:', user);
       if (!user) throw new Error('Not authenticated');
 
       const { error } = await supabase
@@ -321,7 +474,6 @@ export const sendCampaignInvitationAtom = atom(
           inviter_id: user.id,
           invitee_id: friendId
         });
-      console.log('[sendCampaignInvitationAtom] insert error:', error);
       if (error) throw error;
     } catch (error) {
       console.error('[sendCampaignInvitationAtom] error:', error);
@@ -334,13 +486,11 @@ export const sendCampaignInvitationAtom = atom(
 export const respondToCampaignInvitationAtom = atom(
   null,
   async (get, set, { invitationId, response }: { invitationId: string; response: 'accepted' | 'rejected' }) => {
-    console.log('[respondToCampaignInvitationAtom] called with', { invitationId, response });
     try {
       const { error } = await supabase
         .from('campaign_invitations')
         .update({ status: response })
         .eq('id', invitationId);
-      console.log('[respondToCampaignInvitationAtom] update error:', error);
       if (error) throw error;
 
       if (response === 'accepted') {
@@ -379,8 +529,7 @@ export const respondToCampaignInvitationAtom = atom(
       }
 
       // Refresh campaign invitations
-      set(fetchCampaignInvitationsAtom, null);
-      console.log('[respondToCampaignInvitationAtom] campaign invitation handled');
+      set(fetchCampaignInvitationsAtom);
     } catch (error) {
       console.error('[respondToCampaignInvitationAtom] error:', error);
       throw error;
