@@ -29,6 +29,14 @@ import {
   addCampaignMessageAtom
 } from '../atoms/campaignHistoryAtoms';
 import { updateCampaignReadStatusAtom } from '../atoms/campaignReadStatusAtoms';
+import {
+  sortedPlayerActionsAtom,
+  fetchPlayerActionsAtom,
+  initializePlayerActionsRealtimeAtom,
+  getAiChoicesAtom,
+  setAiChoicesAtom,
+  clearAiChoicesAtom
+} from '../atoms/playerActionsAtoms';
 import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
 import EnhancedStoryChoices from '../components/EnhancedStoryChoices';
@@ -54,20 +62,7 @@ export default function StoryScreen() {
   const [showChoices, setShowChoices] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentChoices, setCurrentChoices] = useState<string[]>([
-    'Explore deeper into the forest',
-    'Search for signs of civilization',
-    'Set up camp for the night',
-    'Listen carefully for any sounds',
-    'Cast a detection spell to sense magic',
-    'Use your rope to climb the nearby tree',
-    'Talk to your companions about the situation',
-    'Attack the suspicious rustling in the bushes',
-    'Carefully examine the strange markings on the ground',
-    'Rest here and recover your strength',
-    'Intimidate any potential threats with a show of force',
-    'Use a healing potion to restore health',
-  ]);
+
 
 
 
@@ -84,8 +79,19 @@ export default function StoryScreen() {
   const [, addCampaignMessage] = useAtom(addCampaignMessageAtom);
   const [, updateCampaignReadStatus] = useAtom(updateCampaignReadStatusAtom);
 
+  // Player actions atoms
+  const [playerActions] = useAtom(sortedPlayerActionsAtom);
+  const [, fetchPlayerActions] = useAtom(fetchPlayerActionsAtom);
+  const [, initializePlayerActionsRealtime] = useAtom(initializePlayerActionsRealtimeAtom);
+
+  // AI choices persistence atoms
+  const [getAiChoices] = useAtom(getAiChoicesAtom);
+  const [, setAiChoices] = useAtom(setAiChoicesAtom);
+  const [, clearAiChoices] = useAtom(clearAiChoicesAtom);
+
   const scrollViewRef = useRef<ScrollView>(null);
   const realtimeUnsubscribeRef = useRef<(() => void) | null>(null);
+  const playerActionsUnsubscribeRef = useRef<(() => void) | null>(null);
 
   // Monitor connection health
   useConnectionMonitor();
@@ -142,6 +148,53 @@ export default function StoryScreen() {
       }
     };
   }, [currentCampaign?.uid, fetchCampaignHistory, initializeRealtimeSubscription, clearCampaignHistory, updateCampaignReadStatus]);
+
+  // Load player actions when campaign and user are available
+  useEffect(() => {
+    if (!currentCampaign || !user) return;
+
+    console.log('📋 Loading player actions for campaign:', currentCampaign.uid, 'user:', user.id);
+
+    // Fetch player actions from database
+    fetchPlayerActions({ campaignUid: currentCampaign.uid, userId: user.id });
+
+    // Initialize real-time subscription for player actions
+    const initializePlayerActionsSubscription = async () => {
+      try {
+        // Clean up any existing subscription first
+        if (playerActionsUnsubscribeRef.current) {
+          playerActionsUnsubscribeRef.current();
+          playerActionsUnsubscribeRef.current = null;
+        }
+
+        const unsubscribe = await initializePlayerActionsRealtime({
+          campaignUid: currentCampaign.uid,
+          userId: user.id
+        });
+        playerActionsUnsubscribeRef.current = unsubscribe;
+      } catch (error) {
+        console.error('Error initializing player actions realtime:', error);
+      }
+    };
+
+    initializePlayerActionsSubscription();
+
+    // Log current AI choices for debugging
+    const existingAiChoices = getAiChoices(currentCampaign.uid);
+    console.log('🎯 Existing AI choices for campaign:', existingAiChoices);
+
+    // Cleanup function
+    return () => {
+      if (playerActionsUnsubscribeRef.current) {
+        try {
+          playerActionsUnsubscribeRef.current();
+          playerActionsUnsubscribeRef.current = null;
+        } catch (error) {
+          console.error('Error during player actions subscription cleanup:', error);
+        }
+      }
+    };
+  }, [currentCampaign?.uid, user?.id, fetchPlayerActions, initializePlayerActionsRealtime, getAiChoices]);
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages are added
@@ -201,12 +254,9 @@ export default function StoryScreen() {
         // If campaign is still in 'creation' status, transition it to 'waiting'
         if (currentCampaign.status === 'creation') {
           console.log('🔄 Transitioning campaign from creation to waiting status');
-          // Import upsertCampaignAtom dynamically to avoid circular dependency
-          const { upsertCampaignAtom } = await import('../atoms/campaignAtoms');
-          const [, upsertCampaign] = await import('jotai').then(jotai => [null, jotai.useSetAtom(upsertCampaignAtom)]);
 
-          // Note: We can't use useSetAtom in useEffect, so we'll make the API call directly
-          // This will be handled by the supabase update and the real-time subscription will update our state
+          // Update campaign status directly using Supabase
+          // The real-time subscription will update our state
           const { supabase } = await import('../config/supabase');
           await supabase
             .from('campaigns')
@@ -268,7 +318,9 @@ export default function StoryScreen() {
         });
 
         // Set the choices from the initial story
-        setCurrentChoices(data.choices || []);
+        if (currentCampaign) {
+          setAiChoices({ campaignUid: currentCampaign.uid, choices: data.choices || [] });
+        }
 
         console.log('✅ Initial story generation completed successfully');
 
@@ -398,7 +450,10 @@ export default function StoryScreen() {
 
     setIsLoading(true);
     setError(null);
-    setCurrentChoices([]); // Clear choices while loading
+    // Clear choices while loading
+    if (currentCampaign) {
+      clearAiChoices(currentCampaign.uid);
+    }
 
     try {
       // Determine message type based on input type
@@ -483,13 +538,19 @@ export default function StoryScreen() {
           message_type: 'dm',
         });
 
-        setCurrentChoices(data.choices || []); // Use choices from AI response
+        // Use choices from AI response
+        if (currentCampaign) {
+          setAiChoices({ campaignUid: currentCampaign.uid, choices: data.choices || [] });
+        }
       }
 
     } catch (error) {
       console.error('Error sending player action:', error);
       setError(error instanceof Error ? error.message : 'Failed to get DM response');
-      setCurrentChoices([]); // Clear choices on error
+      // Clear choices on error
+      if (currentCampaign) {
+        clearAiChoices(currentCampaign.uid);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -547,15 +608,34 @@ export default function StoryScreen() {
     );
   }
 
-  // Use dynamic choices from AI or fallback to default choices
-  const choicesToShow = currentChoices.length > 0
-    ? currentChoices
-    : [
-      'Explore deeper into the forest',
-      'Search for signs of civilization',
-      'Set up camp for the night',
-      'Listen carefully for any sounds',
-    ];
+  // Use dynamic choices from AI, database actions, or fallback to defaults
+  const getDatabaseActionChoices = () => {
+    if (!playerActions || playerActions.length === 0) {
+      console.log('🎬 No player actions available');
+      return [];
+    }
+
+    // Filter for current game mode (exploration by default)
+    const currentGameMode = 'exploration';
+    const modeActions = playerActions.filter(action => action.game_mode === currentGameMode);
+
+    // Convert action data to choice strings
+    return modeActions.map(action => action.action_data.title);
+  };
+
+  const databaseChoices = getDatabaseActionChoices();
+  const aiChoices = currentCampaign ? getAiChoices(currentCampaign.uid) : [];
+
+  const choicesToShow = aiChoices.length > 0
+    ? aiChoices // Use AI-generated choices first
+    : databaseChoices.length > 0
+      ? databaseChoices // Use database actions second
+      : [
+        'Explore deeper into the forest',
+        'Search for signs of civilization',
+        'Set up camp for the night',
+        'Listen carefully for any sounds',
+      ]; // Fallback to defaults last
 
   const currentCharacter = getCurrentCharacter();
   const currentInputOption = getCurrentInputOption();

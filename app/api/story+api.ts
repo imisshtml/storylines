@@ -154,32 +154,3 @@ function inferActionType(message: string): string {
 
   return 'other';
 }
-
-// Legacy function kept for any remaining references, but now unused
-function parseStoryResponse(response: string) {
-  const choicesMatch = response.match(/\[CHOICES\](.*?)\[\/CHOICES\]/s);
-
-  if (choicesMatch) {
-    const story = response.split('[CHOICES]')[0].trim();
-    const choicesText = choicesMatch[1].trim();
-    const choices = choicesText
-      .split('\n')
-      .map(line => line.replace(/^\d+\.\s*/, '').trim())
-      .filter(choice => choice.length > 0)
-      .slice(0, 4);
-
-    return { story, choices };
-  }
-
-  return {
-    story: response.trim(),
-    choices: []
-  };
-}
-
-// Legacy function kept for any remaining references, but now unused
-function buildSystemPrompt(context: any) {
-  // This function is now handled by the middleware's PromptBuilder
-  // Keeping for backward compatibility but it's no longer used
-  return '';
-}
