@@ -31,8 +31,6 @@ export default function StoryEventItem({ message }: StoryEventItemProps) {
       case 'player':
         // Show character avatar if available, otherwise default user icon
         if (message.character_avatar && message.character_avatar.trim() !== '') {
-          console.log('📸 Showing avatar for character:', message.character_name, message.character_avatar);
-          
           // Create a mock character object to use with getCharacterAvatarUrl
           const mockCharacter = {
             avatar: message.character_avatar,
@@ -57,7 +55,6 @@ export default function StoryEventItem({ message }: StoryEventItemProps) {
             </View>
           );
         }
-        console.log('👤 No avatar found for character:', message.character_name || 'unknown', 'character_id:', message.character_id);
         return <User size={24} color="#4CAF50" />;
       case 'system':
         return <Info size={24} color="#2196F3" />;
