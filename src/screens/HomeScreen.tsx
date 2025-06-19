@@ -819,7 +819,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   campaignButton: {
-    backgroundColor: 'rgba(156, 39, 176, 0.9)',
+    backgroundColor: 'rgba(33, 150, 243, 0.9)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
