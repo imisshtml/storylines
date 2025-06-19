@@ -291,8 +291,11 @@ export default function CharacterViewScreen() {
 
   const hasSpellcasting = () => {
     // Check if the character's class supports spellcasting by looking at spells
-    return (character?.spells && character.spells.length > 0) || false;
+    const spellClasses = ['Bard', 'Cleric', 'Druid', 'Paladin', 'Ranger', 'Sorcerer', 'Warlock', 'Wizard'];
+    return spellClasses.includes(character?.class!) || false;
   };
+
+  const no1stLvlSpells = (character?.class === 'Paladin' || character?.class === 'Ranger') && character?.level === 1;
 
   const getAvailableTabs = () => {
     const tabs = [
@@ -365,7 +368,7 @@ export default function CharacterViewScreen() {
   };
 
   const canEditSpells = () => {
-    return !isCampaignStarted();
+    return !isCampaignStarted() && !no1stLvlSpells;
   };
 
   const canShopEquipment = () => {
@@ -1278,7 +1281,9 @@ export default function CharacterViewScreen() {
                 </View>
               ) : (
                 <View style={styles.noSpellsContainer}>
-                  <Text style={styles.noSpellsText}>No spells selected</Text>
+                  <Text style={styles.noSpellsText}>
+                    {no1stLvlSpells ? 'You do not have 1st level spells' : 'No spells selected'}
+                  </Text>
                   {canEditSpells() && (
                     <TouchableOpacity
                       style={styles.addSpellsButton}
