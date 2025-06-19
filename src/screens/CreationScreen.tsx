@@ -409,9 +409,21 @@ export default function CreationScreen() {
   };
 
   const loadRaceTraits = async (race: Race) => {
-    // For now, we'll use the traits from the race object
-    // In the future, this could be expanded to load from a traits table
-    setRaceTraits(race.traits || []);
+    try {
+      // Load traits from database based on race
+      const { data: traits, error } = await supabase
+        .from('traits')
+        .select('*')
+        .eq('race_index', race.index)
+        .order('name');
+
+      if (error) throw error;
+      setRaceTraits(traits || []);
+    } catch (error) {
+      console.error('Error loading race traits:', error);
+      // Fallback to traits from race object if database fails
+      setRaceTraits(race.traits || []);
+    }
   };
 
   const getAbilityBonus = (abilityName: string) => {
@@ -1664,11 +1676,14 @@ export default function CreationScreen() {
                         <ChevronDown size={16} color="#4CAF50" />
                       )}
                     </View>
-                    {expandedTraits.has(trait.index || `trait-${index}`) && trait.desc && (
+                    {expandedTraits.has(trait.index || `trait-${index}`) && trait.description && (
                       <View style={styles.featureDetails}>
-                        {trait.desc.map((desc: string, i: number) => (
-                          <Text key={i} style={styles.modalText}>{desc}</Text>
-                        ))}
+                        {Array.isArray(trait.description) 
+                          ? trait.description.map((desc: string, i: number) => (
+                              <Text key={i} style={styles.modalText}>{desc}</Text>
+                            ))
+                          : <Text style={styles.modalText}>{trait.description}</Text>
+                        }
                       </View>
                     )}
                   </TouchableOpacity>
