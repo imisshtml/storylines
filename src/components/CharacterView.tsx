@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Shield, Swords, Brain, Heart, Footprints, Star, Package, BookOpen, Medal, Scroll, Sword, Sparkles, Zap, ChevronUp, ChevronDown } from 'lucide-react-native';
+import { Shield, Swords, Brain, Heart, Footprints, Star, Package, BookOpen, Medal, Scroll, Sword, Sparkles, Zap, ChevronUp, ChevronDown, Moon } from 'lucide-react-native';
 import { Character, type DnDAbilities, isTwoHandedWeapon } from '../atoms/characterAtoms';
 import { supabase } from '../config/supabase';
+import SpellSlotTracker from './SpellSlotTracker';
+import AbilityUsageTracker from './AbilityUsageTracker';
 
 type CoreStat = {
   name: string;
@@ -346,6 +348,111 @@ export default function CharacterView({ character }: CharacterViewProps) {
   // Get spells from character data
   const spells: Spell[] = character.spells || [];
 
+  // Usage tracking handlers
+  const handleUseSpellSlot = async (level: number) => {
+    if (!character) return;
+    
+    try {
+      const currentUsed = character.spell_slots_used?.[level.toString()] || 0;
+      const maxSlots = character.spell_slots_max?.[level.toString()] || 0;
+      
+      if (currentUsed >= maxSlots) return; // Already at max
+      
+      const newUsed = { ...character.spell_slots_used, [level.toString()]: currentUsed + 1 };
+      
+      const { error } = await supabase
+        .from('characters')
+        .update({ spell_slots_used: newUsed })
+        .eq('id', character.id);
+        
+      if (error) throw error;
+      
+      // Update local state would need to be handled by parent component
+      console.log(`Used level ${level} spell slot`);
+    } catch (error) {
+      console.error('Error using spell slot:', error);
+    }
+  };
+
+  const handleRestoreSpellSlot = async (level: number) => {
+    if (!character) return;
+    
+    try {
+      const currentUsed = character.spell_slots_used?.[level.toString()] || 0;
+      
+      if (currentUsed <= 0) return; // Already at min
+      
+      const newUsed = { ...character.spell_slots_used, [level.toString()]: Math.max(0, currentUsed - 1) };
+      
+      const { error } = await supabase
+        .from('characters')
+        .update({ spell_slots_used: newUsed })
+        .eq('id', character.id);
+        
+      if (error) throw error;
+      
+      console.log(`Restored level ${level} spell slot`);
+    } catch (error) {
+      console.error('Error restoring spell slot:', error);
+    }
+  };
+
+  const handleUseAbility = async (abilityKey: string, type: 'feature' | 'trait') => {
+    if (!character) return;
+    
+    try {
+      const usesField = type === 'feature' ? 'feature_uses' : 'trait_uses';
+      const currentUses = character[usesField] || {};
+      const abilityUse = currentUses[abilityKey];
+      
+      if (!abilityUse || abilityUse.used >= abilityUse.max) return;
+      
+      const newUses = {
+        ...currentUses,
+        [abilityKey]: { ...abilityUse, used: abilityUse.used + 1 }
+      };
+      
+      const { error } = await supabase
+        .from('characters')
+        .update({ [usesField]: newUses })
+        .eq('id', character.id);
+        
+      if (error) throw error;
+      
+      console.log(`Used ${type} ability: ${abilityKey}`);
+    } catch (error) {
+      console.error('Error using ability:', error);
+    }
+  };
+
+  const handleRestoreAbility = async (abilityKey: string, type: 'feature' | 'trait') => {
+    if (!character) return;
+    
+    try {
+      const usesField = type === 'feature' ? 'feature_uses' : 'trait_uses';
+      const currentUses = character[usesField] || {};
+      const abilityUse = currentUses[abilityKey];
+      
+      if (!abilityUse || abilityUse.used <= 0) return;
+      
+      const newUses = {
+        ...currentUses,
+        [abilityKey]: { ...abilityUse, used: Math.max(0, abilityUse.used - 1) }
+      };
+      
+      const { error } = await supabase
+        .from('characters')
+        .update({ [usesField]: newUses })
+        .eq('id', character.id);
+        
+      if (error) throw error;
+      
+      console.log(`Restored ${type} ability: ${abilityKey}`);
+    } catch (error) {
+      console.error('Error restoring ability:', error);
+    }
+  };
+
   const renderCombatStats = () => (
     <View style={styles.combatStatsGrid}>
       {combatStats.map((stat, index) => (
@@ -383,118 +490,93 @@ export default function CharacterView({ character }: CharacterViewProps) {
 
   const renderFeatures = () => (
     <View style={styles.featuresList}>
-      {/* Racial Traits */}
-      {characterTraits.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Racial Traits</Text>
-          <View style={styles.traitsList}>
-            {characterTraits.map((trait, index) => {
-              const traitKey = trait.index || `trait-${index}`;
-              const isExpanded = expandedTraits.has(traitKey);
+      {/* Features with Usage Tracking */}
+      <AbilityUsageTracker
+        character={character}
+        abilities={characterFeatures
+          .filter(feature => feature.level <= character.level && feature.uses_per_rest)
+          .map(feature => ({
+            key: feature.index || feature.name.toLowerCase().replace(/\s+/g, '-'),
+            name: feature.name,
+            type: 'feature' as const,
+            description: feature.usage_description || feature.description
+          }))}
+        onUseAbility={handleUseAbility}
+        onRestoreAbility={handleRestoreAbility}
+      />
 
-              return (
+      {/* Features List */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Class Features</Text>
+        <View style={styles.traitsList}>
+          {characterFeatures
+            .filter(feature => feature.level <= character.level)
+            .map((feature, index) => (
+              <View key={index} style={styles.traitItem}>
                 <TouchableOpacity
-                  key={traitKey}
-                  style={styles.traitItem}
-                  onPress={() => toggleTraitExpanded(traitKey)}
+                  style={styles.traitHeader}
+                  onPress={() => toggleFeatureExpanded(`${feature.index}-${index}`)}
                 >
-                  <View style={styles.traitHeader}>
-                    <Text style={styles.traitName}>{trait.name}</Text>
-                    {isExpanded ? (
-                      <ChevronUp size={20} color="#4CAF50" />
-                    ) : (
-                      <ChevronDown size={20} color="#4CAF50" />
-                    )}
+                  <View style={styles.traitInfo}>
+                    <Text style={styles.traitName}>{feature.name}</Text>
+                    <Text style={styles.traitSource}>Level {feature.level}</Text>
                   </View>
-                  {isExpanded && trait.description && (
-                    <View style={styles.traitDetails}>
-                      {Array.isArray(trait.description) 
-                        ? trait.description.map((desc: string, i: number) => (
-                            <Text key={i} style={styles.traitDescription}>{desc}</Text>
-                          ))
-                        : <Text style={styles.traitDescription}>{trait.description}</Text>
-                      }
-                    </View>
+                  {expandedFeatures.has(`${feature.index}-${index}`) ? (
+                    <ChevronUp size={20} color="#4CAF50" />
+                  ) : (
+                    <ChevronDown size={20} color="#666" />
                   )}
                 </TouchableOpacity>
-              );
-            })}
-          </View>
+                {expandedFeatures.has(`${feature.index}-${index}`) && (
+                  <Text style={styles.traitDescription}>{feature.description}</Text>
+                )}
+              </View>
+            ))}
         </View>
-      )}
+      </View>
 
-      {/* Class Features */}
-      {characterFeatures.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Class Features</Text>
-          <View style={styles.classFeaturesList}>
-            {characterFeatures.map((feature, index) => {
-              const isExpanded = expandedFeatures.has(feature.index);
-              const isAvailable = feature.level <= character.level;
+      {/* Traits with Usage Tracking */}
+      <AbilityUsageTracker
+        character={character}
+        abilities={characterTraits
+          .filter(trait => trait.uses_per_rest)
+          .map(trait => ({
+            key: trait.index || trait.name.toLowerCase().replace(/\s+/g, '-'),
+            name: trait.name,
+            type: 'trait' as const,
+            description: trait.usage_description || trait.description
+          }))}
+        onUseAbility={handleUseAbility}
+        onRestoreAbility={handleRestoreAbility}
+      />
 
-              return (
-                <TouchableOpacity
-                  key={feature.index}
-                  style={[
-                    styles.featureItem,
-                    !isAvailable && styles.featureItemDisabled
-                  ]}
-                  onPress={() => toggleFeatureExpanded(feature.index)}
-                >
-                  <View style={styles.featureHeader}>
-                    <View style={styles.featureHeaderLeft}>
-                      <Text style={[
-                        styles.featureName,
-                        !isAvailable && styles.featureNameDisabled
-                      ]}>
-                        {feature.name}
-                      </Text>
-                      <Text style={[
-                        styles.featureLevel,
-                        !isAvailable && styles.featureLevelDisabled
-                      ]}>
-                        Level {feature.level}{!isAvailable ? ' (Not Available)' : ''}
-                      </Text>
-                    </View>
-                    {isExpanded ? (
-                      <ChevronUp size={20} color={isAvailable ? "#4CAF50" : "#666"} />
-                    ) : (
-                      <ChevronDown size={20} color={isAvailable ? "#4CAF50" : "#666"} />
-                    )}
-                  </View>
-                  {isExpanded && (
-                    <View style={styles.featureDetails}>
-                      {feature.prerequisites && feature.prerequisites.length > 0 && (
-                        <View style={styles.featurePrerequisites}>
-                          <Text style={styles.featurePrerequisitesTitle}>Prerequisites:</Text>
-                          {feature.prerequisites.map((req: string, i: number) => (
-                            <Text key={i} style={styles.featurePrerequisite}>• {req}</Text>
-                          ))}
-                        </View>
-                      )}
-                      {feature.description && feature.description.map((desc: string, i: number) => (
-                        <Text key={i} style={[
-                          styles.featureDescription,
-                          !isAvailable && styles.featureDescriptionDisabled
-                        ]}>
-                          {desc}
-                        </Text>
-                      ))}
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+      {/* Traits List */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Racial Traits</Text>
+        <View style={styles.traitsList}>
+          {characterTraits.map((trait, index) => (
+            <View key={index} style={styles.traitItem}>
+              <TouchableOpacity
+                style={styles.traitHeader}
+                onPress={() => toggleTraitExpanded(`${trait.index}-${index}`)}
+              >
+                <View style={styles.traitInfo}>
+                  <Text style={styles.traitName}>{trait.name}</Text>
+                  <Text style={styles.traitSource}>{character.race}</Text>
+                </View>
+                {expandedTraits.has(`${trait.index}-${index}`) ? (
+                  <ChevronUp size={20} color="#4CAF50" />
+                ) : (
+                  <ChevronDown size={20} color="#666" />
+                )}
+              </TouchableOpacity>
+              {expandedTraits.has(`${trait.index}-${index}`) && (
+                <Text style={styles.traitDescription}>{trait.description}</Text>
+              )}
+            </View>
+          ))}
         </View>
-      )}
-
-      {/* Show message if no features loaded */}
-      {characterFeatures.length === 0 && (!character.traits || character.traits.length === 0) && (
-        <View style={styles.emptySection}>
-          <Text style={styles.emptySectionText}>No traits or features available</Text>
-        </View>
-      )}
+      </View>
     </View>
   );
 
@@ -657,45 +739,107 @@ export default function CharacterView({ character }: CharacterViewProps) {
     );
   };
 
-  const renderSpells = () => (
-    <View style={styles.spellsList}>
-      {spells.length === 0 ? (
-        <View style={styles.emptySection}>
-          <Text style={styles.emptySectionText}>No spells known</Text>
+  const renderSpells = () => {
+    // Check if this is a half-caster at level 1
+    const isHalfCaster = character.class === 'Paladin' || character.class === 'Ranger';
+    const isLevel1 = character.level === 1;
+    const hasSpellSlots = character.spell_slots_max && Object.values(character.spell_slots_max).some(slots => slots > 0);
+    
+    // Debug info - remove this after fixing
+    console.log('Spells debug:', {
+      class: character.class,
+      level: character.level,
+      isHalfCaster,
+      isLevel1,
+      hasSpellSlots,
+      spell_slots_max: character.spell_slots_max,
+      spellsLength: spells.length
+    });
+    
+    return (
+      <View style={styles.spellsList}>
+        {/* Debug info - remove this after fixing */}
+        <View style={styles.halfCasterNotice}>
+          <Text style={styles.halfCasterTitle}>Debug Info</Text>
+          <Text style={styles.halfCasterDescription}>
+            Class: {character.class} | Level: {character.level}
+            {'\n'}Half-caster: {isHalfCaster ? 'Yes' : 'No'}
+            {'\n'}Level 1: {isLevel1 ? 'Yes' : 'No'}
+            {'\n'}Has spell slots: {hasSpellSlots ? 'Yes' : 'No'}
+            {'\n'}Spells count: {spells.length}
+          </Text>
         </View>
-      ) : (
-        spells.map((spell, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.spellItem}
-            onPress={() => setExpandedSpell(expandedSpell === spell.name ? null : spell.name)}
-          >
-            <View style={styles.spellHeader}>
-              <Text style={styles.spellName}>
-                {spell.name} ({spell.level === 0 ? 'c' : spell.level})
-              </Text>
-            </View>
-            {expandedSpell === spell.name ? (
-              <View style={styles.spellDetails}>
-                <Text style={styles.spellSchool}>{spell.school?.name || 'Unknown School'}</Text>
-                <Text style={styles.spellProperty}>Casting Time: {spell.casting_time}</Text>
-                <Text style={styles.spellProperty}>Range: {spell.range}</Text>
-                <Text style={styles.spellProperty}>Components: {spell.components?.join(', ') || 'None'}</Text>
-                <Text style={styles.spellProperty}>Duration: {spell.duration}</Text>
-                {spell.description && spell.description.map((desc, i) => (
-                  <Text key={i} style={styles.spellDescription}>{desc}</Text>
-                ))}
+        
+        {/* Show informative message for half-casters at level 1 */}
+        {isHalfCaster && isLevel1 && !hasSpellSlots && (
+          <View style={styles.halfCasterNotice}>
+            <Text style={styles.halfCasterTitle}>Spellcasting Unlocks at Level 2</Text>
+            <Text style={styles.halfCasterDescription}>
+              {character.class}s are half-casters who begin their magical journey at 2nd level. 
+              You will gain spell slots and the ability to cast spells when you reach level 2.
+            </Text>
+            <Text style={styles.halfCasterDetails}>
+              At level 2, you will gain:
+              {'\n'}• 2 first-level spell slots
+              {'\n'}• Access to {character.class.toLowerCase()} spells
+              {character.class === 'Paladin' 
+                ? '\n• Divine magic focused on protection and smiting'
+                : '\n• Nature magic for tracking and survival'
+              }
+            </Text>
+          </View>
+        )}
+
+        {/* Spell Slot Tracker - only show if character has spell slots */}
+        {hasSpellSlots && (
+          <SpellSlotTracker
+            character={character}
+            onUseSpellSlot={handleUseSpellSlot}
+            onRestoreSpellSlot={handleRestoreSpellSlot}
+          />
+        )}
+        
+        {/* Spells List */}
+        {spells.length === 0 && !isHalfCaster ? (
+          <View style={styles.emptySection}>
+            <Text style={styles.emptySectionText}>No spells known</Text>
+          </View>
+        ) : spells.length > 0 ? (
+          spells.map((spell, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.spellItem}
+              onPress={() => setExpandedSpell(expandedSpell === spell.name ? null : spell.name)}
+            >
+              <View style={styles.spellHeader}>
+                <Text style={styles.spellName}>
+                  {spell.name} ({spell.level === 0 ? 'c' : spell.level})
+                </Text>
               </View>
-            ) : (
-              <Text style={styles.spellPreview} numberOfLines={1}>
-                {spell.description?.[0] || 'No description available'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        ))
-      )}
-    </View>
-  );
+              {expandedSpell === spell.name ? (
+                <View style={styles.spellDetails}>
+                  <Text style={styles.spellSchool}>{spell.school?.name || 'Unknown School'}</Text>
+                  <Text style={styles.spellProperty}>Casting Time: {spell.casting_time}</Text>
+                  <Text style={styles.spellProperty}>Range: {spell.range}</Text>
+                  <Text style={styles.spellProperty}>Components: {spell.components?.join(', ') || 'None'}</Text>
+                  <Text style={styles.spellProperty}>Duration: {spell.duration}</Text>
+                  {spell.description && spell.description.map((desc, i) => (
+                    <Text key={i} style={styles.spellDescription}>{desc}</Text>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.spellPreview} numberOfLines={1}>
+                  {spell.description?.[0] || 'No description available'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          ))
+        ) : null}
+      </View>
+    );
+  };
+
+
 
   return (
     <View style={styles.container}>
@@ -708,11 +852,11 @@ export default function CharacterView({ character }: CharacterViewProps) {
           <Medal size={24} color={activeTab === 'stats' ? '#4CAF50' : '#666'} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'equipment' && styles.activeTab]}
-          onPress={() => setActiveTab('equipment')}
+          style={[styles.tab, activeTab === 'features' && styles.activeTab]}
+          onPress={() => setActiveTab('features')}
           activeOpacity={0.7}
         >
-          <Sword size={24} color={activeTab === 'equipment' ? '#4CAF50' : '#666'} />
+          <BookOpen size={24} color={activeTab === 'features' ? '#4CAF50' : '#666'} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'spells' && styles.activeTab]}
@@ -722,11 +866,11 @@ export default function CharacterView({ character }: CharacterViewProps) {
           <Scroll size={24} color={activeTab === 'spells' ? '#4CAF50' : '#666'} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'features' && styles.activeTab]}
-          onPress={() => setActiveTab('features')}
+          style={[styles.tab, activeTab === 'equipment' && styles.activeTab]}
+          onPress={() => setActiveTab('equipment')}
           activeOpacity={0.7}
         >
-          <BookOpen size={24} color={activeTab === 'features' ? '#4CAF50' : '#666'} />
+          <Sword size={24} color={activeTab === 'equipment' ? '#4CAF50' : '#666'} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'inventory' && styles.activeTab]}
@@ -735,6 +879,7 @@ export default function CharacterView({ character }: CharacterViewProps) {
         >
           <Package size={24} color={activeTab === 'inventory' ? '#4CAF50' : '#666'} />
         </TouchableOpacity>
+
       </View>
 
       <ScrollView style={styles.content}>
@@ -911,13 +1056,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  traitInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   traitName: {
     fontSize: 16,
     color: '#1a1a1a',
     fontFamily: 'Inter-Bold',
   },
-  traitDetails: {
-    marginTop: 8,
+  traitSource: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Inter-Regular',
   },
   traitDescription: {
     fontSize: 14,
@@ -925,74 +1077,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     marginTop: 8,
     lineHeight: 20,
-  },
-  classFeaturesList: {
-    gap: 12,
-  },
-  featureItem: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  featureItemDisabled: {
-    backgroundColor: '#f0f0f0',
-  },
-  featureHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  featureHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  featureName: {
-    fontSize: 16,
-    color: '#1a1a1a',
-    fontFamily: 'Inter-Bold',
-  },
-  featureNameDisabled: {
-    color: '#666',
-  },
-  featureLevel: {
-    fontSize: 14,
-    color: '#666',
-    fontFamily: 'Inter-Regular',
-  },
-  featureLevelDisabled: {
-    color: '#999',
-  },
-  featureDetails: {
-    marginTop: 8,
-  },
-  featurePrerequisites: {
-    marginBottom: 8,
-  },
-  featurePrerequisitesTitle: {
-    fontSize: 14,
-    color: '#4CAF50',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 4,
-  },
-  featurePrerequisite: {
-    fontSize: 14,
-    color: '#666',
-    fontFamily: 'Inter-Regular',
-  },
-  featureDescription: {
-    fontSize: 14,
-    color: '#666',
-    fontFamily: 'Inter-Regular',
-    lineHeight: 20,
-  },
-  featureDescriptionDisabled: {
-    color: '#999',
   },
   inventoryList: {
     gap: 8,
@@ -1211,4 +1295,37 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
   },
+  halfCasterNotice: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  halfCasterTitle: {
+    fontSize: 18,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  halfCasterDescription: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 12,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  halfCasterDetails: {
+    fontSize: 14,
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+    lineHeight: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+  },
+
 });

@@ -83,6 +83,21 @@ export type EquippedItems = {
 
 export type EquipmentSlot = 'armor' | 'leftHand' | 'rightHand' | 'rings' | 'head' | 'necklace' | 'boots' | 'gloves';
 
+export type SpellSlots = {
+  [level: string]: number; // e.g., {"1": 4, "2": 3, "3": 2}
+};
+
+export type AbilityUse = {
+  used: number;
+  max: number;
+  resets_on: 'short' | 'long' | 'none';
+  description?: string;
+};
+
+export type AbilityUses = {
+  [abilityKey: string]: AbilityUse;
+};
+
 export type Character = {
   id: string;
   user_id: string;
@@ -111,6 +126,15 @@ export type Character = {
   features?: any[];
   saving_throws?: any[];
   proficiency?: any[];
+  // Usage tracking fields
+  spell_slots_used?: SpellSlots;
+  spell_slots_max?: SpellSlots;
+  feature_uses?: AbilityUses;
+  trait_uses?: AbilityUses;
+  short_rest_recharge?: AbilityUses;
+  long_rest_recharge?: AbilityUses;
+  last_short_rest?: string;
+  last_long_rest?: string;
   created_at?: string;
   updated_at?: string;
 };
@@ -767,5 +791,119 @@ export const getSlotDisplayName = (slot: EquipmentSlot): string => {
     case 'boots': return 'Boots';
     case 'gloves': return 'Gloves';
     default: return slot;
+  }
+};
+
+// Spell slot management functions
+export const getSpellSlotsUsed = (character: Character, level: number): number => {
+  return character.spell_slots_used?.[level.toString()] || 0;
+};
+
+export const getSpellSlotsMax = (character: Character, level: number): number => {
+  return character.spell_slots_max?.[level.toString()] || 0;
+};
+
+export const getSpellSlotsRemaining = (character: Character, level: number): number => {
+  const max = getSpellSlotsMax(character, level);
+  const used = getSpellSlotsUsed(character, level);
+  return Math.max(0, max - used);
+};
+
+export const canCastSpell = (character: Character, spellLevel: number): boolean => {
+  // Check if character has any spell slots of this level or higher available
+  for (let level = spellLevel; level <= 9; level++) {
+    if (getSpellSlotsRemaining(character, level) > 0) {
+      return true;
+    }
+  }
+  return false;
+};
+
+// Feature and trait usage functions
+export const getAbilityUses = (character: Character, abilityKey: string, type: 'feature' | 'trait'): AbilityUse | null => {
+  const uses = type === 'feature' ? character.feature_uses : character.trait_uses;
+  return uses?.[abilityKey] || null;
+};
+
+export const canUseAbility = (character: Character, abilityKey: string, type: 'feature' | 'trait'): boolean => {
+  const abilityUse = getAbilityUses(character, abilityKey, type);
+  if (!abilityUse) return true; // If not tracked, assume it can be used
+  return abilityUse.used < abilityUse.max;
+};
+
+export const getAbilityUsesRemaining = (character: Character, abilityKey: string, type: 'feature' | 'trait'): number => {
+  const abilityUse = getAbilityUses(character, abilityKey, type);
+  if (!abilityUse) return Infinity; // If not tracked, unlimited uses
+  return Math.max(0, abilityUse.max - abilityUse.used);
+};
+
+// Rest requirement checking
+export const needsShortRest = (character: Character): boolean => {
+  // Check if any short rest abilities are used up
+  const featureUses = character.feature_uses || {};
+  const traitUses = character.trait_uses || {};
+  
+  for (const ability of Object.values(featureUses)) {
+    if (ability.resets_on === 'short' && ability.used >= ability.max) {
+      return true;
+    }
+  }
+  
+  for (const ability of Object.values(traitUses)) {
+    if (ability.resets_on === 'short' && ability.used >= ability.max) {
+      return true;
+    }
+  }
+  
+  return false;
+};
+
+export const needsLongRest = (character: Character): boolean => {
+  // Check if any long rest abilities are used up or spell slots are used
+  const spellSlotsUsed = character.spell_slots_used || {};
+  const featureUses = character.feature_uses || {};
+  const traitUses = character.trait_uses || {};
+  
+  // Check spell slots
+  for (const [level, used] of Object.entries(spellSlotsUsed)) {
+    if (used > 0) return true;
+  }
+  
+  // Check long rest abilities
+  for (const ability of Object.values(featureUses)) {
+    if (ability.resets_on === 'long' && ability.used >= ability.max) {
+      return true;
+    }
+  }
+  
+  for (const ability of Object.values(traitUses)) {
+    if (ability.resets_on === 'long' && ability.used >= ability.max) {
+      return true;
+    }
+  }
+  
+  return false;
+};
+
+// Rest functions (to be called with database updates)
+export const performShortRest = async (characterId: string) => {
+  const { error } = await supabase.rpc('perform_short_rest', {
+    character_id: characterId
+  });
+  
+  if (error) {
+    console.error('Error performing short rest:', error);
+    throw error;
+  }
+};
+
+export const performLongRest = async (characterId: string) => {
+  const { error } = await supabase.rpc('perform_long_rest', {
+    character_id: characterId
+  });
+  
+  if (error) {
+    console.error('Error performing long rest:', error);
+    throw error;
   }
 };

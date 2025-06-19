@@ -53,9 +53,9 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
   try {
     const startTime = Date.now();
     
-    // Create a promise that rejects after timeout
+    // Create a promise that rejects after timeout (increased to 10 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Connection timeout')), 5000);
+      setTimeout(() => reject(new Error('Connection timeout')), 10000);
     });
     
     const queryPromise = supabase
@@ -72,13 +72,14 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
       return false;
     }
     
-    // Consider slow responses as potential connection issues
-    if (responseTime > 10000) { // 10 seconds
+    // Consider slow responses as potential connection issues (increased threshold)
+    if (responseTime > 15000) { // 15 seconds
       console.warn('Connection check slow:', responseTime, 'ms');
       return false;
     }
     
     lastConnectionCheck = Date.now();
+    console.log(`Connection check successful (${responseTime}ms)`);
     return true;
   } catch (error) {
     console.error('Connection check failed:', error);
@@ -186,12 +187,23 @@ export const startConnectionMonitoring = (interval: number = 60000): void => {
     clearInterval(connectionCheckInterval);
   }
   
+  console.log(`Starting connection monitoring with ${interval/1000}s interval`);
+  
   connectionCheckInterval = setInterval(async () => {
     try {
+      // Skip check if already reconnecting
+      if (isReconnecting) {
+        console.log('Periodic check: Reconnection in progress, skipping check');
+        return;
+      }
+      
+      console.log('Periodic connection check...');
       const isConnected = await checkSupabaseConnection();
       if (!isConnected) {
         console.log('Periodic check: Connection lost, attempting to refresh...');
         await refreshSupabaseConnection();
+      } else {
+        console.log('Periodic check: Connection healthy');
       }
     } catch (error) {
       console.error('Error in periodic connection check:', error);
