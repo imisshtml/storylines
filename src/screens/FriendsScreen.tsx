@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   SafeAreaView,
   TextInput,
-  ActivityIndicator,
   Modal,
   Platform,
   StatusBar,
@@ -49,10 +48,11 @@ import {
   sendCampaignInvitationAtom,
   respondToCampaignInvitationAtom,
   type Friendship,
-  type UserProfile,
 } from '../atoms/friendsAtoms';
 import { useCustomAlert } from '../components/CustomAlert';
 import { supabase } from '../config/supabase';
+import ActivityIndicator from '../components/ActivityIndicator';
+import { useLoading } from '../hooks/useLoading';
 
 type TabType = 'friends' | 'requests' | 'invitations' | 'search';
 
@@ -79,12 +79,12 @@ export default function FriendsScreen() {
   const [, setUserSearchResults] = useAtom(userSearchResultsAtom);
 
   const { showAlert } = useCustomAlert();
+  const { isLoading, withLoading } = useLoading();
 
   const [activeTab, setActiveTab] = useState<TabType>('friends');
   const [searchQuery, setSearchQuery] = useState('');
   const [showCampaignInviteModal, setShowCampaignInviteModal] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<Friendship | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
   const sentRef = useRef(false);
   const [sentInvitations, setSentInvitations] = useState<any[]>([]);
@@ -113,13 +113,23 @@ export default function FriendsScreen() {
 
   useEffect(() => {
     if (user) {
-      fetchFriends();
-      fetchRequestsReceived();
-      fetchRequestsSent();
-      fetchInvitations();
-      fetchSentInvitations();
+      const loadInitialData = async () => {
+        try {
+          await Promise.all([
+            fetchFriends(),
+            fetchRequestsReceived(),
+            fetchRequestsSent(),
+            fetchInvitations(),
+            fetchSentInvitations()
+          ]);
+        } catch (error) {
+          console.error('Error loading initial data:', error);
+        }
+      };
+      
+      withLoading(loadInitialData, 'initialLoad')();
     }
-  }, [user, fetchFriends, fetchRequestsReceived, fetchRequestsSent, fetchInvitations]);
+  }, [user, fetchFriends, fetchRequestsReceived, fetchRequestsSent, fetchInvitations, withLoading]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -143,45 +153,42 @@ export default function FriendsScreen() {
     sentRef.current = true;
     console.log('[handleSendFriendRequest] called with', targetUserId);
     try {
-      setIsLoading(true);
-      console.log('[handleSendFriendRequest] setIsLoading(true)');
-      await sendFriendRequest(targetUserId);
-      console.log('[handleSendFriendRequest] sendFriendRequest resolved');
-      showAlert('Friend Request Sent', 'Your friend request has been sent successfully!', undefined, 'success');
-      console.log('[handleSendFriendRequest] showAlert called (success)');
-      setTimeout(() => {
-        setSearchQuery('');
-        setUserSearchResults([]);
-        if (searchInputRef.current) {
-          searchInputRef.current.blur();
-        }
-        sentRef.current = false;
-        console.log('[handleSendFriendRequest] setSearchQuery("") and blur input, sentRef reset');
-      }, 1500);
+      await withLoading(async () => {
+        console.log('[handleSendFriendRequest] sendFriendRequest called');
+        await sendFriendRequest(targetUserId);
+        console.log('[handleSendFriendRequest] sendFriendRequest resolved');
+        showAlert('Friend Request Sent', 'Your friend request has been sent successfully!', undefined, 'success');
+        console.log('[handleSendFriendRequest] showAlert called (success)');
+        setTimeout(() => {
+          setSearchQuery('');
+          setUserSearchResults([]);
+          if (searchInputRef.current) {
+            searchInputRef.current.blur();
+          }
+          sentRef.current = false;
+          console.log('[handleSendFriendRequest] setSearchQuery("") and blur input, sentRef reset');
+        }, 1500);
+      }, 'sendFriendRequest')();
     } catch (error) {
       showAlert('Error', 'Failed to send friend request. Please try again.', undefined, 'error');
       console.log('[handleSendFriendRequest] showAlert called (error)', error);
       sentRef.current = false;
-    } finally {
-      setIsLoading(false);
-      console.log('[handleSendFriendRequest] setIsLoading(false)');
     }
   };
 
   const handleRespondToFriendRequest = async (friendshipId: string, response: 'accepted' | 'rejected') => {
     try {
-      setIsLoading(true);
-      await respondToFriendRequest({ friendshipId, response });
-      showAlert(
-        response === 'accepted' ? 'Friend Request Accepted' : 'Friend Request Rejected',
-        `You have ${response} the friend request.`,
-        undefined,
-        'success'
-      );
+      await withLoading(async () => {
+        await respondToFriendRequest({ friendshipId, response });
+        showAlert(
+          response === 'accepted' ? 'Friend Request Accepted' : 'Friend Request Rejected',
+          `You have ${response} the friend request.`,
+          undefined,
+          'success'
+        );
+      }, 'respondToFriendRequest')();
     } catch (error) {
       showAlert('Error', 'Failed to respond to friend request. Please try again.', undefined, 'error');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -196,13 +203,12 @@ export default function FriendsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              setIsLoading(true);
-              await removeFriend(friendship.id);
-              showAlert('Friend Removed', 'Friend has been removed from your list.', undefined, 'success');
+              await withLoading(async () => {
+                await removeFriend(friendship.id);
+                showAlert('Friend Removed', 'Friend has been removed from your list.', undefined, 'success');
+              }, 'removeFriend')();
             } catch (error) {
               showAlert('Error', 'Failed to remove friend. Please try again.', undefined, 'error');
-            } finally {
-              setIsLoading(false);
             }
           },
         },
@@ -220,54 +226,52 @@ export default function FriendsScreen() {
     if (!selectedFriend) return;
 
     try {
-      setIsLoading(true);
-      await sendCampaignInvitation({
-        campaignId,
-        friendId: selectedFriend.friend_profile!.id,
-      });
-      showAlert(
-        'Campaign Invitation Sent',
-        `Invitation sent to ${selectedFriend.friend_profile?.username}!`,
-        undefined,
-        'success'
-      );
+      await withLoading(async () => {
+        await sendCampaignInvitation({
+          campaignId,
+          friendId: selectedFriend.friend_profile!.id,
+        });
+        showAlert(
+          'Campaign Invitation Sent',
+          `Invitation sent to ${selectedFriend.friend_profile?.username}!`,
+          undefined,
+          'success'
+        );
 
-      // Refresh sent invitations to update pending status
-      fetchSentInvitations();
+        // Refresh sent invitations to update pending status
+        fetchSentInvitations();
 
-      setShowCampaignInviteModal(false);
-      setSelectedFriend(null);
+        setShowCampaignInviteModal(false);
+        setSelectedFriend(null);
+      }, 'sendCampaignInvite')();
     } catch (error) {
       showAlert('Error', 'Failed to send campaign invitation. Please try again.', undefined, 'error');
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handleRespondToCampaignInvitation = async (invitationId: string, response: 'accepted' | 'rejected') => {
     try {
-      setIsLoading(true);
-      await respondToCampaignInvitation({ invitationId, response });
+      await withLoading(async () => {
+        await respondToCampaignInvitation({ invitationId, response });
 
-      if (response === 'accepted') {
-        showAlert(
-          'Campaign Invitation Accepted',
-          'You have joined the campaign! Redirecting to campaign setup...',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.push('/invite'),
-            },
-          ],
-          'success'
-        );
-      } else {
-        showAlert('Campaign Invitation Rejected', 'You have declined the campaign invitation.', undefined, 'success');
-      }
+        if (response === 'accepted') {
+          showAlert(
+            'Campaign Invitation Accepted',
+            'You have joined the campaign! Redirecting to campaign setup...',
+            [
+              {
+                text: 'OK',
+                onPress: () => router.push('/invite'),
+              },
+            ],
+            'success'
+          );
+        } else {
+          showAlert('Campaign Invitation Rejected', 'You have declined the campaign invitation.', undefined, 'success');
+        }
+      }, 'respondToCampaignInvitation')();
     } catch (error) {
       showAlert('Error', 'Failed to respond to campaign invitation. Please try again.', undefined, 'error');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -411,12 +415,14 @@ export default function FriendsScreen() {
                 <TouchableOpacity
                   style={[styles.actionButton, styles.acceptButton]}
                   onPress={() => handleRespondToFriendRequest(request.id, 'accepted')}
+                  disabled={isLoading('respondToFriendRequest')}
                 >
                   <Check size={16} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionButton, styles.rejectButton]}
                   onPress={() => handleRespondToFriendRequest(request.id, 'rejected')}
+                  disabled={isLoading('respondToFriendRequest')}
                 >
                   <X size={16} color="#fff" />
                 </TouchableOpacity>
@@ -495,12 +501,14 @@ export default function FriendsScreen() {
               <TouchableOpacity
                 style={[styles.actionButton, styles.acceptButton]}
                 onPress={() => handleRespondToCampaignInvitation(invitation.id, 'accepted')}
+                disabled={isLoading('respondToCampaignInvitation')}
               >
                 <Check size={16} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionButton, styles.rejectButton]}
                 onPress={() => handleRespondToCampaignInvitation(invitation.id, 'rejected')}
+                disabled={isLoading('respondToCampaignInvitation')}
               >
                 <X size={16} color="#fff" />
               </TouchableOpacity>
@@ -527,10 +535,7 @@ export default function FriendsScreen() {
 
       <ScrollView style={styles.listContainer} showsVerticalScrollIndicator={false}>
         {searchLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#4CAF50" />
-            <Text style={styles.loadingText}>Searching...</Text>
-          </View>
+          <ActivityIndicator isLoading={true} text="Searching..." style={styles.searchLoadingContainer} />
         ) : searchResults.length === 0 && searchQuery.trim() ? (
           <View style={styles.emptyState}>
             <UserX size={48} color="#666" />
@@ -561,9 +566,15 @@ export default function FriendsScreen() {
               <TouchableOpacity
                 style={[styles.actionButton, styles.addButton]}
                 onPress={() => handleSendFriendRequest(userProfile.id)}
-                disabled={isLoading}
+                disabled={isLoading('sendFriendRequest')}
               >
-                <UserPlus size={16} color="#fff" />
+                <ActivityIndicator 
+                  isLoading={isLoading('sendFriendRequest')} 
+                  size="small" 
+                  color="#fff"
+                >
+                  <UserPlus size={16} color="#fff" />
+                </ActivityIndicator>
               </TouchableOpacity>
             </View>
           ))
@@ -588,12 +599,18 @@ export default function FriendsScreen() {
         {renderTabButton('search', 'Search')}
       </View>
 
-      <View style={styles.content}>
-        {activeTab === 'friends' && renderFriendsList()}
-        {activeTab === 'requests' && renderFriendRequests()}
-        {activeTab === 'invitations' && renderCampaignInvitations()}
-        {activeTab === 'search' && renderSearch()}
-      </View>
+      <ActivityIndicator 
+        isLoading={isLoading('initialLoad')} 
+        text="Loading friends data..." 
+        style={styles.content}
+      >
+        <View style={styles.content}>
+          {activeTab === 'friends' && renderFriendsList()}
+          {activeTab === 'requests' && renderFriendRequests()}
+          {activeTab === 'invitations' && renderCampaignInvitations()}
+          {activeTab === 'search' && renderSearch()}
+        </View>
+      </ActivityIndicator>
 
       {/* Campaign Invite Modal */}
       <Modal
@@ -612,48 +629,54 @@ export default function FriendsScreen() {
                 <X size={24} color="#fff" />
               </TouchableOpacity>
             </View>
-            <ScrollView style={styles.modalBody}>
-              {getAvailableCampaigns().length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Crown size={48} color="#666" />
-                  <Text style={styles.emptyStateTitle}>{'No Available Campaigns'}</Text>
-                  <Text style={styles.emptyStateText}>
-                    {"You don't have any campaigns in creation phase to invite friends to."}
-                  </Text>
-                </View>
-              ) : (
-                getAvailableCampaigns().map((campaign) => {
-                  const isPending = selectedFriend?.friend_profile ?
-                    hasPendingInvitation(selectedFriend.friend_profile.id, campaign.uid) :
-                    false;
+            <ActivityIndicator 
+              isLoading={isLoading('sendCampaignInvite')} 
+              text="Sending invitation..." 
+              style={styles.modalBody}
+            >
+              <ScrollView style={styles.modalBody}>
+                {getAvailableCampaigns().length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Crown size={48} color="#666" />
+                    <Text style={styles.emptyStateTitle}>{'No Available Campaigns'}</Text>
+                    <Text style={styles.emptyStateText}>
+                      {"You don't have any campaigns in creation phase to invite friends to."}
+                    </Text>
+                  </View>
+                ) : (
+                  getAvailableCampaigns().map((campaign) => {
+                    const isPending = selectedFriend?.friend_profile ?
+                      hasPendingInvitation(selectedFriend.friend_profile.id, campaign.uid) :
+                      false;
 
-                  return (
-                    <TouchableOpacity
-                      key={campaign.id}
-                      onPress={isPending ? undefined : () => handleSendCampaignInvite(campaign.uid)}
-                      style={[
-                        styles.campaignOption,
-                        isPending && styles.campaignOptionDisabled
-                      ]}
-                      disabled={isPending}
-                    >
-                      <View style={styles.campaignInfo}>
-                        <Text style={styles.campaignName}>{campaign.name}</Text>
-                        <Text style={styles.campaignAdventure}>{campaign.adventure}</Text>
-                      </View>
-                      {isPending ? (
-                        <View style={styles.pendingIndicator}>
-                          <Clock size={16} color="#FFA726" />
-                          <Text style={styles.pendingText}>{'Pending'}</Text>
+                    return (
+                      <TouchableOpacity
+                        key={campaign.id}
+                        onPress={isPending ? undefined : () => handleSendCampaignInvite(campaign.uid)}
+                        style={[
+                          styles.campaignOption,
+                          isPending && styles.campaignOptionDisabled
+                        ]}
+                        disabled={isPending}
+                      >
+                        <View style={styles.campaignInfo}>
+                          <Text style={styles.campaignName}>{campaign.name}</Text>
+                          <Text style={styles.campaignAdventure}>{campaign.adventure}</Text>
                         </View>
-                      ) : (
-                        <ChevronRight size={20} color="#4CAF50" />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </ScrollView>
+                        {isPending ? (
+                          <View style={styles.pendingIndicator}>
+                            <Clock size={16} color="#FFA726" />
+                            <Text style={styles.pendingText}>{'Pending'}</Text>
+                          </View>
+                        ) : (
+                          <ChevronRight size={20} color="#4CAF50" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </ScrollView>
+            </ActivityIndicator>
           </View>
         </View>
       </Modal>
@@ -760,6 +783,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     color: '#fff',
+  },
+  searchLoadingContainer: {
+    padding: 20,
   },
   emptyState: {
     flex: 1,
@@ -963,18 +989,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  loadingContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 20,
-    gap: 8,
-  },
-  loadingText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#888',
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -1004,6 +1018,7 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     padding: 20,
+    flex: 1,
   },
   campaignOption: {
     backgroundColor: '#2a2a2a',

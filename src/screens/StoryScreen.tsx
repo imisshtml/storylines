@@ -11,8 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
-  ActivityIndicator,
-  Alert,
   StatusBar,
 } from 'react-native';
 import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, MessageSquare, Drama, Ear, CircleHelp as HelpCircle } from 'lucide-react-native';
@@ -41,6 +39,8 @@ import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
 import EnhancedStoryChoices from '../components/EnhancedStoryChoices';
 import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
+import ActivityIndicator from '../components/ActivityIndicator';
+import { useLoading } from '../hooks/useLoading';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask';
 
@@ -60,11 +60,8 @@ export default function StoryScreen() {
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
   const [isCharacterSheetVisible, setIsCharacterSheetVisible] = useState(false);
   const [showChoices, setShowChoices] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-
-
+  const { isLoading, startLoading, stopLoading } = useLoading();
 
   // Input type selection
   const [selectedInputType, setSelectedInputType] = useState<InputType>('say');
@@ -225,16 +222,16 @@ export default function StoryScreen() {
         currentCampaign: currentCampaign?.name,
         user: user?.username,
         campaignHistoryLength: campaignHistory.length,
-        isLoading,
+        isLoading: isLoading('initialStory'),
         campaignStatus: currentCampaign?.status
       });
 
-      if (!currentCampaign || !user || campaignHistory.length > 0 || isLoading) {
+      if (!currentCampaign || !user || campaignHistory.length > 0 || isLoading('initialStory')) {
         console.log('🚫 Early return from generateInitialStory:', {
           hasCurrentCampaign: !!currentCampaign,
           hasUser: !!user,
           campaignHistoryLength: campaignHistory.length,
-          isLoading
+          isLoading: isLoading('initialStory')
         });
         return;
       }
@@ -248,7 +245,7 @@ export default function StoryScreen() {
       console.log('🎭 Generating initial story for campaign:', currentCampaign.name);
 
       try {
-        setIsLoading(true);
+        startLoading('initialStory');
         setError(null);
 
         // If campaign is still in 'creation' status, transition it to 'waiting'
@@ -329,7 +326,7 @@ export default function StoryScreen() {
         // Don't show error to user for initial story generation failure
         // Just let them start with the welcome message
       } finally {
-        setIsLoading(false);
+        stopLoading('initialStory');
       }
     };
 
@@ -337,20 +334,7 @@ export default function StoryScreen() {
     const timeoutId = setTimeout(generateInitialStory, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [currentCampaign, user, campaignHistory.length, isLoading, addCampaignMessage]);
-
-  useEffect(() => {
-    // Show error alert if there's an error
-    if (error) {
-      Alert.alert(
-        'Connection Error',
-        'Failed to get response from Dungeon Master. Please check your internet connection and try again.',
-        [
-          { text: 'OK', onPress: () => setError(null) }
-        ]
-      );
-    }
-  }, [error]);
+  }, [currentCampaign, user, campaignHistory.length, isLoading, startLoading, stopLoading, addCampaignMessage, setAiChoices]);
 
   // Get current user's character for this campaign
   const getCurrentCharacter = (): Character | null => {
@@ -448,7 +432,7 @@ export default function StoryScreen() {
       return;
     }
 
-    setIsLoading(true);
+    startLoading('sendAction');
     setError(null);
     // Clear choices while loading
     if (currentCampaign) {
@@ -552,12 +536,12 @@ export default function StoryScreen() {
         clearAiChoices(currentCampaign.uid);
       }
     } finally {
-      setIsLoading(false);
+      stopLoading('sendAction');
     }
   };
 
   const handleSend = async () => {
-    if (!userInput.trim() || isLoading) return;
+    if (!userInput.trim() || isLoading('sendAction')) return;
 
     const action = userInput.trim();
     setUserInput('');
@@ -576,7 +560,7 @@ export default function StoryScreen() {
   };
 
   const handleChoiceSelect = async (choice: string) => {
-    if (isLoading) return;
+    if (isLoading('sendAction')) return;
 
     setShowChoices(false);
     await sendPlayerAction(
@@ -601,10 +585,11 @@ export default function StoryScreen() {
 
   if (!currentCampaign) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingText}>Loading campaign...</Text>
-      </View>
+      <ActivityIndicator 
+        isLoading={true} 
+        fullScreen 
+        text="Loading campaign..."
+      />
     );
   }
 
@@ -685,9 +670,18 @@ export default function StoryScreen() {
               ))
             )}
 
-            {isLoading && (
+            {isLoading('initialStory') && (
               <View style={styles.loadingEvent}>
-                <ActivityIndicator size="small" color="#FFD700" />
+                <ActivityIndicator size="small" color="#FFD700" isLoading={true} />
+                <Text style={styles.loadingEventText}>
+                  The Dungeon Master is preparing your adventure...
+                </Text>
+              </View>
+            )}
+
+            {isLoading('sendAction') && (
+              <View style={styles.loadingEvent}>
+                <ActivityIndicator size="small" color="#FFD700" isLoading={true} />
                 <Text style={styles.loadingEventText}>
                   The Dungeon Master is thinking...
                 </Text>
@@ -703,11 +697,11 @@ export default function StoryScreen() {
               </View>
             )}
 
-            {showChoices && !isLoading && selectedInputType !== 'whisper' && (
+            {showChoices && !isLoading('sendAction') && selectedInputType !== 'whisper' && (
               <EnhancedStoryChoices
                 choices={choicesToShow}
                 onChoiceSelect={handleChoiceSelect}
-                disabled={isLoading}
+                disabled={isLoading('sendAction')}
               />
             )}
           </ScrollView>
@@ -752,18 +746,18 @@ export default function StoryScreen() {
               placeholderTextColor="#666"
               multiline
               maxLength={500}
-              editable={!isLoading}
+              editable={!isLoading('sendAction')}
             />
             <TouchableOpacity
               style={[
                 styles.sendButton,
-                (!userInput.trim() || isLoading) && styles.sendButtonDisabled
+                (!userInput.trim() || isLoading('sendAction')) && styles.sendButtonDisabled
               ]}
               onPress={handleSend}
-              disabled={!userInput.trim() || isLoading}
+              disabled={!userInput.trim() || isLoading('sendAction')}
             >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#666" />
+              {isLoading('sendAction') ? (
+                <ActivityIndicator size="small" color="#666" isLoading={true} />
               ) : (
                 <Forward size={24} color={userInput.trim() ? '#fff' : '#666'} />
               )}
@@ -836,18 +830,6 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-  },
-  loadingText: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    marginTop: 16,
   },
   header: {
     flexDirection: 'row',
