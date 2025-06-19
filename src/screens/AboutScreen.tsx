@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
-  ImageBackground,
   Platform,
   StatusBar,
 } from 'react-native';
@@ -31,7 +30,9 @@ export default function AboutScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.licenseContainer}>
           <Text style={styles.srdNotice}>
-            The Systems Reference Document (SRD 5.1) is released under the Creative Commons Attribution 4.0 International License (CC BY 4.0)
+            {`The Systems Reference Document (SRD 5.1) is released under the Creative Commons Attribution 4.0 International License (CC BY 4.0)`}
+            {`\n\n`}
+            {`This product is not affiliated with, endorsed, or sponsored by Wizards of the Coast.\nIt is compatible with the 5th Edition System Reference Document.`}
           </Text>
 
           <View style={styles.separator} />
