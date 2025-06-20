@@ -145,6 +145,12 @@ export const refreshSupabaseConnection = async (): Promise<void> => {
   
   isReconnecting = true;
   
+  // Set a timeout to ensure isReconnecting doesn't get stuck
+  const timeoutId = setTimeout(() => {
+    console.warn('Reconnection timeout - resetting isReconnecting flag');
+    isReconnecting = false;
+  }, 30000); // 30 second timeout
+  
   try {
     console.log('Refreshing Supabase connection...');
     
@@ -168,16 +174,19 @@ export const refreshSupabaseConnection = async (): Promise<void> => {
     // Test the connection with a simple query
     const connectionTest = await checkSupabaseConnection();
     if (!connectionTest) {
-      throw new Error('Connection test failed after refresh');
+      console.warn('Connection test failed after refresh, but continuing...');
+      // Don't throw here - let the app continue functioning
+    } else {
+      console.log('Supabase connection successfully refreshed and tested');
     }
-    
-    console.log('Supabase connection successfully refreshed and tested');
     
   } catch (error) {
     console.error('Error refreshing connection:', error);
-    throw error;
+    // Don't re-throw the error to prevent blocking the app
   } finally {
+    clearTimeout(timeoutId);
     isReconnecting = false;
+    console.log('Reconnection process completed, flag reset');
   }
 };
 
@@ -220,6 +229,13 @@ export const stopConnectionMonitoring = (): void => {
     connectionCheckInterval = null;
     console.log('Stopped connection monitoring');
   }
+};
+
+// Reset connection state (useful for debugging)
+export const resetConnectionState = (): void => {
+  isReconnecting = false;
+  lastConnectionCheck = Date.now();
+  console.log('Connection state reset');
 };
 
 // Enhanced operation wrapper with user-friendly error messages
