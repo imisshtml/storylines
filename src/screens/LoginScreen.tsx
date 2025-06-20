@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backgroundImage: {
-    opacity: 0.7,
+    opacity: 1,
   },
   overlay: {
     flex: 1,
