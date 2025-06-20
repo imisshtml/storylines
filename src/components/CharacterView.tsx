@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { Shield, Swords, Brain, Heart, Footprints, Star, Package, BookOpen, Medal, Scroll, Sword, Sparkles, Zap, ChevronUp, ChevronDown, Moon, LogOut } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Shield, Swords, Brain, Heart, Footprints, Star, Package, BookOpen, Medal, Scroll, Sword, Sparkles, Zap, ChevronUp, ChevronDown, Moon } from 'lucide-react-native';
 import { Character, type DnDAbilities, isTwoHandedWeapon } from '../atoms/characterAtoms';
 import { supabase } from '../config/supabase';
 import SpellSlotTracker from './SpellSlotTracker';
 import AbilityUsageTracker from './AbilityUsageTracker';
-import { useAtom } from 'jotai';
-import { userAtom } from '../atoms/authAtoms';
-import { useCustomAlert } from './CustomAlert';
-import { router } from 'expo-router';
 
 type CoreStat = {
   name: string;
@@ -63,18 +59,15 @@ type Spell = {
 
 interface CharacterViewProps {
   character?: Character | null;
-  onRefresh?: () => void;
 }
 
-export default function CharacterView({ character, onRefresh }: CharacterViewProps) {
+export default function CharacterView({ character }: CharacterViewProps) {
   const [activeTab, setActiveTab] = useState<'stats' | 'features' | 'inventory' | 'spells' | 'equipment'>('stats');
   const [expandedSpell, setExpandedSpell] = useState<string | null>(null);
   const [expandedTraits, setExpandedTraits] = useState<Set<string>>(new Set());
   const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set());
   const [characterFeatures, setCharacterFeatures] = useState<any[]>([]);
   const [characterTraits, setCharacterTraits] = useState<any[]>([]);
-  const [user] = useAtom(userAtom);
-  const { showAlert } = useCustomAlert();
 
   // Load character features when character changes
   useEffect(() => {
@@ -142,91 +135,6 @@ export default function CharacterView({ character, onRefresh }: CharacterViewPro
       newExpandedFeatures.add(featureIndex);
     }
     setExpandedFeatures(newExpandedFeatures);
-  };
-
-  const handleLeaveCampaign = async () => {
-    if (!character || !character.campaign_id || !user) return;
-    
-    showAlert(
-      'Leave Campaign',
-      'Are you sure you want to leave this campaign? Your character will be removed from the campaign.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Leave Campaign', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // First, get the campaign to check if user is owner
-              const { data: campaign, error: campaignError } = await supabase
-                .from('campaigns')
-                .select('*')
-                .eq('uid', character.campaign_id)
-                .single();
-                
-              if (campaignError) throw campaignError;
-              
-              if (campaign.owner === user.id) {
-                // User is the owner, append "quit" to owner field
-                const { error: updateError } = await supabase
-                  .from('campaigns')
-                  .update({ owner: `${user.id}_quit` })
-                  .eq('uid', character.campaign_id);
-                  
-                if (updateError) throw updateError;
-              } else {
-                // User is a player, remove from players array
-                const updatedPlayers = campaign.players.filter((player: any) => player.id !== user.id);
-                
-                const { error: updateError } = await supabase
-                  .from('campaigns')
-                  .update({ players: updatedPlayers })
-                  .eq('uid', character.campaign_id);
-                  
-                if (updateError) throw updateError;
-              }
-              
-              // Remove character from campaign
-              const { error: characterError } = await supabase
-                .from('characters')
-                .update({ campaign_id: null })
-                .eq('id', character.id);
-                
-              if (characterError) throw characterError;
-              
-              showAlert(
-                'Success',
-                'You have left the campaign successfully.',
-                [
-                  { 
-                    text: 'OK',
-                    onPress: () => {
-                      // Refresh character data
-                      if (onRefresh) {
-                        onRefresh();
-                      }
-                      
-                      // Navigate back to home
-                      router.replace('/home');
-                    }
-                  }
-                ],
-                'success'
-              );
-            } catch (error) {
-              console.error('Error leaving campaign:', error);
-              showAlert(
-                'Error',
-                'Failed to leave campaign. Please try again.',
-                undefined,
-                'error'
-              );
-            }
-          }
-        }
-      ],
-      'warning'
-    );
   };
 
   // If no character is provided, show placeholder message
@@ -931,6 +839,8 @@ export default function CharacterView({ character, onRefresh }: CharacterViewPro
     );
   };
 
+
+
   return (
     <View style={styles.container}>
       <View style={styles.tabs}>
@@ -969,6 +879,7 @@ export default function CharacterView({ character, onRefresh }: CharacterViewPro
         >
           <Package size={24} color={activeTab === 'inventory' ? '#4CAF50' : '#666'} />
         </TouchableOpacity>
+
       </View>
 
       <ScrollView style={styles.content}>
@@ -982,17 +893,6 @@ export default function CharacterView({ character, onRefresh }: CharacterViewPro
         {activeTab === 'inventory' && renderInventory()}
         {activeTab === 'equipment' && renderEquipment()}
         {activeTab === 'spells' && renderSpells()}
-        
-        {/* Leave Campaign Button */}
-        {character.campaign_id && (
-          <TouchableOpacity 
-            style={styles.leaveCampaignButton}
-            onPress={handleLeaveCampaign}
-          >
-            <LogOut size={20} color="#fff" />
-            <Text style={styles.leaveCampaignText}>Leave Campaign</Text>
-          </TouchableOpacity>
-        )}
       </ScrollView>
     </View>
   );
@@ -1427,19 +1327,5 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
   },
-  leaveCampaignButton: {
-    backgroundColor: '#f44336',
-    borderRadius: 12,
-    padding: 16,
-    marginVertical: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  leaveCampaignText: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-  },
+
 });
