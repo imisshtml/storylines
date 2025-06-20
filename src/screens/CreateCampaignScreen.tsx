@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Platform, StatusBar, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView } from 'react-native';
-import { CircleAlert as AlertCircle, Save, ArrowLeft, ChevronDown } from 'lucide-react-native';
+import { CircleAlert as AlertCircle, Save, ArrowLeft, ChevronDown, Trash2 } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { campaignsLoadingAtom, campaignsErrorAtom, currentCampaignAtom, upsertCampaignAtom, type Campaign } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
 import AdventureSelectSheet, { type Adventure, ADVENTURES } from '../components/AdventureSelectSheet';
+import { supabase } from '../config/supabase';
+import { useCustomAlert } from '../components/CustomAlert';
 
 type Tone = 'serious' | 'humorous' | 'grimdark';
 type ContentLevel = 'kids' | 'teens' | 'adults';
@@ -45,6 +47,7 @@ export default function CreateCampaignScreen() {
   const [error] = useAtom(campaignsErrorAtom);
   const [, upsertCampaign] = useAtom(upsertCampaignAtom);
   const [user] = useAtom(userAtom);
+  const { showAlert } = useCustomAlert();
 
   const [campaignName, setCampaignName] = useState('');
   const [selectedAdventure, setSelectedAdventure] = useState<Adventure | null>(null);
@@ -55,6 +58,7 @@ export default function CreateCampaignScreen() {
   const [rpFocusValue, setRpFocusValue] = useState(2); // 0-4 scale, 2 = balanced
   const [playerLimit, setPlayerLimit] = useState(3);
   const [isAdventureSheetVisible, setIsAdventureSheetVisible] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const isEditing = currentCampaign !== null;
 
@@ -152,6 +156,58 @@ export default function CreateCampaignScreen() {
     } catch (err) {
       console.error('Error saving campaign:', err);
     }
+  };
+
+  const handleDelete = () => {
+    if (!currentCampaign || !isEditing) return;
+
+    showAlert(
+      'Delete Campaign',
+      'Are you sure you want to delete this campaign? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsDeleting(true);
+              
+              // Delete the campaign from Supabase
+              const { error } = await supabase
+                .from('campaigns')
+                .delete()
+                .eq('id', currentCampaign.id);
+              
+              if (error) throw error;
+              
+              // Clear current campaign and navigate back to home
+              setCurrentCampaign(null);
+              router.replace('/home');
+              
+              // Show success message
+              showAlert(
+                'Campaign Deleted',
+                'The campaign has been successfully deleted.',
+                undefined,
+                'success'
+              );
+            } catch (error) {
+              console.error('Error deleting campaign:', error);
+              showAlert(
+                'Error',
+                'Failed to delete campaign. Please try again.',
+                undefined,
+                'error'
+              );
+            } finally {
+              setIsDeleting(false);
+            }
+          }
+        }
+      ],
+      'warning'
+    );
   };
 
   if (isLoading) {
@@ -371,6 +427,23 @@ export default function CreateCampaignScreen() {
             {isEditing ? 'Save Changes' : 'Create Campaign'}
           </Text>
         </TouchableOpacity>
+
+        {isEditing && currentCampaign && currentCampaign.status === 'creation' && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={handleDelete}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Trash2 color="#fff" size={20} />
+                <Text style={styles.deleteButtonText}>Delete Campaign</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       <AdventureSelectSheet
@@ -525,6 +598,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#666',
   },
   saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    marginLeft: 8,
+    fontFamily: 'Inter-Bold',
+  },
+  deleteButton: {
+    backgroundColor: '#f44336',
+    borderRadius: 8,
+    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 0,
+    marginBottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButtonText: {
     color: '#fff',
     fontSize: 16,
     marginLeft: 8,
