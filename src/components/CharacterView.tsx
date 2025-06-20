@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Shield, Swords, Brain, Heart, Footprints, Star, Package, BookOpen, Medal, Scroll, Sword, Sparkles, Zap, ChevronUp, ChevronDown, Moon } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import { Shield, Swords, Brain, Heart, Footprints, Star, Package, BookOpen, Medal, Scroll, Sword, Sparkles, Zap, ChevronUp, ChevronDown, Moon, LogOut, X } from 'lucide-react-native';
 import { Character, type DnDAbilities, isTwoHandedWeapon } from '../atoms/characterAtoms';
 import { supabase } from '../config/supabase';
+import { fetchCampaignsAtom } from '../atoms/campaignAtoms';
+import { useAtom } from 'jotai';
+import { router } from 'expo-router';
 import SpellSlotTracker from './SpellSlotTracker';
 import AbilityUsageTracker from './AbilityUsageTracker';
+import { useCustomAlert } from './CustomAlert';
 
 type CoreStat = {
   name: string;
@@ -59,15 +63,20 @@ type Spell = {
 
 interface CharacterViewProps {
   character?: Character | null;
+  onClose?: () => void;
+  onLeaveCampaign?: () => void;
 }
 
-export default function CharacterView({ character }: CharacterViewProps) {
+export default function CharacterView({ character, onClose, onLeaveCampaign }: CharacterViewProps) {
   const [activeTab, setActiveTab] = useState<'stats' | 'features' | 'inventory' | 'spells' | 'equipment'>('stats');
   const [expandedSpell, setExpandedSpell] = useState<string | null>(null);
   const [expandedTraits, setExpandedTraits] = useState<Set<string>>(new Set());
   const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set());
   const [characterFeatures, setCharacterFeatures] = useState<any[]>([]);
   const [characterTraits, setCharacterTraits] = useState<any[]>([]);
+  const [showLeaveCampaignModal, setShowLeaveCampaignModal] = useState(false);
+  const { showAlert } = useCustomAlert();
+  const [, fetchCampaigns] = useAtom(fetchCampaignsAtom);
 
   // Load character features when character changes
   useEffect(() => {
@@ -839,7 +848,135 @@ export default function CharacterView({ character }: CharacterViewProps) {
     );
   };
 
+  const handleLeaveCampaign = () => {
+    if (onClose) {
+      onClose(); // Close the CharacterView modal first
+    }
+    // Show confirmation modal after a brief delay to ensure CharacterView closes
+    setTimeout(() => {
+      setShowLeaveCampaignModal(true);
+    }, 100);
+  };
 
+  const confirmLeaveCampaign = async () => {
+    if (!character?.campaign_id) {
+      setShowLeaveCampaignModal(false);
+      return;
+    }
+
+    try {
+      console.log('Starting leave campaign process for character:', character.id, 'campaign:', character.campaign_id);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No authenticated user found');
+        setShowLeaveCampaignModal(false);
+        return;
+      }
+
+      console.log('User ID:', user.id);
+
+      // First, get the current campaign to access the players array
+      const { data: campaign, error: campaignQueryError } = await supabase
+        .from('campaigns')
+        .select('*')
+        .eq('uid', character.campaign_id)
+        .single();
+
+      if (campaignQueryError) {
+        console.error('Error fetching campaign:', campaignQueryError);
+        throw campaignQueryError;
+      }
+
+      if (!campaign) {
+        console.error('Campaign not found');
+        setShowLeaveCampaignModal(false);
+        return;
+      }
+
+      console.log('Found campaign:', campaign.name, 'with players:', campaign.players);
+
+      const isOwner = campaign.owner === user.id;
+      console.log('User is owner:', isOwner);
+
+      // Remove character from campaign
+      const { error: characterError } = await supabase
+        .from('characters')
+        .update({ 
+          campaign_id: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', character.id);
+
+      if (characterError) {
+        console.error('Error updating character:', characterError);
+        throw characterError;
+      }
+
+      console.log('Successfully removed character from campaign');
+
+      // Remove user from campaign's players array and handle owner leaving
+      const currentPlayers = campaign.players || [];
+      const updatedPlayers = currentPlayers.filter((player: any) => player.id !== user.id);
+      
+      console.log('Removing user from players. Before:', currentPlayers.length, 'After:', updatedPlayers.length);
+
+      // Prepare campaign update
+      const campaignUpdate: any = { players: updatedPlayers };
+      
+      // If the owner is leaving, append "quit" to the owner field
+      if (isOwner) {
+        campaignUpdate.owner = `${campaign.owner}quit`;
+        console.log('Owner leaving - updating owner field to:', campaignUpdate.owner);
+      }
+
+      const { error: updatePlayersError } = await supabase
+        .from('campaigns')
+        .update(campaignUpdate)
+        .eq('uid', character.campaign_id);
+
+      if (updatePlayersError) {
+        console.error('Error updating campaign:', updatePlayersError);
+        throw updatePlayersError;
+      }
+
+      console.log('Successfully updated campaign');
+
+      setShowLeaveCampaignModal(false);
+      
+      // Refresh campaigns data
+      console.log('Refreshing campaigns data...');
+      await fetchCampaigns();
+      
+      // Call the leave campaign callback to handle navigation
+      if (onLeaveCampaign) {
+        onLeaveCampaign();
+      }
+
+      // Route back to home screen
+      router.replace('/home');
+
+      showAlert(
+        'Left Campaign',
+        'You have successfully left the campaign.',
+        [{ text: 'OK' }],
+        'success'
+      );
+
+    } catch (error) {
+      console.error('Error leaving campaign:', error);
+      showAlert(
+        'Error',
+        'Failed to leave campaign. Please try again.',
+        [{ text: 'OK' }],
+        'error'
+      );
+    }
+  };
+
+  const cancelLeaveCampaign = () => {
+    setShowLeaveCampaignModal(false);
+  };
 
   return (
     <View style={styles.container}>
@@ -879,7 +1016,6 @@ export default function CharacterView({ character }: CharacterViewProps) {
         >
           <Package size={24} color={activeTab === 'inventory' ? '#4CAF50' : '#666'} />
         </TouchableOpacity>
-
       </View>
 
       <ScrollView style={styles.content}>
@@ -894,6 +1030,64 @@ export default function CharacterView({ character }: CharacterViewProps) {
         {activeTab === 'equipment' && renderEquipment()}
         {activeTab === 'spells' && renderSpells()}
       </ScrollView>
+
+      {/* Leave Campaign Button */}
+      <View style={styles.leaveCampaignContainer}>
+        <TouchableOpacity
+          style={styles.leaveCampaignButton}
+          onPress={handleLeaveCampaign}
+          activeOpacity={0.7}
+        >
+          <LogOut size={20} color="#ff5252" />
+          <Text style={styles.leaveCampaignText}>Leave Campaign</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Leave Campaign Confirmation Modal */}
+      <Modal
+        visible={showLeaveCampaignModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={cancelLeaveCampaign}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmationModal}>
+            <View style={styles.confirmationHeader}>
+              <Text style={styles.confirmationTitle}>Leave Campaign?</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={cancelLeaveCampaign}
+                activeOpacity={0.7}
+              >
+                <X size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.confirmationMessage}>
+              Are you sure you want to leave this campaign? You will lose access to your character and campaign data.
+            </Text>
+            
+            <View style={styles.confirmationButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={cancelLeaveCampaign}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={confirmLeaveCampaign}
+                activeOpacity={0.7}
+              >
+                <LogOut size={18} color="#fff" />
+                <Text style={styles.confirmButtonText}>Leave Campaign</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1327,5 +1521,102 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
   },
-
+  leaveCampaignContainer: {
+    padding: 16,
+    paddingTop: 8,
+    backgroundColor: '#121212',
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+  },
+  leaveCampaignButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 82, 82, 0.1)',
+    borderWidth: 1,
+    borderColor: '#ff5252',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  leaveCampaignText: {
+    fontSize: 16,
+    color: '#ff5252',
+    fontFamily: 'Inter-Bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  confirmationModal: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  confirmationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  confirmationTitle: {
+    fontSize: 20,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  confirmationMessage: {
+    fontSize: 16,
+    color: '#ccc',
+    fontFamily: 'Inter-Regular',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  confirmationButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: '#ff5252',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
 });
