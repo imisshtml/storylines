@@ -9,8 +9,9 @@ import {
   StatusBar,
   Platform,
   Image,
+  Alert,
 } from 'react-native';
-import { ArrowLeft, Plus, Star, Crown, Users, Sword, Shield, UserPlus } from 'lucide-react-native';
+import { ArrowLeft, Plus, Star, Crown, Users, Sword, Shield, UserPlus, LogOut } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
@@ -19,6 +20,8 @@ import { userAtom } from '../atoms/authAtoms';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
+import { supabase } from '../config/supabase';
+import { useCustomAlert } from '../components/CustomAlert';
 
 export default function CharactersScreen() {
   const [characters] = useAtom(charactersAtom);
@@ -26,6 +29,7 @@ export default function CharactersScreen() {
   const [user] = useAtom(userAtom);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
   const { isLoading, withLoading } = useLoading();
+  const { showAlert } = useCustomAlert();
 
   useEffect(() => {
     const loadCharacters = async () => {
@@ -56,6 +60,81 @@ export default function CharactersScreen() {
     router.push('/creation');
   };
 
+  const handleLeaveCampaign = async (character: Character) => {
+    if (!character.campaign_id || !user) return;
+    
+    showAlert(
+      'Leave Campaign',
+      'Are you sure you want to leave this campaign? Your character will be removed from the campaign.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Leave Campaign', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // First, get the campaign to check if user is owner
+              const { data: campaign, error: campaignError } = await supabase
+                .from('campaigns')
+                .select('*')
+                .eq('uid', character.campaign_id)
+                .single();
+                
+              if (campaignError) throw campaignError;
+              
+              if (campaign.owner === user.id) {
+                // User is the owner, append "quit" to owner field
+                const { error: updateError } = await supabase
+                  .from('campaigns')
+                  .update({ owner: `${user.id}_quit` })
+                  .eq('uid', character.campaign_id);
+                  
+                if (updateError) throw updateError;
+              } else {
+                // User is a player, remove from players array
+                const updatedPlayers = campaign.players.filter((player: any) => player.id !== user.id);
+                
+                const { error: updateError } = await supabase
+                  .from('campaigns')
+                  .update({ players: updatedPlayers })
+                  .eq('uid', character.campaign_id);
+                  
+                if (updateError) throw updateError;
+              }
+              
+              // Remove character from campaign
+              const { error: characterError } = await supabase
+                .from('characters')
+                .update({ campaign_id: null })
+                .eq('id', character.id);
+                
+              if (characterError) throw characterError;
+              
+              // Refresh characters
+              await fetchCharacters();
+              
+              showAlert(
+                'Success',
+                'You have left the campaign successfully.',
+                undefined,
+                'success'
+              );
+            } catch (error) {
+              console.error('Error leaving campaign:', error);
+              showAlert(
+                'Error',
+                'Failed to leave campaign. Please try again.',
+                undefined,
+                'error'
+              );
+            }
+          }
+        }
+      ],
+      'warning'
+    );
+  };
+
   const getCharacterCampaignName = (character: Character) => {
     if (character.campaign_id) {
       // Find the campaign by campaign_id (which should match campaign.uid)
@@ -83,12 +162,7 @@ export default function CharactersScreen() {
     const campaignInfo = getCharacterCampaignStatus(character);
     
     return (
-      <TouchableOpacity
-        key={character.id}
-        style={styles.characterCard}
-        onPress={() => handleCharacterPress(character)}
-        activeOpacity={0.8}
-      >
+      <View key={character.id} style={styles.characterCard}>
         {/* Character Avatar */}
         <View style={styles.avatarContainer}>
           <Image
@@ -156,9 +230,20 @@ export default function CharactersScreen() {
               <Sword size={12} color="#f44336" />
               <Text style={styles.statText}>HP {character.current_hitpoints || 0}/{character.max_hitpoints || 0}</Text>
             </View>
+            
+            {/* Leave Campaign Button */}
+            {character.campaign_id && (
+              <TouchableOpacity 
+                style={styles.leaveCampaignButton}
+                onPress={() => handleLeaveCampaign(character)}
+              >
+                <LogOut size={12} color="#fff" />
+                <Text style={styles.leaveCampaignText}>Leave</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -401,6 +486,7 @@ const styles = StyleSheet.create({
   statsPreview: {
     flexDirection: 'row',
     gap: 16,
+    alignItems: 'center',
   },
   statItem: {
     flexDirection: 'row',
@@ -459,6 +545,20 @@ const styles = StyleSheet.create({
   createFirstCharacterText: {
     color: '#fff',
     fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  leaveCampaignButton: {
+    backgroundColor: '#f44336',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  leaveCampaignText: {
+    color: '#fff',
+    fontSize: 12,
     fontFamily: 'Inter-Bold',
   },
 });
