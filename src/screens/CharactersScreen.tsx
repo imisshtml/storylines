@@ -9,7 +9,6 @@ import {
   StatusBar,
   Platform,
   Image,
-  ActivityIndicator,
 } from 'react-native';
 import { ArrowLeft, Plus, Star, Crown, Users, Sword, Shield, UserPlus } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -18,30 +17,29 @@ import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/ch
 import { campaignsAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
+import ActivityIndicator from '../components/ActivityIndicator';
+import { useLoading } from '../hooks/useLoading';
 
 export default function CharactersScreen() {
   const [characters] = useAtom(charactersAtom);
   const [campaigns] = useAtom(campaignsAtom);
   const [user] = useAtom(userAtom);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading, withLoading } = useLoading();
 
   useEffect(() => {
     const loadCharacters = async () => {
       if (user) {
-        setIsLoading(true);
         try {
-          await fetchCharacters();
+          await withLoading(fetchCharacters, 'fetchCharacters')();
         } catch (error) {
           console.error('Error loading characters:', error);
-        } finally {
-          setIsLoading(false);
         }
       }
     };
 
     loadCharacters();
-  }, [user, fetchCharacters]);
+  }, [user, fetchCharacters, withLoading]);
 
   const handleBack = () => {
     router.back();
@@ -164,23 +162,6 @@ export default function CharactersScreen() {
     );
   };
 
-  if (isLoading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <ArrowLeft color="#fff" size={24} />
-          </TouchableOpacity>
-          <Text style={styles.title}>My Characters</Text>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-          <Text style={styles.loadingText}>Loading characters...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -193,45 +174,51 @@ export default function CharactersScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
-        style={styles.content} 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+      <ActivityIndicator 
+        isLoading={isLoading('fetchCharacters')} 
+        text="Loading characters..." 
+        style={styles.content}
       >
-        {characters.length === 0 ? (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIconContainer}>
-              <Users size={64} color="#666" />
-            </View>
-            <Text style={styles.emptyTitle}>No Characters Yet</Text>
-            <Text style={styles.emptyDescription}>
-              Create your first 5e character to begin your adventure!
-            </Text>
-            <TouchableOpacity
-              style={styles.createFirstCharacterButton}
-              onPress={handleCreateCharacter}
-            >
-              <Plus size={20} color="#fff" />
-              <Text style={styles.createFirstCharacterText}>Create Character</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <View style={styles.headerInfo}>
-              <Text style={styles.characterCount}>
-                {characters.length} Character{characters.length !== 1 ? 's' : ''}
+        <ScrollView 
+          style={styles.content} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {characters.length === 0 ? (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIconContainer}>
+                <Users size={64} color="#666" />
+              </View>
+              <Text style={styles.emptyTitle}>No Characters Yet</Text>
+              <Text style={styles.emptyDescription}>
+                Create your first 5e character to begin your adventure!
               </Text>
-              <Text style={styles.headerSubtext}>
-                Tap a character to view details and manage spells
-              </Text>
+              <TouchableOpacity
+                style={styles.createFirstCharacterButton}
+                onPress={handleCreateCharacter}
+              >
+                <Plus size={20} color="#fff" />
+                <Text style={styles.createFirstCharacterText}>Create Character</Text>
+              </TouchableOpacity>
             </View>
+          ) : (
+            <>
+              <View style={styles.headerInfo}>
+                <Text style={styles.characterCount}>
+                  {characters.length} Character{characters.length !== 1 ? 's' : ''}
+                </Text>
+                <Text style={styles.headerSubtext}>
+                  Tap a character to view details and manage spells
+                </Text>
+              </View>
 
-            <View style={styles.charactersGrid}>
-              {characters.map(renderCharacterCard)}
-            </View>
-          </>
-        )}
-      </ScrollView>
+              <View style={styles.charactersGrid}>
+                {characters.map(renderCharacterCard)}
+              </View>
+            </>
+          )}
+        </ScrollView>
+      </ActivityIndicator>
     </SafeAreaView>
   );
 }
@@ -276,17 +263,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    marginTop: 16,
   },
   headerInfo: {
     marginBottom: 20,
