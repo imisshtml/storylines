@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backgroundImage: {
-    opacity: 0.7,
+    opacity: 1,
   },
   overlay: {
     flex: 1,
@@ -572,14 +572,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
     width: '100%',
-  },
-  logo: {
-    fontSize: 32,
-    fontFamily: 'Inter-Bold',
-    color: '#fff',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
   },
   welcomeText: {
     fontSize: 14,
