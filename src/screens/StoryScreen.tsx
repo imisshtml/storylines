@@ -672,7 +672,6 @@ export default function StoryScreen() {
 
             {isLoading('initialStory') && (
               <View style={styles.loadingEvent}>
-                <ActivityIndicator size="small" color="#FFD700" isLoading={true} />
                 <Text style={styles.loadingEventText}>
                   The Dungeon Master is preparing your adventure...
                 </Text>
@@ -681,9 +680,8 @@ export default function StoryScreen() {
 
             {isLoading('sendAction') && (
               <View style={styles.loadingEvent}>
-                <ActivityIndicator size="small" color="#FFD700" isLoading={true} />
                 <Text style={styles.loadingEventText}>
-                  The Dungeon Master is thinking...
+                  Your story is being woven...
                 </Text>
               </View>
             )}
@@ -756,11 +754,8 @@ export default function StoryScreen() {
               onPress={handleSend}
               disabled={!userInput.trim() || isLoading('sendAction')}
             >
-              {isLoading('sendAction') ? (
-                <ActivityIndicator size="small" color="#666" isLoading={true} />
-              ) : (
-                <Forward size={24} color={userInput.trim() ? '#fff' : '#666'} />
-              )}
+
+              <Forward size={24} color={userInput.trim() ? '#fff' : '#666'} />
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
