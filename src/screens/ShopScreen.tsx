@@ -79,46 +79,37 @@ export default function ShopScreen() {
       id: 'remove_ads',
       title: 'Remove Ads',
       description: 'Enjoy uninterrupted gameplay without advertisements',
-      price: '$0.99',
+      price: '$1.99',
       image: require('../../assets/images/noAds.png'),
       type: 'one_time',
-      revenueCatId: 'remove_ads',
+      revenueCatId: 'prod2355afb536',
     },
     {
       id: 'character_limit',
-      title: 'Character Limit +2',
-      description: 'Create 2 additional characters for your adventures',
-      price: '$0.99',
+      title: 'Character Limit +3',
+      description: 'Create 3 additional characters for your adventures',
+      price: '$1.99',
       image: require('../../assets/images/increaseCharacters.png'),
       type: 'one_time',
-      revenueCatId: 'character_limit_2',
+      revenueCatId: 'proded7232c986',
     },
     {
       id: 'campaign_limit',
-      title: 'Campaign Limit +2',
-      description: 'Host 2 additional campaigns simultaneously',
-      price: '$0.99',
+      title: 'Campaign Limit +3',
+      description: 'Host and/or Join 3 additional campaigns',
+      price: '$1.99',
       image: require('../../assets/images/increaseCampaigns.png'),
       type: 'one_time',
-      revenueCatId: 'campaign_limit_2',
+      revenueCatId: 'prod99b2b546bd',
     },
     {
       id: 'all_adventures',
       title: 'Access All Adventures',
       description: 'Unlock all premium adventure modules and content',
-      price: '$2.99',
+      price: '$4.99',
       image: require('../../assets/images/allAdventures.png'),
       type: 'one_time',
-      revenueCatId: 'all_adventures',
-    },
-    {
-      id: 'group_size',
-      title: 'Group Size +2',
-      description: 'Increase your maximum party size by 2 players',
-      price: '$0.99',
-      image: require('../../assets/images/increaseGroup.png'),
-      type: 'one_time',
-      revenueCatId: 'group_size_2',
+      revenueCatId: 'prod100afcaa33',
     },
     {
       id: 'scroll_rebirth',
@@ -127,9 +118,22 @@ export default function ShopScreen() {
       price: '$0.99',
       image: require('../../assets/images/scrollRevive.png'),
       type: 'one_time',
-      revenueCatId: 'scroll_rebirth',
+      revenueCatId: 'prod35985e127b',
     },
   ];
+  /*
+  DM prod340862bac9
+  AP prod8b4bd9634c
+  {
+      id: 'group_size',
+      title: 'Group Size +2',
+      description: 'Increase your maximum party size by 2 players',
+      price: '$0.99',
+      image: require('../../assets/images/increaseGroup.png'),
+      type: 'one_time',
+      revenueCatId: 'group_size_2',
+    },
+  */
 
   // Check if an item is purchased
   const isItemPurchased = (itemId: string): boolean => {
@@ -142,7 +146,7 @@ export default function ShopScreen() {
         return userCapabilities.allAdventuresUnlocked;
       case 'group_size':
         // Group size can be purchased twice, so check if at max (7 players)
-        return userCapabilities.groupSizeLimit >= 7;
+        return userCapabilities.groupSizeLimit >= 5;
       case 'character_limit':
         // Character limit purchases are stackable, so we don't mark as "purchased"
         return false;
