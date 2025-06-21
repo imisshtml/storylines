@@ -17,19 +17,11 @@
         "foregroundImage": "./assets/images/sl_icon_1024.png",
         "backgroundColor": "#050908"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.imisshtml.storylines"
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/storylines_splash.jpg",
-          "imageWidth": 1024,
-          "resizeMode": "cover",
-          "backgroundColor": "#050908"
-        }
-      ],
       [
         "react-native-google-mobile-ads",
         {
