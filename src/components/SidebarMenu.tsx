@@ -145,12 +145,6 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       },
     },
     {
-      icon: <Bell size={24} color="#fff" />,
-      title: 'Test Notification',
-      subtitle: 'Send a test push notification',
-      onPress: handleTestNotification,
-    },
-    {
       icon: <UserCog size={24} color="#fff" />,
       title: 'Account & Settings',
       subtitle: 'Manage your account',
@@ -169,6 +163,14 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       },
     },
   ];
+  /*
+    {
+      icon: <Bell size={24} color="#fff" />,
+      title: 'Test Notification',
+      subtitle: 'Send a test push notification',
+      onPress: handleTestNotification,
+    },
+  */
 
   if (!isVisible) return null;
 

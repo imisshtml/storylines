@@ -94,14 +94,37 @@ PODS:
     - Yoga
   - ExpoSMS (13.1.4):
     - ExpoModulesCore
-  - ExpoSplashScreen (0.30.9):
-    - ExpoModulesCore
   - ExpoSymbols (0.4.5):
     - ExpoModulesCore
   - ExpoSystemUI (5.0.8):
     - ExpoModulesCore
   - ExpoWebBrowser (14.1.6):
     - ExpoModulesCore
+  - EXSplashScreen (0.27.7):
+    - DoubleConversion
+    - ExpoModulesCore
+    - glog
+    - hermes-engine
+    - RCT-Folly (= 2024.11.18.00)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-hermes
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - Yoga
   - fast_float (6.1.4)
   - FBLazyVector (0.79.2)
   - fmt (11.0.2)
@@ -2208,10 +2231,10 @@ DEPENDENCIES:
   - ExpoLinking (from `../node_modules/expo-linking/ios`)
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoSMS (from `../node_modules/expo-sms/ios`)
-  - ExpoSplashScreen (from `../node_modules/expo-splash-screen/ios`)
   - ExpoSymbols (from `../node_modules/expo-symbols/ios`)
   - ExpoSystemUI (from `../node_modules/expo-system-ui/ios`)
   - ExpoWebBrowser (from `../node_modules/expo-web-browser/ios`)
+  - EXSplashScreen (from `../node_modules/expo-splash-screen/ios`)
   - fast_float (from `../node_modules/react-native/third-party-podspecs/fast_float.podspec`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - fmt (from `../node_modules/react-native/third-party-podspecs/fmt.podspec`)
@@ -2347,14 +2370,14 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-modules-core"
   ExpoSMS:
     :path: "../node_modules/expo-sms/ios"
-  ExpoSplashScreen:
-    :path: "../node_modules/expo-splash-screen/ios"
   ExpoSymbols:
     :path: "../node_modules/expo-symbols/ios"
   ExpoSystemUI:
     :path: "../node_modules/expo-system-ui/ios"
   ExpoWebBrowser:
     :path: "../node_modules/expo-web-browser/ios"
+  EXSplashScreen:
+    :path: "../node_modules/expo-splash-screen/ios"
   fast_float:
     :podspec: "../node_modules/react-native/third-party-podspecs/fast_float.podspec"
   FBLazyVector:
@@ -2531,10 +2554,10 @@ SPEC CHECKSUMS:
   ExpoLinking: b85ff4eafeae6fc638c6cace60007ae521af0ef4
   ExpoModulesCore: d431ffe83c8673d02cb38425594a5f5480fd3061
   ExpoSMS: 770f0b60a777f5d3f65fd7fc369ff62ff97e09a9
-  ExpoSplashScreen: 03ef991c0f9575a10269e08083cb4bd10e0989bc
   ExpoSymbols: c5612a90fb9179cdaebcd19bea9d8c69e5d3b859
   ExpoSystemUI: 29fb31c0e06eea3f5d88299d5c290101fc69f61f
   ExpoWebBrowser: 06fb5f767f53ad53944b068cdd207984cb998712
+  EXSplashScreen: e0bacf12b7f3224eeb2d0620376e6679b9089df6
   fast_float: 06eeec4fe712a76acc9376682e4808b05ce978b6
   FBLazyVector: 84b955f7b4da8b895faf5946f73748267347c975
   fmt: a40bb5bd0294ea969aaaba240a927bd33d878cdd
