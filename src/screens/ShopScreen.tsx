@@ -16,14 +16,13 @@ import { router } from 'expo-router';
 import { useCustomAlert } from '../components/CustomAlert';
 import DMSubscriptionModal from '../components/DMSubscriptionModal';
 import AdventurerPackModal from '../components/AdventurerPackModal';
-import { PurchaseManager } from '../utils/purchaseManager';
+import { PurchaseManager, purchaseManager } from '../utils/purchaseManager';
 import { useAtom } from 'jotai';
 import { userAtom } from '../atoms/authAtoms';
 import { fetchUserCapabilitiesAtom, userCapabilitiesAtom } from '../atoms/userCapabilitiesAtoms';
 import ScrollSelectionModal from '../components/ScrollSelectionModal';
-
-// TODO: Import RevenueCat
-// import Purchases from 'react-native-purchases';
+import RevenueCatPaywall from '../components/RevenueCatPaywall';
+import { usePaywall } from '../hooks/usePaywall';
 
 interface ShopItem {
   id: string;
@@ -47,22 +46,21 @@ export default function ShopScreen() {
   const [user] = useAtom(userAtom);
   const [, fetchCapabilities] = useAtom(fetchUserCapabilitiesAtom);
   const [userCapabilities] = useAtom(userCapabilitiesAtom);
+  const { isPaywallVisible, showPaywall, hidePaywall, currentOffering } = usePaywall();
 
   // Load capabilities when component mounts
   useEffect(() => {
     const loadCapabilities = async () => {
       if (user?.id) {
         try {
-          console.log('ShopScreen: Loading capabilities...');
           await fetchCapabilities();
-          console.log('ShopScreen: Capabilities loaded:', userCapabilities);
-          setCapabilitiesLoaded(true);
+          // Initialize RevenueCat
+          await purchaseManager.initialize(user.id);
         } catch (error) {
-          console.error('Error loading capabilities in shop:', error);
-          setCapabilitiesLoaded(true); // Set to true anyway to avoid infinite loading
+          console.error('Failed to load capabilities or initialize RevenueCat:', error);
+        } finally {
+          setCapabilitiesLoaded(true);
         }
-      } else {
-        setCapabilitiesLoaded(true); // No user, so no capabilities to load
       }
     };
 
@@ -173,80 +171,29 @@ export default function ShopScreen() {
     router.back();
   };
 
-  const handlePurchase = async (item: ShopItem) => {
-    // Don't allow purchasing already purchased non-consumable items
-    if (isItemPurchased(item.id)) {
-      showAlert(
-        'Already Purchased',
-        'You have already purchased this item.',
-        [{ text: 'OK' }],
-        'info'
-      );
-      return;
-    }
-
-    if (item.id === 'dm_subscription') {
-      setShowDMModal(true);
-      return;
-    }
-
+  const handlePurchase = async (productId: string) => {
     if (!user?.id) {
-      showAlert(
-        'Authentication Required',
-        'Please log in to make purchases.',
-        [{ text: 'OK' }],
-        'error'
-      );
+      showAlert('Authentication Error', 'Please log in to make purchases.', [{ text: 'OK' }], 'error');
       return;
     }
 
-    setLoadingItemId(item.id);
+    setLoadingItemId(productId);
+
     try {
-      // TODO: Implement RevenueCat purchase logic
-      console.log(`Purchasing ${item.title}...`);
+      const result = await purchaseManager.purchaseProduct(productId);
       
-      // Placeholder for RevenueCat integration
-      // const product = await Purchases.getProducts([item.revenueCatId]);
-      // const purchaseResult = await Purchases.purchaseProduct(product[0]);
-      
-      // Simulate purchase delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Process the purchase in our database
-      const success = await PurchaseManager.handlePurchaseSuccess(item.revenueCatId || item.id, user.id);
-      
-      if (success) {
-        // Refresh user capabilities after purchase
+      if (result.success) {
+        showAlert('Purchase Successful!', 'Your purchase has been completed.', [{ text: 'OK' }], 'success');
+        // Refresh capabilities to reflect new purchase
         await fetchCapabilities();
-        
-        // Special handling for scroll of rebirth
-        if (item.id === 'scroll_rebirth') {
-          showAlert(
-            'Purchase Successful!',
-            'Your Scroll of Rebirth is ready! Now choose which character should receive it.',
-            [{ text: 'Choose Character' }],
-            'success'
-          );
-          setShowScrollModal(true);
-        } else {
-          showAlert(
-            'Purchase Successful!',
-            `${item.title} has been added to your account.`,
-            [{ text: 'Continue' }],
-            'success'
-          );
-        }
       } else {
-        throw new Error('Failed to process purchase');
+        if (result.error !== 'Purchase cancelled by user') {
+          showAlert('Purchase Failed', result.error || 'Something went wrong. Please try again.', [{ text: 'OK' }], 'error');
+        }
       }
     } catch (error) {
       console.error('Purchase error:', error);
-      showAlert(
-        'Purchase Failed',
-        'There was an issue processing your purchase. Please try again.',
-        [{ text: 'OK' }],
-        'error'
-      );
+      showAlert('Purchase Failed', 'Something went wrong. Please try again.', [{ text: 'OK' }], 'error');
     } finally {
       setLoadingItemId(null);
     }
@@ -254,43 +201,25 @@ export default function ShopScreen() {
 
   const handleRestorePurchases = async () => {
     if (!user?.id) {
-      showAlert(
-        'Authentication Required',
-        'Please log in to restore purchases.',
-        [{ text: 'OK' }],
-        'error'
-      );
+      showAlert('Authentication Error', 'Please log in to restore purchases.', [{ text: 'OK' }], 'error');
       return;
     }
 
     setIsLoading(true);
+
     try {
-      // TODO: Implement RevenueCat restore logic
-      console.log('Restoring purchases...');
+      const result = await purchaseManager.restorePurchases();
       
-      const success = await PurchaseManager.restorePurchases(user.id);
-      
-      if (success) {
-        // Refresh user capabilities after restore
+      if (result.success) {
+        showAlert('Purchases Restored!', 'Your previous purchases have been restored.', [{ text: 'OK' }], 'success');
+        // Refresh capabilities to reflect restored purchases
         await fetchCapabilities();
-        
-        showAlert(
-          'Purchases Restored',
-          'Your previous purchases have been restored successfully.',
-          [{ text: 'OK' }],
-          'success'
-        );
       } else {
-        throw new Error('Failed to restore purchases');
+        showAlert('Restore Failed', result.error || 'No purchases found to restore.', [{ text: 'OK' }], 'error');
       }
     } catch (error) {
       console.error('Restore error:', error);
-      showAlert(
-        'Restore Failed',
-        'Unable to restore purchases. Please try again.',
-        [{ text: 'OK' }],
-        'error'
-      );
+      showAlert('Restore Failed', 'Something went wrong. Please try again.', [{ text: 'OK' }], 'error');
     } finally {
       setIsLoading(false);
     }
@@ -323,9 +252,8 @@ export default function ShopScreen() {
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ArrowLeft color="#fff" size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Shop</Text>
+        <Text style={styles.headerTitle}>The Goblin's Market</Text>
         <View style={styles.headerRight}>
-          <ShoppingCart size={24} color="#4CAF50" />
         </View>
       </View>
 
@@ -333,6 +261,33 @@ export default function ShopScreen() {
         {/* Featured Subscriptions */}
         <View style={styles.subscriptionsSection}>
           <Text style={styles.sectionTitle}>Premium Subscriptions</Text>
+          
+          {/* RevenueCat Paywall Button */}
+          <TouchableOpacity
+            style={[styles.premiumCard, { borderWidth: 2, borderColor: '#FFD700' }]}
+            onPress={() => showPaywall()}
+            activeOpacity={0.8}
+          >
+            <View style={styles.premiumContent}>
+              <View style={styles.premiumLeft}>
+                <View style={[styles.premiumImageContainer, { backgroundColor: 'rgba(255, 215, 0, 0.1)', borderColor: 'rgba(255, 215, 0, 0.3)' }]}>
+                  <Crown size={32} color="#FFD700" />
+                </View>
+                <View style={styles.premiumInfo}>
+                  <View style={styles.premiumHeader}>
+                    <Text style={[styles.premiumTitle, { color: '#FFD700' }]}>RevenueCat Paywall</Text>
+                  </View>
+                  <Text style={styles.premiumDescription}>
+                    Experience our optimized paywall with A/B tested templates
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.premiumPriceContainer}>
+                <Text style={[styles.premiumPrice, { color: '#FFD700' }]}>Try</Text>
+                <Text style={[styles.premiumPeriod, { color: '#FFD700' }]}>Now</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
           
           {/* DM Subscription */}
           <TouchableOpacity
@@ -414,7 +369,7 @@ export default function ShopScreen() {
                     loadingItemId === item.id && styles.shopItemLoading,
                     isPurchased && styles.shopItemPurchased
                   ]}
-                  onPress={() => handlePurchase(item)}
+                  onPress={() => handlePurchase(item.id)}
                   disabled={loadingItemId === item.id || isPurchased}
                   activeOpacity={isPurchased ? 1 : 0.8}
                 >
@@ -507,6 +462,20 @@ export default function ShopScreen() {
         isVisible={showScrollModal}
         onClose={() => setShowScrollModal(false)}
         onSuccess={handleScrollModalSuccess}
+      />
+
+      {/* RevenueCat Paywall */}
+      <RevenueCatPaywall
+        visible={isPaywallVisible}
+        onClose={hidePaywall}
+        offering={currentOffering}
+        onPurchaseSuccess={() => {
+          console.log('Purchase successful from RevenueCat paywall');
+          // Refresh capabilities will be handled by the paywall component
+        }}
+        onPurchaseError={(error) => {
+          console.error('Purchase failed from RevenueCat paywall:', error);
+        }}
       />
     </SafeAreaView>
   );
