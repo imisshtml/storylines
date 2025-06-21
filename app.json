@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.imisshtml.storylines"
     },
     "android": {
       "adaptiveIcon": {
@@ -32,8 +33,8 @@
       [
         "react-native-google-mobile-ads",
         {
-          "android_app_id": "ca-app-pub-4846990712111779~8324709931",
-          "ios_app_id": "ca-app-pub-4846990712111779~3524358138"
+          "androidAppId": "ca-app-pub-4846990712111779~8324709931",
+          "iosAppId": "ca-app-pub-4846990712111779~3524358138"
         }
       ]
     ],
