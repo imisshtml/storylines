@@ -34,7 +34,7 @@
     "expo-notifications": "~0.30.5",
     "expo-router": "~5.0.6",
     "expo-sms": "^13.1.4",
-    "expo-splash-screen": "~0.30.9",
+    "expo-splash-screen": "~0.27.5",
     "expo-status-bar": "~2.2.3",
     "expo-symbols": "~0.4.4",
     "expo-system-ui": "~5.0.7",

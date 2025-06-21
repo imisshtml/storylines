@@ -633,6 +633,8 @@ export default function StoryScreen() {
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
+        {/* Banner Ad */}
+        <BannerAd size={BannerAdSize.BANNER} style={styles.bannerAd} />
         <View style={styles.header}>
           <TouchableOpacity onPress={handleHomePress} style={styles.headerButton}>
             <Home size={24} color="#2a2a2a" />
@@ -646,9 +648,6 @@ export default function StoryScreen() {
             <User2 size={24} color="#2a2a2a" />
           </TouchableOpacity>
         </View>
-
-        {/* Banner Ad */}
-        <BannerAd size={BannerAdSize.BANNER} style={styles.bannerAd} />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
