@@ -1,5 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { useAtom } from 'jotai';
+import { useLimitEnforcement } from '../hooks/useLimitEnforcement';
+import { Lock } from 'lucide-react-native';
 
 export type Adventure = {
   id: string;
@@ -53,6 +56,22 @@ type Props = {
 };
 
 export default function AdventureSelectSheet({ isVisible, onClose, onSelect, selectedId }: Props) {
+  const { canAccessAllAdventures } = useLimitEnforcement();
+  
+  const hasAllAdventures = canAccessAllAdventures();
+  const availableAdventures = hasAllAdventures ? ADVENTURES : ADVENTURES.slice(0, 3);
+  const lockedAdventures = hasAllAdventures ? [] : ADVENTURES.slice(3);
+
+  const handleAdventureSelect = (adventure: Adventure) => {
+    onSelect(adventure);
+    onClose();
+  };
+
+  const handleLockedAdventurePress = () => {
+    // You could show an upgrade prompt here or navigate to shop
+    // For now, we'll just prevent selection
+  };
+
   return (
     <Modal
       visible={isVisible}
@@ -64,18 +83,25 @@ export default function AdventureSelectSheet({ isVisible, onClose, onSelect, sel
         <View style={styles.modalContent}>
           <View style={styles.handle} />
           <Text style={styles.title}>Select Adventure</Text>
+          
+          {!hasAllAdventures && (
+            <View style={styles.upgradeNotice}>
+              <Text style={styles.upgradeText}>
+                Purchase &quot;Access All Adventures&quot; in the shop to unlock all {ADVENTURES.length} adventures!
+              </Text>
+            </View>
+          )}
+          
           <ScrollView style={styles.scrollView}>
-            {ADVENTURES.map((adventure) => (
+            {/* Available Adventures */}
+            {availableAdventures.map((adventure) => (
               <TouchableOpacity
                 key={adventure.id}
                 style={[
                   styles.adventureCard,
                   selectedId === adventure.id && styles.selectedCard
                 ]}
-                onPress={() => {
-                  onSelect(adventure);
-                  onClose();
-                }}
+                onPress={() => handleAdventureSelect(adventure)}
               >
                 <Text style={[
                   styles.adventureTitle,
@@ -91,6 +117,36 @@ export default function AdventureSelectSheet({ isVisible, onClose, onSelect, sel
                 </Text>
               </TouchableOpacity>
             ))}
+
+            {/* Locked Adventures */}
+            {lockedAdventures.length > 0 && (
+              <>
+                <View style={styles.lockedSection}>
+                  <View style={styles.lockedHeader}>
+                    <Lock size={16} color="#888" />
+                    <Text style={styles.lockedSectionTitle}>Premium Adventures</Text>
+                  </View>
+                </View>
+                
+                {lockedAdventures.map((adventure) => (
+                  <TouchableOpacity
+                    key={adventure.id}
+                    style={styles.lockedAdventureCard}
+                    onPress={handleLockedAdventurePress}
+                  >
+                    <View style={styles.lockedOverlay}>
+                      <Lock size={20} color="#666" />
+                    </View>
+                    <Text style={styles.lockedAdventureTitle}>
+                      {adventure.title}
+                    </Text>
+                    <Text style={styles.lockedAdventureDescription}>
+                      {adventure.description}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </>
+            )}
           </ScrollView>
         </View>
       </View>
@@ -126,6 +182,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontFamily: 'Inter-Bold',
   },
+  upgradeNotice: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.3)',
+  },
+  upgradeText: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+  },
   scrollView: {
     flex: 1,
   },
@@ -152,5 +222,48 @@ const styles = StyleSheet.create({
   },
   selectedText: {
     color: '#fff',
+  },
+  lockedSection: {
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  lockedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  lockedSectionTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: '#888',
+  },
+  lockedAdventureCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    opacity: 0.6,
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  lockedOverlay: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    zIndex: 1,
+  },
+  lockedAdventureTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#666',
+    marginBottom: 8,
+    fontFamily: 'Inter-Bold',
+    paddingRight: 40, // Make room for lock icon
+  },
+  lockedAdventureDescription: {
+    fontSize: 14,
+    color: '#555',
+    fontFamily: 'Inter-Regular',
   },
 }); 

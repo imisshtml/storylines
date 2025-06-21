@@ -60,6 +60,12 @@ import { raceDesc, classDesc, skillsDesc, skillsStat } from '../data/characterDa
 import { DEFAULT_AVATARS, getAvatarById } from '../data/defaultAvatars';
 import { useCustomAlert } from '../components/CustomAlert';
 import { supabase } from '../config/supabase';
+import { 
+  userCapabilitiesAtom, 
+  fetchUserCapabilitiesAtom, 
+  checkUserLimitAtom 
+} from '../atoms/userCapabilitiesAtoms';
+import { charactersAtom } from '../atoms/characterAtoms';
 
 const CREATION_STEPS = [
   { id: 0, title: 'Info', icon: User },
@@ -81,8 +87,12 @@ const POINT_BUY_TOTAL = 27;
 
 export default function CreationScreen() {
   const [user] = useAtom(userAtom);
-  const [currentStep, setCurrentStep] = useAtom(characterCreationStepAtom);
+  const [characters] = useAtom(charactersAtom);
+  const [userCapabilities] = useAtom(userCapabilitiesAtom);
+  const [, fetchCapabilities] = useAtom(fetchUserCapabilitiesAtom);
+  const [, checkUserLimit] = useAtom(checkUserLimitAtom);
   const { showAlert, hideAlert } = useCustomAlert();
+  const [currentStep, setCurrentStep] = useAtom(characterCreationStepAtom);
   const [characterName, setCharacterName] = useAtom(characterNameAtom);
   const [selectedRace, setSelectedRace] = useAtom(selectedRaceAtom);
   const [selectedClass, setSelectedClass] = useAtom(selectedClassAtom);
@@ -139,6 +149,7 @@ export default function CreationScreen() {
           fetchClasses(),
           fetchSpells(),
           fetchEquipment(),
+          fetchCapabilities(), // Load user capabilities
         ]);
       } catch (error) {
         console.error('Error loading character creation data:', error);
@@ -148,7 +159,40 @@ export default function CreationScreen() {
     };
 
     loadData();
-  }, [fetchRaces, fetchClasses, fetchSpells, fetchEquipment]);
+  }, [fetchRaces, fetchClasses, fetchSpells, fetchEquipment, fetchCapabilities]);
+
+  // Check character limit before allowing creation
+  useEffect(() => {
+    const checkLimit = async () => {
+      if (user && characters.length > 0) {
+        const canCreate = await checkUserLimit('character', characters.length);
+        if (!canCreate) {
+          showAlert(
+            'Character Limit Reached',
+            `You can only create ${userCapabilities.characterLimit} characters. Purchase character limit upgrades in the shop to create more characters.`,
+            [
+              {
+                text: 'Go to Shop',
+                onPress: () => {
+                  router.replace('/shop');
+                },
+              },
+              {
+                text: 'Go Back',
+                onPress: () => {
+                  router.back();
+                },
+                style: 'cancel',
+              },
+            ],
+            'warning'
+          );
+        }
+      }
+    };
+
+    checkLimit();
+  }, [user, characters.length, userCapabilities.characterLimit, checkUserLimit, showAlert]);
 
   // Set starting wealth when class is selected
   useEffect(() => {
@@ -527,6 +571,29 @@ export default function CreationScreen() {
   const handleSaveCharacter = async () => {
     if (!user || !characterName || !selectedRace || !selectedClass) {
       showAlert('Error', 'Please complete all required fields', undefined, 'error');
+      return;
+    }
+
+    // Final check before saving
+    const canCreate = await checkUserLimit('character', characters.length);
+    if (!canCreate) {
+      showAlert(
+        'Character Limit Reached',
+        `You can only create ${userCapabilities.characterLimit} characters. Purchase character limit upgrades in the shop to create more characters.`,
+        [
+          {
+            text: 'Go to Shop',
+            onPress: () => {
+              router.replace('/shop');
+            },
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+        ],
+        'warning'
+      );
       return;
     }
 

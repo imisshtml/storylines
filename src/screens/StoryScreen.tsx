@@ -41,6 +41,8 @@ import EnhancedStoryChoices from '../components/EnhancedStoryChoices';
 import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
+import BannerAd from '../components/BannerAd';
+import { BannerAdSize } from 'react-native-google-mobile-ads';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask';
 
@@ -645,6 +647,9 @@ export default function StoryScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Banner Ad */}
+        <BannerAd size={BannerAdSize.BANNER} style={styles.bannerAd} />
+
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.content}
@@ -1063,5 +1068,11 @@ const styles = StyleSheet.create({
   },
   playerActionsPanel: {
     marginVertical: 16,
+  },
+  bannerAd: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
   },
 });

@@ -150,13 +150,14 @@ export class PurchaseManager {
       throw fetchError;
     }
     
-    const currentValue = profile?.[limitType] || 0;
+    const currentValue = (profile as any)?.[limitType] || 0;
     const newValue = currentValue + increment;
     
     // Update with new value
+    const updateData = { [limitType]: newValue };
     const { error: updateError } = await supabase
       .from('profiles')
-      .update({ [limitType]: newValue })
+      .update(updateData)
       .eq('id', userId);
       
     if (updateError) {

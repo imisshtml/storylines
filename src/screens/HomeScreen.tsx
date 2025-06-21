@@ -25,6 +25,7 @@ import { useCustomAlert } from '../components/CustomAlert';
 import { initializeNotificationListeners, requestNotificationPermissions } from '../utils/notifications';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
+import { useLimitEnforcement } from '../hooks/useLimitEnforcement';
 
 export default function HomeScreen() {
   const [campaigns] = useAtom(campaignsAtom);
@@ -46,6 +47,7 @@ export default function HomeScreen() {
   const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
   const { showAlert } = useCustomAlert();
   const { isLoading, withLoading } = useLoading();
+  const { checkCampaignLimit } = useLimitEnforcement();
 
   // Fetch characters and read status when component mounts or user changes
   useEffect(() => {
@@ -188,13 +190,16 @@ export default function HomeScreen() {
     }
   };
 
-  const handleCreateCampaign = () => {
-    // Clear current campaign data to ensure new campaign starts fresh
-    setCurrentCampaign(null);
-    // Small delay to ensure state is cleared before navigation
-    setTimeout(() => {
-      router.push('/create');
-    }, 50);
+  const handleCreateCampaign = async () => {
+    const canCreate = await checkCampaignLimit();
+    if (canCreate) {
+      // Clear current campaign data to ensure new campaign starts fresh
+      setCurrentCampaign(null);
+      // Small delay to ensure state is cleared before navigation
+      setTimeout(() => {
+        router.push('/create');
+      }, 50);
+    }
   };
 
   const getCharacterAvatar = (character: Character) => {

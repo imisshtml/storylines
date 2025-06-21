@@ -11,7 +11,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { ArrowLeft, ShoppingCart, Crown } from 'lucide-react-native';
+import { ArrowLeft, ShoppingCart, Crown, Check } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useCustomAlert } from '../components/CustomAlert';
 import DMSubscriptionModal from '../components/DMSubscriptionModal';
@@ -19,6 +19,8 @@ import AdventurerPackModal from '../components/AdventurerPackModal';
 import { PurchaseManager } from '../utils/purchaseManager';
 import { useAtom } from 'jotai';
 import { userAtom } from '../atoms/authAtoms';
+import { fetchUserCapabilitiesAtom, userCapabilitiesAtom } from '../atoms/userCapabilitiesAtoms';
+import ScrollSelectionModal from '../components/ScrollSelectionModal';
 
 // TODO: Import RevenueCat
 // import Purchases from 'react-native-purchases';
@@ -39,8 +41,38 @@ export default function ShopScreen() {
   const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
   const [showDMModal, setShowDMModal] = useState(false);
   const [showAdventurerModal, setShowAdventurerModal] = useState(false);
+  const [showScrollModal, setShowScrollModal] = useState(false);
+  const [capabilitiesLoaded, setCapabilitiesLoaded] = useState(false);
   const { showAlert } = useCustomAlert();
   const [user] = useAtom(userAtom);
+  const [, fetchCapabilities] = useAtom(fetchUserCapabilitiesAtom);
+  const [userCapabilities] = useAtom(userCapabilitiesAtom);
+
+  // Load capabilities when component mounts
+  useEffect(() => {
+    const loadCapabilities = async () => {
+      if (user?.id) {
+        try {
+          console.log('ShopScreen: Loading capabilities...');
+          await fetchCapabilities();
+          console.log('ShopScreen: Capabilities loaded:', userCapabilities);
+          setCapabilitiesLoaded(true);
+        } catch (error) {
+          console.error('Error loading capabilities in shop:', error);
+          setCapabilitiesLoaded(true); // Set to true anyway to avoid infinite loading
+        }
+      } else {
+        setCapabilitiesLoaded(true); // No user, so no capabilities to load
+      }
+    };
+
+    loadCapabilities();
+  }, [user?.id, fetchCapabilities]);
+
+  // Debug: Log capabilities changes
+  useEffect(() => {
+    console.log('ShopScreen: User capabilities updated:', userCapabilities);
+  }, [userCapabilities]);
 
   const shopItems: ShopItem[] = [
     {
@@ -99,11 +131,56 @@ export default function ShopScreen() {
     },
   ];
 
+  // Check if an item is purchased
+  const isItemPurchased = (itemId: string): boolean => {
+    console.log(`ShopScreen: Checking if ${itemId} is purchased. adsRemoved:`, userCapabilities.adsRemoved);
+    
+    switch (itemId) {
+      case 'remove_ads':
+        return userCapabilities.adsRemoved;
+      case 'all_adventures':
+        return userCapabilities.allAdventuresUnlocked;
+      case 'group_size':
+        // Group size can be purchased twice, so check if at max (7 players)
+        return userCapabilities.groupSizeLimit >= 7;
+      case 'character_limit':
+        // Character limit purchases are stackable, so we don't mark as "purchased"
+        return false;
+      case 'campaign_limit':
+        // Campaign limit purchases are stackable, so we don't mark as "purchased"
+        return false;
+      case 'scroll_rebirth':
+        // Scrolls are consumable, so never mark as "purchased"
+        return false;
+      default:
+        return false;
+    }
+  };
+
+  // Get purchase status text
+  const getPurchaseStatusText = (itemId: string): string => {
+    if (isItemPurchased(itemId)) {
+      return 'Purchased';
+    }
+    return '';
+  };
+
   const handleBack = () => {
     router.back();
   };
 
   const handlePurchase = async (item: ShopItem) => {
+    // Don't allow purchasing already purchased non-consumable items
+    if (isItemPurchased(item.id)) {
+      showAlert(
+        'Already Purchased',
+        'You have already purchased this item.',
+        [{ text: 'OK' }],
+        'info'
+      );
+      return;
+    }
+
     if (item.id === 'dm_subscription') {
       setShowDMModal(true);
       return;
@@ -135,12 +212,26 @@ export default function ShopScreen() {
       const success = await PurchaseManager.handlePurchaseSuccess(item.revenueCatId || item.id, user.id);
       
       if (success) {
-        showAlert(
-          'Purchase Successful!',
-          `${item.title} has been added to your account.`,
-          [{ text: 'Continue' }],
-          'success'
-        );
+        // Refresh user capabilities after purchase
+        await fetchCapabilities();
+        
+        // Special handling for scroll of rebirth
+        if (item.id === 'scroll_rebirth') {
+          showAlert(
+            'Purchase Successful!',
+            'Your Scroll of Rebirth is ready! Now choose which character should receive it.',
+            [{ text: 'Choose Character' }],
+            'success'
+          );
+          setShowScrollModal(true);
+        } else {
+          showAlert(
+            'Purchase Successful!',
+            `${item.title} has been added to your account.`,
+            [{ text: 'Continue' }],
+            'success'
+          );
+        }
       } else {
         throw new Error('Failed to process purchase');
       }
@@ -176,6 +267,9 @@ export default function ShopScreen() {
       const success = await PurchaseManager.restorePurchases(user.id);
       
       if (success) {
+        // Refresh user capabilities after restore
+        await fetchCapabilities();
+        
         showAlert(
           'Purchases Restored',
           'Your previous purchases have been restored successfully.',
@@ -197,6 +291,24 @@ export default function ShopScreen() {
       setIsLoading(false);
     }
   };
+
+  const handleScrollModalSuccess = () => {
+    // Refresh capabilities after scroll is assigned
+    fetchCapabilities();
+  };
+
+  // Show loading while capabilities are being fetched
+  if (!capabilitiesLoaded) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#121212" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.loadingText}>Loading shop...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -286,46 +398,64 @@ export default function ShopScreen() {
         <View style={styles.itemsSection}>
           <Text style={styles.sectionTitle}>One-Time Purchases</Text>
           <View style={styles.itemsGrid}>
-            {shopItems.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.shopItem, loadingItemId === item.id && styles.shopItemLoading]}
-                onPress={() => handlePurchase(item)}
-                disabled={loadingItemId === item.id}
-                activeOpacity={0.8}
-              >
-                {/* Content */}
-                <View style={styles.itemContent}>
-                  <View style={styles.itemLeft}>
-                    <View style={styles.itemImageContainer}>
-                      <Image 
-                        source={item.image} 
-                        style={styles.itemImage}
-                        resizeMode="contain"
-                      />
-                    </View>
-                    <View style={styles.itemInfo}>
-                      <Text style={styles.itemTitle}>{item.title}</Text>
-                      <Text style={styles.itemDescription}>{item.description}</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.itemRight}>
-                    {loadingItemId === item.id ? (
-                      <View style={styles.itemLoadingContainer}>
-                        <ActivityIndicator size="small" color="#4CAF50" />
+            {shopItems.map((item) => {
+              const isPurchased = isItemPurchased(item.id);
+              const statusText = getPurchaseStatusText(item.id);
+              
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.shopItem, 
+                    loadingItemId === item.id && styles.shopItemLoading,
+                    isPurchased && styles.shopItemPurchased
+                  ]}
+                  onPress={() => handlePurchase(item)}
+                  disabled={loadingItemId === item.id || isPurchased}
+                  activeOpacity={isPurchased ? 1 : 0.8}
+                >
+                  {/* Content */}
+                  <View style={styles.itemContent}>
+                    <View style={styles.itemLeft}>
+                      <View style={styles.itemImageContainer}>
+                        <Image 
+                          source={item.image} 
+                          style={[styles.itemImage, isPurchased && styles.itemImagePurchased]}
+                          resizeMode="contain"
+                        />
                       </View>
-                    ) : (
-                      <View style={styles.itemPriceContainer}>
-                        <Text style={styles.itemPrice}>
-                          {item.price}
+                      <View style={styles.itemInfo}>
+                        <Text style={[styles.itemTitle, isPurchased && styles.itemTitlePurchased]}>
+                          {item.title}
+                        </Text>
+                        <Text style={[styles.itemDescription, isPurchased && styles.itemDescriptionPurchased]}>
+                          {item.description}
                         </Text>
                       </View>
-                    )}
+                    </View>
+                    
+                    <View style={styles.itemRight}>
+                      {loadingItemId === item.id ? (
+                        <View style={styles.itemLoadingContainer}>
+                          <ActivityIndicator size="small" color="#4CAF50" />
+                        </View>
+                      ) : isPurchased ? (
+                        <View style={styles.purchasedContainer}>
+                          <Check size={16} color="#4CAF50" />
+                          <Text style={styles.purchasedText}>Purchased</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.itemPriceContainer}>
+                          <Text style={styles.itemPrice}>
+                            {item.price}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -366,6 +496,13 @@ export default function ShopScreen() {
       <AdventurerPackModal
         isVisible={showAdventurerModal}
         onClose={() => setShowAdventurerModal(false)}
+      />
+
+      {/* Scroll Selection Modal */}
+      <ScrollSelectionModal
+        isVisible={showScrollModal}
+        onClose={() => setShowScrollModal(false)}
+        onSuccess={handleScrollModalSuccess}
       />
     </SafeAreaView>
   );
@@ -511,6 +648,10 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     transform: [{ scale: 0.98 }],
   },
+  shopItemPurchased: {
+    opacity: 0.5,
+    transform: [{ scale: 0.98 }],
+  },
   itemContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -536,6 +677,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
   },
+  itemImagePurchased: {
+    opacity: 0.5,
+  },
   itemInfo: {
     flex: 1,
   },
@@ -545,11 +689,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 4,
   },
+  itemTitlePurchased: {
+    opacity: 0.5,
+  },
   itemDescription: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#ccc',
     lineHeight: 18,
+  },
+  itemDescriptionPurchased: {
+    opacity: 0.5,
   },
   itemRight: {
     alignItems: 'flex-end',
@@ -578,6 +728,16 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  purchasedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  purchasedText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#4CAF50',
   },
   restoreSection: {
     padding: 16,
@@ -615,5 +775,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 300,
     lineHeight: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    marginTop: 16,
   },
 });

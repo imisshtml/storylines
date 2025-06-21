@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { friendRequestsReceivedAtom } from '../atoms/friendsAtoms';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
 import { sendTestNotification } from '../utils/notifications';
+import { useLimitEnforcement } from '../hooks/useLimitEnforcement';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.8;
@@ -25,6 +26,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
   const [friendRequestsReceived] = useAtom(friendRequestsReceivedAtom);
   const friendRequestCount = friendRequestsReceived.length;
+  const { checkCampaignLimit } = useLimitEnforcement();
 
   React.useEffect(() => {
     if (isVisible) {
@@ -71,12 +73,17 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
     return name.charAt(0).toUpperCase();
   };
 
-  const handleCreateCampaign = () => {
-    onClose();
-    setCurrentCampaign(null);
-    setTimeout(() => {
-      router.push('/create');
-    }, 50);
+  const handleCreateCampaign = async () => {
+    const canCreate = await checkCampaignLimit();
+    if (canCreate) {
+      onClose();
+      setCurrentCampaign(null);
+      setTimeout(() => {
+        router.push('/create');
+      }, 50);
+    } else {
+      onClose(); // Close sidebar even if limit reached
+    }
   };
 
   const handleJoinCampaign = () => {

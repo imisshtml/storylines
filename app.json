@@ -28,6 +28,13 @@
           "resizeMode": "cover",
           "backgroundColor": "#050908"
         }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "android_app_id": "ca-app-pub-4846990712111779~8324709931",
+          "ios_app_id": "ca-app-pub-4846990712111779~3524358138"
+        }
       ]
     ],
     "experiments": {
