@@ -102,7 +102,7 @@ export default function HomeScreen() {
         }
       }
 
-      if (campaign.status === 'creation') {
+      if (campaign.status === 'creation' || campaign.status === 'open') {
         router.push('/invite');
       } else {
         // Handle other campaign states
@@ -139,7 +139,7 @@ export default function HomeScreen() {
   };
 
   const handleJoinCampaign = () => {
-    setIsJoinModalVisible(true);
+    router.push('/join')
   };
 
   const handleAcceptCampaignInvitation = async (invitationId: string) => {
@@ -431,14 +431,6 @@ export default function HomeScreen() {
                             ) : null;
                           })()}
                         </View>
-                        {campaign.status === 'creation' && isOwner(campaign) && (
-                          <TouchableOpacity
-                            style={styles.settingsButton}
-                            onPress={() => handleSettingsPress(campaign.id)}
-                          >
-                            <Settings size={20} color="#888" />
-                          </TouchableOpacity>
-                        )}
                       </View>
                       <Text style={styles.campaignDetails}>
                         {isOwner(campaign) && (
@@ -446,12 +438,12 @@ export default function HomeScreen() {
                             <Crown size={14} color="#FFD700" />
                           </View>
                         )}
-                        {campaign.status === 'creation'
-                          ? 'In Creation'
+                        {(campaign.status === 'creation' || campaign.status === 'open')
+                          ? `Players: ${campaign.players.length}/${campaign.limit} • Waiting to Start`
                           : `Players: ${campaign.players.length} • ${campaign.status === 'waiting' ? 'Waiting' : 'In Progress'}`
                         }
                       </Text>
-                      {campaign.status === 'creation' && isOwner(campaign) ? (
+                      {(campaign.status === 'creation' || campaign.status === 'open') && isOwner(campaign) ? (
                         <View style={styles.creationButtonsContainer}>
                           <TouchableOpacity
                             style={styles.campaignButton}
@@ -473,7 +465,7 @@ export default function HomeScreen() {
                           style={styles.continueButton}
                           onPress={() => handleCampaignPress(campaign.id)}
                         >
-                          {campaign.status === 'creation' ? (
+                          {(campaign.status === 'creation' || campaign.status === 'open') ? (
                             <>
                               <Users size={20} color="#fff" />
                               <Text style={styles.buttonText}>Waiting for Start</Text>
@@ -512,7 +504,7 @@ export default function HomeScreen() {
                         onPress={handleJoinCampaign}
                       >
                         <Users size={20} color="#fff" />
-                        <Text style={styles.buttonText}>Join via Code</Text>
+                        <Text style={styles.buttonText}>Join a Campaign</Text>
                       </TouchableOpacity>
                     </View>
                   </>

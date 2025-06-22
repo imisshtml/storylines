@@ -8,7 +8,7 @@ export type Campaign = {
   level: number;
   tone: 'serious' | 'humorous' | 'grimdark';
   exclude: string[];
-  status: 'creation' | 'waiting' | 'in_progress';
+  status: 'creation' | 'waiting' | 'in_progress' | 'open';
   players: Player[];
   invite_code: string;
   owner: string;

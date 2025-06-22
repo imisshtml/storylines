@@ -129,7 +129,7 @@ export default function CharactersScreen() {
                 </View>
                 <View style={[
                   styles.statusBadge,
-                  campaignInfo.status === 'creation' && styles.creationStatus,
+                  (campaignInfo.status === 'creation' || campaignInfo.status === 'open') && styles.creationStatus,
                   campaignInfo.status === 'waiting' && styles.waitingStatus,
                   campaignInfo.status === 'in_progress' && styles.activeStatus,
                 ]}>
