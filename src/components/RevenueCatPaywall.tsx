@@ -97,22 +97,11 @@ export default function RevenueCatPaywall({
     <Modal
       visible={visible}
       animationType="slide"
+      transparent
       presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container}>
-        {/* Custom Header */}
-        <View style={styles.header}>
-          <View style={styles.headerSpacer} />
-          <Text style={styles.headerTitle}>Upgrade Storylines</Text>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={onClose}
-          >
-            <X size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
+      <View style={styles.container}>
         {/* RevenueCat Paywall */}
         <View style={styles.paywallContainer}>
           {isInitialized ? (
@@ -131,7 +120,7 @@ export default function RevenueCatPaywall({
             </View>
           )}
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
@@ -139,17 +128,14 @@ export default function RevenueCatPaywall({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#1a1a1a',
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    paddingBottom: 12,
+    paddingTop: 60,
   },
   headerSpacer: {
     width: 24, // Same width as close button for centering

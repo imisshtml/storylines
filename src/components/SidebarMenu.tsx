@@ -105,7 +105,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
 
   const menuItems = [
     {
-      icon: <Users size={24} color="#fff" />,
+      icon: <Image source={require('../../assets/images/characters.png')} style={styles.img} />,
       title: 'My Characters',
       subtitle: 'View and Create 5e characters',
       onPress: () => {
@@ -114,19 +114,19 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       },
     },
     {
-      icon: <Plus size={24} color="#fff" />,
+      icon: <Image source={require('../../assets/images/create.png')} style={styles.img} />,
       title: 'Create Campaign',
       subtitle: 'Start a new adventure',
       onPress: handleCreateCampaign,
     },
     {
-      icon: <Binary size={24} color="#fff" />,
+      icon: <Image source={require('../../assets/images/join.png')} style={styles.img} />,
       title: 'Join via Code',
       subtitle: 'Join an existing campaign',
       onPress: handleJoinCampaign,
     },
     {
-      icon: <Handshake size={24} color="#fff" />,
+      icon: <Image source={require('../../assets/images/friends.png')} style={styles.img} />,
       title: 'Friends',
       subtitle: 'Every Hero needs a fellowship',
       onPress: () => {
@@ -136,7 +136,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       badge: friendRequestCount > 0 ? friendRequestCount : undefined,
     },
     {
-      icon: <Landmark size={24} color="#ff0" />,
+      icon: <Image source={require('../../assets/images/market.png')} style={styles.img} />,
       title: "The Goblin's Market",
       subtitle: 'Enhance your adventure',
       onPress: () => {
@@ -145,7 +145,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       },
     },
     {
-      icon: <UserCog size={24} color="#fff" />,
+      icon: <Image source={require('../../assets/images/account.png')} style={styles.img} />,
       title: 'Account & Settings',
       subtitle: 'Manage your account',
       onPress: () => {
@@ -154,7 +154,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       },
     },
     {
-      icon: <Info size={24} color="#fff" />,
+      icon: <Image source={require('../../assets/images/about.png')} style={styles.img} />,
       title: 'About',
       subtitle: 'App information',
       onPress: () => {
@@ -410,4 +410,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     textAlign: 'center',
   },
+  img: {
+    width: 40, 
+    height: 40
+  }
 });

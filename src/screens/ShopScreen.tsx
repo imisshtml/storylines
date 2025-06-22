@@ -260,39 +260,10 @@ export default function ShopScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Featured Subscriptions */}
         <View style={styles.subscriptionsSection}>
-          <Text style={styles.sectionTitle}>Premium Subscriptions</Text>
-          
-          {/* RevenueCat Paywall Button */}
-          <TouchableOpacity
-            style={[styles.premiumCard, { borderWidth: 2, borderColor: '#FFD700' }]}
-            onPress={() => showPaywall()}
-            activeOpacity={0.8}
-          >
-            <View style={styles.premiumContent}>
-              <View style={styles.premiumLeft}>
-                <View style={[styles.premiumImageContainer, { backgroundColor: 'rgba(255, 215, 0, 0.1)', borderColor: 'rgba(255, 215, 0, 0.3)' }]}>
-                  <Crown size={32} color="#FFD700" />
-                </View>
-                <View style={styles.premiumInfo}>
-                  <View style={styles.premiumHeader}>
-                    <Text style={[styles.premiumTitle, { color: '#FFD700' }]}>RevenueCat Paywall</Text>
-                  </View>
-                  <Text style={styles.premiumDescription}>
-                    Experience our optimized paywall with A/B tested templates
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.premiumPriceContainer}>
-                <Text style={[styles.premiumPrice, { color: '#FFD700' }]}>Try</Text>
-                <Text style={[styles.premiumPeriod, { color: '#FFD700' }]}>Now</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-          
           {/* DM Subscription */}
           <TouchableOpacity
             style={styles.premiumCard}
-            onPress={() => setShowDMModal(true)}
+            onPress={() => showPaywall()}
             activeOpacity={0.8}
           >
             <View style={styles.premiumContent}>
@@ -307,10 +278,10 @@ export default function ShopScreen() {
                 <View style={styles.premiumInfo}>
                   <View style={styles.premiumHeader}>
                     <Crown size={20} color="#FFD700" />
-                    <Text style={styles.premiumTitle}>DM Subscription</Text>
+                    <Text style={styles.premiumTitle}>Ultimate Host</Text>
                   </View>
                   <Text style={styles.premiumDescription}>
-                    Ultimate DM tools, unlimited campaigns, and exclusive content
+                    Make the most of your campaigns for you and your players!
                   </Text>
                 </View>
               </View>
@@ -355,7 +326,7 @@ export default function ShopScreen() {
 
         {/* Shop Items */}
         <View style={styles.itemsSection}>
-          <Text style={styles.sectionTitle}>One-Time Purchases</Text>
+          <View style={styles.divider} />
           <View style={styles.itemsGrid}>
             {shopItems.map((item) => {
               const isPurchased = isItemPurchased(item.id);
@@ -584,6 +555,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#ccc',
     lineHeight: 18,
+    paddingRight: 2,
   },
   premiumPriceContainer: {
     alignItems: 'flex-end',
@@ -760,4 +732,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginTop: 16,
   },
+  divider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#2f2f2f',
+    marginBottom: 24
+  }
 });
