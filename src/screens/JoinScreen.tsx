@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -32,19 +32,24 @@ import { userAtom } from '../atoms/authAtoms';
 import { fetchCampaignsAtom, currentCampaignAtom } from '../atoms/campaignAtoms';
 import { useCustomAlert } from '../components/CustomAlert';
 import { ADVENTURES } from '../components/AdventureSelectSheet';
+import { getCharacterAvatarUrl } from '../utils/avatarStorage';
+import { charactersAtom, Character } from '../atoms/characterAtoms';
 
 type Campaign = {
   id: string;
   uid: string;
   name: string;
   adventure: string;
+  level: number;
+  tone: 'serious' | 'humorous' | 'grimdark';
+  exclude: string[];
   owner: string;
-  status: string;
+  status: 'creation' | 'waiting' | 'in_progress' | 'open';
   players: any[];
+  invite_code: string;
   limit: number;
   content_level: 'kids' | 'teens' | 'adults';
-  rp_focus: string;
-  tone: string;
+  rp_focus: 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heavy_combat';
   priority?: boolean;
   created_at: string;
   owner_profile?: {
@@ -57,6 +62,8 @@ export default function JoinScreen() {
   const [user] = useAtom(userAtom);
   const [, fetchCampaigns] = useAtom(fetchCampaignsAtom);
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
+  const [characters] = useAtom(charactersAtom);
+  const [campaignCharacters, setCampaignCharacters] = useState<Character[]>([]);
   
   const [inviteCode, setInviteCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -69,9 +76,77 @@ export default function JoinScreen() {
   
   const { showAlert } = useCustomAlert();
 
+  const fetchCampaignCharacters = useCallback(async (campaignId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('characters')
+        .select('*')
+        .eq('campaign_id', campaignId);
+
+      if (error) {
+        console.error('Error fetching campaign characters:', error);
+        return;
+      }
+
+      setCampaignCharacters(data || []);
+    } catch (error) {
+      console.error('Error fetching campaign characters:', error);
+    }
+  }, []);
+
+  const getPlayerCharacter = useCallback((playerId: string, campaign: Campaign): Character | null => {
+    // First, check if character info is stored in the campaign's players array
+    const player = campaign.players.find(p => p.id === playerId);
+    const playerWithCharacter = player as any;
+    if (playerWithCharacter && playerWithCharacter.character) {
+      // Convert the stored character info back to a Character object
+      const charData = playerWithCharacter.character;
+      return {
+        id: charData.id,
+        name: charData.name,
+        class: charData.class,
+        race: charData.race,
+        level: charData.level,
+        user_id: playerId,
+        campaign_id: campaign.id,
+        // Add default values for other required Character fields
+        background: '',
+        abilities: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
+        skills: [],
+        spells: [],
+        equipment: [],
+        current_hitpoints: 0,
+        max_hitpoints: 0,
+        temp_hitpoints: 0,
+        armor_class: 10,
+        conditions: [],
+        gold: 0,
+        silver: 0,
+        copper: 0,
+        avatar: charData.avatar || '',
+        traits: [],
+        features: [],
+        saving_throws: [],
+        proficiency: [],
+        created_at: '',
+        updated_at: '',
+      } as Character;
+    }
+
+    // Fall back to database query
+    const character = campaignCharacters.find(char => char.user_id === playerId);
+    return character || null;
+  }, [campaignCharacters]);
+
   useEffect(() => {
     fetchOpenCampaigns();
   }, []);
+
+  useEffect(() => {
+    if (selectedCampaign) {
+      fetchCampaignCharacters(selectedCampaign.id);
+    }
+  }, [selectedCampaign, fetchCampaignCharacters]);
 
   const fetchOpenCampaigns = async () => {
     if (!user) return;
@@ -81,19 +156,39 @@ export default function JoinScreen() {
       // Fetch campaigns with status 'open'
       const { data: campaigns, error } = await supabase
         .from('campaigns')
-        .select(`
-          *,
-          owner_profile:profiles!campaigns_owner_fkey(username, email)
-        `)
+        .select('*')
         .eq('status', 'open');
       
       if (error) {
         console.error('Error fetching open campaigns:', error);
         throw error;
       }
+
+      // Fetch owner profiles separately
+      const ownerIds = campaigns?.map(c => c.owner) || [];
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, email')
+        .in('id', ownerIds);
+
+      if (profilesError) {
+        console.error('Error fetching owner profiles:', profilesError);
+        // Continue without profiles rather than failing completely
+      }
+
+      // Map profiles to campaigns
+      const profileMap = (profiles || []).reduce((acc, profile) => {
+        acc[profile.id] = profile;
+        return acc;
+      }, {} as Record<string, any>);
+
+      const campaignsWithProfiles = campaigns?.map(campaign => ({
+        ...campaign,
+        owner_profile: profileMap[campaign.owner]
+      })) || [];
       
       // Filter out campaigns where the user is already a player
-      const filteredCampaigns = campaigns.filter(campaign => {
+      const filteredCampaigns = campaignsWithProfiles.filter(campaign => {
         // Skip if user is the owner
         if (campaign.owner === user.id) return false;
         
@@ -482,7 +577,7 @@ export default function JoinScreen() {
                   
                   <View style={styles.campaignDetails}>
                     <View style={styles.campaignDetail}>
-                      <Text style={styles.detailLabel}>DM:</Text>
+                      <Text style={styles.detailLabel}>Host:</Text>
                       <Text style={styles.detailValue}>
                         {campaign.owner_profile?.username || 'Unknown'}
                       </Text>
@@ -541,14 +636,56 @@ export default function JoinScreen() {
                   </Text>
                 </View>
                 
-                <View style={styles.dmInfoCard}>
-                  <View style={styles.dmHeader}>
-                    <Crown size={20} color="#FFD700" />
-                    <Text style={styles.dmTitle}>Dungeon Master</Text>
+                {/* Players Section */}
+                <View style={styles.playersCard}>
+                  <View style={styles.playersHeader}>
+                    <Users size={20} color="#4CAF50" />
+                    <Text style={styles.playersTitle}>
+                      Players ({selectedCampaign.players.length}/{selectedCampaign.limit || 3})
+                    </Text>
                   </View>
-                  <Text style={styles.dmName}>
-                    {selectedCampaign.owner_profile?.username || 'Unknown DM'}
-                  </Text>
+                  <View style={styles.playersList}>
+                    {selectedCampaign.players.map((player, index) => {
+                      const playerCharacter = getPlayerCharacter(player.id, selectedCampaign);
+                      const isOwner = player.id === selectedCampaign.owner;
+                      
+                      return (
+                        <View key={player.id} style={styles.playerItem}>
+                          <View style={styles.playerInfo}>
+                            {isOwner ? (
+                              <Crown size={16} color="#FFD700" />
+                            ) : (
+                              <Users size={16} color="#4CAF50" />
+                            )}
+                            <Text style={styles.playerName}>
+                              {player.name || `Player ${index + 1}`}
+                            </Text>
+                          </View>
+                          
+                          <View style={styles.characterInfo}>
+                            {playerCharacter ? (
+                              <View style={styles.playerCharacterContainer}>
+                                <Image
+                                  source={getCharacterAvatarUrl(playerCharacter)}
+                                  style={styles.playerCharacterAvatar}
+                                />
+                                <View style={styles.playerCharacterDetails}>
+                                  <Text style={styles.playerCharacterName}>
+                                    {playerCharacter.name}
+                                  </Text>
+                                  <Text style={styles.playerCharacterClass}>
+                                    Lv{playerCharacter.level} {playerCharacter.race} {playerCharacter.class}
+                                  </Text>
+                                </View>
+                              </View>
+                            ) : (
+                              <Text style={styles.noCharacterText}>No Character</Text>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
                 </View>
                 
                 <View style={styles.detailsGrid}>
@@ -580,6 +717,27 @@ export default function JoinScreen() {
                     </Text>
                   </View>
                 </View>
+                
+                {/* Excluded Content Section */}
+                {selectedCampaign?.exclude && selectedCampaign?.exclude.length > 0 && (() => {
+                  // Flatten the exclude array in case it's nested
+                  const flattenedExclude = selectedCampaign?.exclude?.flat() || [];
+                  return flattenedExclude.length > 0 ? (
+                    <View style={styles.excludedContentCard}>
+                      <Text style={styles.excludedContentTitle}>Excluded Content</Text>
+                      <View style={styles.excludedContentList}>
+                        {flattenedExclude.map((item, index) => (
+                          <View key={index} style={styles.excludedContentItem}>
+                            <Text style={styles.excludedContentText}>• {item}</Text>
+                          </View>
+                        ))}
+                      </View>
+                      <Text style={styles.excludedContentNote}>
+                        This content will not appear in the campaign
+                      </Text>
+                    </View>
+                  ) : null;
+                })()}
                 
                 <TouchableOpacity
                   style={[
@@ -904,28 +1062,7 @@ const styles = StyleSheet.create({
     color: '#ccc',
     lineHeight: 20,
   },
-  dmInfoCard: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  dmHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  dmTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-    color: '#FFD700',
-  },
-  dmName: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#fff',
-  },
+
   detailsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -982,5 +1119,112 @@ const styles = StyleSheet.create({
     color: '#888',
     flex: 1,
     lineHeight: 20,
+  },
+  excludedContentCard: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff6b6b',
+  },
+  excludedContentTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: '#ff6b6b',
+    marginBottom: 12,
+  },
+  excludedContentList: {
+    marginBottom: 8,
+  },
+  excludedContentItem: {
+    marginBottom: 4,
+  },
+  excludedContentText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#ccc',
+    lineHeight: 20,
+  },
+  excludedContentNote: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#888',
+    fontStyle: 'italic',
+  },
+  playersCard: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  playersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  playersTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: '#4CAF50',
+  },
+  playersList: {
+    gap: 12,
+  },
+  playerItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  playerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  playerName: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#fff',
+  },
+  characterInfo: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  playerCharacterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  playerCharacterAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#444',
+  },
+  playerCharacterDetails: {
+    alignItems: 'flex-end',
+  },
+  playerCharacterName: {
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+  },
+  playerCharacterClass: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#888',
+  },
+  noCharacterText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#888',
+    fontStyle: 'italic',
   },
 });
