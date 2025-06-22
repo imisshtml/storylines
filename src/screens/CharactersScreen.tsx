@@ -68,7 +68,7 @@ export default function CharactersScreen() {
 
   const getCharacterCampaignName = (character: Character) => {
     if (character.campaign_id) {
-      // Find the campaign by campaign_id (which should match campaign.uid)
+      // Find the campaign by campaign_id (which should match campaign.id)
       const campaign = campaigns.find(c => c.uid === character.campaign_id);
       return campaign ? campaign.name : 'Unknown Campaign';
     }
@@ -91,7 +91,7 @@ export default function CharactersScreen() {
 
   const renderCharacterCard = (character: Character) => {
     const campaignInfo = getCharacterCampaignStatus(character);
-    
+
     return (
       <TouchableOpacity
         key={character.id}
@@ -116,7 +116,7 @@ export default function CharactersScreen() {
           <Text style={styles.characterName} numberOfLines={1}>
             {character.name}
           </Text>
-          
+
           <View style={styles.classRaceContainer}>
             <Text style={styles.classRaceText}>
               {character.race} {character.class}
@@ -139,13 +139,13 @@ export default function CharactersScreen() {
                 </View>
                 <View style={[
                   styles.statusBadge,
-                  campaignInfo.status === 'creation' && styles.creationStatus,
+                  (campaignInfo.status === 'creation' || campaignInfo.status === 'open') && styles.creationStatus,
                   campaignInfo.status === 'waiting' && styles.waitingStatus,
                   campaignInfo.status === 'in_progress' && styles.activeStatus,
                 ]}>
                   <Text style={styles.statusText}>
                     {campaignInfo.status === 'creation' ? 'Setup' :
-                     campaignInfo.status === 'waiting' ? 'Waiting' : 'Active'}
+                      campaignInfo.status === 'waiting' ? 'Waiting' : 'Active'}
                   </Text>
                 </View>
               </View>
@@ -186,13 +186,13 @@ export default function CharactersScreen() {
         </TouchableOpacity>
       </View>
 
-      <ActivityIndicator 
-        isLoading={isLoading('loadData')} 
-        text="Loading characters..." 
+      <ActivityIndicator
+        isLoading={isLoading('fetchCharacters')}
+        text="Loading characters..."
         style={styles.content}
       >
-        <ScrollView 
-          style={styles.content} 
+        <ScrollView
+          style={styles.content}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >

@@ -1,8 +1,8 @@
 export async function POST(request: Request) {
   try {
-    const { campaignUid, message, author, messageType, characterName } = await request.json();
+    const { campaignId, message, author, messageType, characterName } = await request.json();
 
-    if (!campaignUid || !message || !author || !messageType) {
+    if (!campaignId || !message || !author || !messageType) {
       return new Response('Missing required fields', {
         status: 400,
         headers: { 'Content-Type': 'text/plain' },
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const middlewareUrl = process.env.MIDDLEWARE_SERVICE_URL || 'http://localhost:3001';
 
     console.log('📝 Adding campaign summary via API:', {
-      campaignUid,
+      campaignId,
       author,
       messageType,
       characterName
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        campaignUid,
+        campaignId,
         message,
         author,
         messageType,
