@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Play, Users, Settings, Menu, Crown, UserCheck, Star, Circle, Bell, Plus, UserPlus } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, ScrollView, Image } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, ScrollView, Image, Linking } from 'react-native';
 import { useAtom } from 'jotai';
 import { campaignsAtom, currentCampaignAtom, fetchCampaignsAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
@@ -142,6 +142,20 @@ export default function HomeScreen() {
 
   const handleJoinCampaign = () => {
     router.push('/join')
+  };
+
+  const handleBoltPress = async () => {
+    try {
+      const url = 'https://bolt.new/';
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        console.log('Cannot open URL:', url);
+      }
+    } catch (error) {
+      console.error('Error opening URL:', error);
+    }
   };
 
   const handleAcceptCampaignInvitation = async (invitationId: string) => {
@@ -543,6 +557,18 @@ export default function HomeScreen() {
           </View>
         </View>
       </ActivityIndicator>
+
+      <TouchableOpacity 
+        style={styles.boltLogo}
+        onPress={handleBoltPress}
+        activeOpacity={0.7}
+      >
+        <Image 
+          source={require('../../assets/images/logotext_poweredby_360w.png')} 
+          style={styles.boltLogoImage}
+          resizeMode="contain"
+        />
+      </TouchableOpacity>
 
       <SidebarMenu
         isVisible={isSidebarVisible}
@@ -1095,5 +1121,18 @@ const styles = StyleSheet.create({
   },
   gap: {
     marginRight: 10
-  }
+  },
+  boltLogo: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 90,
+    height: 90,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  boltLogoImage: {
+    width: '100%',
+    height: '100%',
+  },
 });
