@@ -26,7 +26,7 @@ export default function StoryEventItem({ message }: StoryEventItemProps) {
 
   const getEventIcon = () => {
     switch (message.message_type) {
-      case 'dm':
+      case 'gm':
         return <Crown size={24} color="#FFD700" />;
       case 'player':
         // Show character avatar if available, otherwise default user icon
@@ -65,11 +65,11 @@ export default function StoryEventItem({ message }: StoryEventItemProps) {
 
   const getEventStyles = () => {
     switch (message.message_type) {
-      case 'dm':
+      case 'gm':
         return {
-          container: styles.dmContainer,
-          text: styles.dmText,
-          header: styles.dmHeader,
+          container: styles.gmContainer,
+          text: styles.gmText,
+          header: styles.gmHeader,
         };
       case 'player':
         return {
@@ -85,9 +85,9 @@ export default function StoryEventItem({ message }: StoryEventItemProps) {
         };
       default:
         return {
-          container: styles.dmContainer,
-          text: styles.dmText,
-          header: styles.dmHeader,
+          container: styles.gmContainer,
+          text: styles.gmText,
+          header: styles.gmHeader,
         };
     }
   };
@@ -99,7 +99,7 @@ export default function StoryEventItem({ message }: StoryEventItemProps) {
       <View style={[styles.header, eventStyles.header]}>
         {getEventIcon()}
         <Text style={styles.headerText}>
-          {message.message_type === 'dm' ? 'Storyteller' :
+          {message.message_type === 'gm' ? 'Storyteller' :
             message.message_type === 'player' ? (message.character_name || message.author) :
               'System'}
         </Text>
@@ -185,16 +185,16 @@ const styles = StyleSheet.create({
     marginTop: 16,
     width: '100%',
   },
-  // DM styles
-  dmContainer: {
+  // GM styles
+  gmContainer: {
     backgroundColor: 'rgba(255, 215, 0, 0.1)',
     borderLeftWidth: 4,
     borderLeftColor: '#FFD700',
   },
-  dmHeader: {
+  gmHeader: {
     borderBottomColor: 'rgba(255, 215, 0, 0.3)',
   },
-  dmText: {
+  gmText: {
     color: '#1a1a1a',
   },
   // Player styles

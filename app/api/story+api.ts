@@ -25,6 +25,7 @@ export async function POST(request: Request) {
 
     // Use the Node.js middleware service instead of direct OpenAI calls
     const middlewareUrl = process.env.MIDDLEWARE_SERVICE_URL || 'http://localhost:3001';
+    console.log('🔗 Middleware URL:', middlewareUrl);
 
     console.log('📤 Sending to middleware:', {
       campaignId,
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
         "Try a different action",
         "Continue exploring",
         "Rest and recover",
-        "Ask the DM for guidance"
+        "Ask the GM for guidance"
       ],
       campaignId: null,
       timestamp: new Date().toISOString(),
