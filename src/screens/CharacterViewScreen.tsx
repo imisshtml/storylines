@@ -128,7 +128,7 @@ export default function CharacterViewScreen() {
     try {
       // Get maximum spell level available for character
       const maxSpellLevel = getMaxSpellLevel();
-      
+
       const { data: spells, error } = await supabase
         .from('spells')
         .select('*')
@@ -162,7 +162,7 @@ export default function CharacterViewScreen() {
 
   const loadCharacterFeatures = async () => {
     if (!character) return;
-    
+
     try {
       // Load class features based on character's class and level
       const { data: features, error } = await supabase
@@ -182,7 +182,7 @@ export default function CharacterViewScreen() {
 
   const loadCharacterTraits = async () => {
     if (!character) return;
-    
+
     try {
       // Load racial traits based on character's race
       const { data: traits, error } = await supabase
@@ -242,7 +242,7 @@ export default function CharacterViewScreen() {
         async () => {
           const { error } = await supabase
             .from('characters')
-            .update({ 
+            .update({
               spells: selectedSpells
             })
             .eq('id', character.id);
@@ -282,7 +282,7 @@ export default function CharacterViewScreen() {
 
   const getCampaignName = () => {
     if (character?.campaign_id) {
-      // Find the campaign by campaign_id (which should match campaign.uid)
+      // Find the campaign by campaign_id (which should match campaign.id)
       const campaign = campaigns.find(c => c.uid === character.campaign_id);
       return campaign ? campaign.name : 'Unknown Campaign';
     }
@@ -315,10 +315,10 @@ export default function CharacterViewScreen() {
   // Get attack actions from equipped weapons
   const getAttackActions = () => {
     if (!character?.equipped_items) return [];
-    
+
     const attacks = [];
     const equipped = character.equipped_items;
-    
+
     // Check left hand weapon
     if (equipped.leftHand && equipped.leftHand.weapon_category) {
       attacks.push({
@@ -329,7 +329,7 @@ export default function CharacterViewScreen() {
         properties: equipped.leftHand.properties || []
       });
     }
-    
+
     // Check right hand weapon
     if (equipped.rightHand && equipped.rightHand.weapon_category) {
       attacks.push({
@@ -340,7 +340,7 @@ export default function CharacterViewScreen() {
         properties: equipped.rightHand.properties || []
       });
     }
-    
+
     return attacks;
   };
 
@@ -349,17 +349,17 @@ export default function CharacterViewScreen() {
       console.log('Character has no campaign_id');
       return false;
     }
-    
+
     console.log('Character campaign_id:', character.campaign_id);
     console.log('Available campaigns:', campaigns.length);
     console.log('Campaigns:', campaigns.map(c => ({ uid: c.uid, name: c.name, status: c.status })));
-    
+
     const campaign = campaigns.find(c => c.uid === character.campaign_id);
     console.log('Found campaign:', campaign);
-    
+
     const isStarted = campaign?.status !== 'creation';
     console.log('Campaign is started:', isStarted);
-    
+
     return isStarted;
   };
 
@@ -516,11 +516,11 @@ export default function CharacterViewScreen() {
 
     try {
       const currentEquipped = character.equipped_items || {};
-      
+
       // Check for two-handed weapon conflicts
       if (slot === 'leftHand' || slot === 'rightHand') {
         const { canEquip, conflictingItems } = canEquipInSlotWithTwoHanded(item, slot, currentEquipped);
-        
+
         if (!canEquip) {
           showAlert('Cannot Equip', 'This item cannot be equipped in this slot.', undefined, 'warning');
           return;
@@ -534,8 +534,8 @@ export default function CharacterViewScreen() {
             conflictMessage,
             [
               { text: 'Cancel', style: 'cancel' },
-              { 
-                text: 'Continue', 
+              {
+                text: 'Continue',
                 onPress: () => proceedWithEquip(item, slot, currentEquipped),
                 style: 'destructive'
               }
@@ -584,7 +584,7 @@ export default function CharacterViewScreen() {
               newEquipped.rightHand = undefined;
             }
           }
-          
+
           // Equip the item in the requested slot
           newEquipped[slot] = item;
         }
@@ -604,7 +604,7 @@ export default function CharacterViewScreen() {
         async () => {
           const { error } = await supabase
             .from('characters')
-            .update({ 
+            .update({
               equipped_items: newEquipped,
               armor_class: newAC
             })
@@ -661,7 +661,7 @@ export default function CharacterViewScreen() {
         async () => {
           const { error } = await supabase
             .from('characters')
-            .update({ 
+            .update({
               equipped_items: newEquipped,
               armor_class: newAC
             })
@@ -690,25 +690,25 @@ export default function CharacterViewScreen() {
 
   const getEquippableItems = (slot: EquipmentSlot): Equipment[] => {
     if (!character?.equipment) return [];
-    
+
     return character.equipment.filter(item => {
       if (!canEquipInSlot(item, slot)) return false;
-      
+
       // Check if item is already equipped and we only have one
       if (isItemEquipped(item)) {
         const itemCount = character.equipment.filter(eq => eq.id === item.id).length;
         return itemCount > 1; // Only show if we have more than one
       }
-      
+
       return true;
     });
   };
 
   const isItemEquipped = (item: Equipment): boolean => {
     if (!character?.equipped_items) return false;
-    
+
     const equipped = character.equipped_items;
-    
+
     // Check all slots
     if (equipped.armor?.id === item.id) return true;
     if (equipped.leftHand?.id === item.id) return true;
@@ -718,7 +718,7 @@ export default function CharacterViewScreen() {
     if (equipped.boots?.id === item.id) return true;
     if (equipped.gloves?.id === item.id) return true;
     if (equipped.rings?.some(ring => ring.id === item.id)) return true;
-    
+
     return false;
   };
 
@@ -736,13 +736,13 @@ export default function CharacterViewScreen() {
 
   const handleEquipFromSelection = async (item: Equipment) => {
     if (!selectedSlot) return;
-    
+
     if (selectedSlot === 'rings' && selectedRingIndex !== null) {
       await handleEquipItem(item, 'rings');
     } else {
       await handleEquipItem(item, selectedSlot);
     }
-    
+
     closeEquipmentSelection();
   };
 
@@ -751,7 +751,7 @@ export default function CharacterViewScreen() {
     if (!character) return null;
     const equipped = character.equipped_items?.[slot];
     const equippableItems = getEquippableItems(slot);
-    
+
     return (
       <>
         {equipped ? (
@@ -790,7 +790,7 @@ export default function CharacterViewScreen() {
     if (!character) return null;
     const rings = character.equipped_items?.rings || [];
     const equippableItems = getEquippableItems('rings');
-    
+
     return (
       <View style={styles.ringSlots}>
         {[0, 1].map((ringIndex) => {
@@ -847,10 +847,10 @@ export default function CharacterViewScreen() {
       }
 
       setShowDeleteConfirmation(false);
-      
+
       // Refresh the characters list
       await fetchCharacters();
-      
+
       showAlert(
         'Character Deleted',
         `${character.name} has been deleted successfully.`,
@@ -904,7 +904,7 @@ export default function CharacterViewScreen() {
   const getMaxSpellLevel = () => {
     if (!character) return 1;
     const characterLevel = character.level || 1;
-    
+
     // Maximum spell level based on character level (simplified 5e progression)
     if (characterLevel >= 17) return 9;
     if (characterLevel >= 15) return 8;
@@ -921,11 +921,11 @@ export default function CharacterViewScreen() {
   const getAvailableSpellLevels = () => {
     const maxLevel = getMaxSpellLevel();
     const levels = [{ value: 0, label: 'Cantrips' }];
-    
+
     for (let i = 1; i <= maxLevel; i++) {
       levels.push({ value: i, label: `${i}${i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th'} Level` });
     }
-    
+
     return levels;
   };
 
@@ -933,7 +933,7 @@ export default function CharacterViewScreen() {
   const getSpellcastingInfo = () => {
     // Simple spellcasting info based on character class name
     if (!character?.class) return null;
-    
+
     // Basic spellcasting info for level 1 characters (can be enhanced for higher levels)
     const spellcastingInfo = {
       cantripsKnown: 0,
@@ -991,8 +991,8 @@ export default function CharacterViewScreen() {
           <ArrowLeft color="#fff" size={24} />
         </TouchableOpacity>
         <Text style={styles.title}>{character.name}</Text>
-        <TouchableOpacity 
-          onPress={() => setShowDeleteConfirmation(true)} 
+        <TouchableOpacity
+          onPress={() => setShowDeleteConfirmation(true)}
           style={styles.deleteButton}
         >
           <Trash2 color="#ff4444" size={20} />
@@ -1003,8 +1003,8 @@ export default function CharacterViewScreen() {
         {/* Character Portrait Section */}
         <View style={styles.portraitSection}>
           <View style={styles.avatarContainer}>
-            <Image 
-              source={getCharacterAvatarUrl(character)} 
+            <Image
+              source={getCharacterAvatarUrl(character)}
               style={styles.avatar}
             />
             <TouchableOpacity
@@ -1028,15 +1028,15 @@ export default function CharacterViewScreen() {
 
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
-          <ScrollView 
-            horizontal 
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tabScrollContent}
           >
             {getAvailableTabs().map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
-              
+
               return (
                 <TouchableOpacity
                   key={tab.id}
@@ -1092,7 +1092,7 @@ export default function CharacterViewScreen() {
                         <Text style={styles.attackRange}>Range: {attack.range}</Text>
                         {attack.properties.length > 0 && (
                           <Text style={styles.attackProperties}>
-                            Properties: {attack.properties.map(prop => 
+                            Properties: {attack.properties.map(prop =>
                               typeof prop === 'string' ? prop : prop.name || 'Unknown'
                             ).join(', ')}
                           </Text>
@@ -1110,7 +1110,7 @@ export default function CharacterViewScreen() {
                   {(['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'] as const).map((ability) => {
                     const finalScore = getFinalAbilityScore(ability);
                     const modifier = getAbilityModifier(finalScore);
-                    
+
                     return (
                       <View key={ability} style={styles.abilityCard}>
                         <Text style={styles.abilityName}>
@@ -1170,10 +1170,10 @@ export default function CharacterViewScreen() {
                           </View>
                           {isExpanded && trait.description && (
                             <View style={styles.traitDetails}>
-                              {Array.isArray(trait.description) 
+                              {Array.isArray(trait.description)
                                 ? trait.description.map((desc: string, i: number) => (
-                                    <Text key={i} style={styles.traitDescription}>{desc}</Text>
-                                  ))
+                                  <Text key={i} style={styles.traitDescription}>{desc}</Text>
+                                ))
                                 : <Text style={styles.traitDescription}>{trait.description}</Text>
                               }
                             </View>
@@ -1330,7 +1330,7 @@ export default function CharacterViewScreen() {
                   {(() => {
                     // Get equipment from the equipment column
                     const equipment = character.equipment || [];
-                    
+
                     if (equipment.length === 0) {
                       return (
                         <Text style={styles.equipmentItem}>• No equipment</Text>
@@ -1351,10 +1351,10 @@ export default function CharacterViewScreen() {
                     return groupedEquipment.map((group: { item: any; quantity: number }, index: number) => {
                       const baseQuantity = group.item.quantity || 1;
                       const totalQuantity = group.quantity * baseQuantity;
-                      const displayName = totalQuantity > 1 
+                      const displayName = totalQuantity > 1
                         ? `${group.item.name} ×${totalQuantity}`
                         : group.item.name;
-                      
+
                       return (
                         <View key={index} style={styles.equipmentItemContainer}>
                           <Text style={styles.equipmentItem}>• {displayName}</Text>
@@ -1382,7 +1382,7 @@ export default function CharacterViewScreen() {
               {/* Equipment Slots */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Equipment Slots</Text>
-                
+
                 <View style={styles.equipmentSlotsGrid}>
                   {/* First row: Armor, Hand slots */}
                   <View style={styles.equipmentRow}>
@@ -1391,13 +1391,13 @@ export default function CharacterViewScreen() {
                       <Text style={styles.equipmentSlotLabel}>Armor</Text>
                       {renderEquipmentSlot('armor')}
                     </View>
-                    
+
                     {/* Hand slots - check for two-handed weapons */}
                     {(() => {
                       const rightHandItem = character.equipped_items?.rightHand;
                       const leftHandItem = character.equipped_items?.leftHand;
                       const isTwoHandedEquipped = rightHandItem && isTwoHandedWeapon(rightHandItem);
-                      
+
                       if (isTwoHandedEquipped) {
                         // Show two-handed weapon spanning both slots
                         return (
@@ -1435,7 +1435,7 @@ export default function CharacterViewScreen() {
                       }
                     })()}
                   </View>
-                  
+
                   {/* Second row: Head, Necklace, Gloves */}
                   <View style={styles.equipmentRow}>
                     <View style={styles.equipmentSlot}>
@@ -1451,7 +1451,7 @@ export default function CharacterViewScreen() {
                       {renderEquipmentSlot('gloves')}
                     </View>
                   </View>
-                  
+
                   {/* Third row: Boots, Rings */}
                   <View style={styles.equipmentRow}>
                     <View style={styles.equipmentSlot}>
@@ -1616,20 +1616,20 @@ export default function CharacterViewScreen() {
               </View>
               <View style={styles.modalBody}>
                 <Text style={styles.modalSubtitle}>Choose your spells</Text>
-                
+
                 {/* Spell Level Dropdown */}
                 {(() => {
                   const spellLevels = getAvailableSpellLevels();
                   const currentSpells = availableSpells.filter(spell => spell.level === selectedSpellLevel);
                   const selectedCurrentLevelSpells = selectedSpells.filter(spell => spell.level === selectedSpellLevel);
-                  
+
                   return (
                     <>
                       <View style={styles.dropdownContainer}>
                         <Text style={styles.dropdownLabel}>Spell Level:</Text>
                         <View style={styles.dropdown}>
-                          <ScrollView 
-                            horizontal 
+                          <ScrollView
+                            horizontal
                             showsHorizontalScrollIndicator={false}
                             contentContainerStyle={styles.dropdownContent}
                           >
@@ -1662,7 +1662,7 @@ export default function CharacterViewScreen() {
                             <Text style={styles.spellCount}>
                               {' '}({selectedCurrentLevelSpells.length}/{(() => {
                                 const spellcastingInfo = getSpellcastingInfo();
-                                return selectedSpellLevel === 0 
+                                return selectedSpellLevel === 0
                                   ? spellcastingInfo?.cantripsKnown || 0
                                   : spellcastingInfo?.spellsKnown || 0;
                               })()})
@@ -1672,11 +1672,11 @@ export default function CharacterViewScreen() {
                             const isSelected = selectedSpells.some(s => s.index === spell.index);
                             const spellcastingInfo = getSpellcastingInfo();
                             const currentLevelSelected = selectedSpells.filter(s => s.level === spell.level);
-                            const maxAllowed = spell.level === 0 
+                            const maxAllowed = spell.level === 0
                               ? spellcastingInfo?.cantripsKnown || 0
                               : spellcastingInfo?.spellsKnown || 0;
                             const isAtLimit = !isSelected && currentLevelSelected.length >= maxAllowed;
-                            
+
                             return (
                               <TouchableOpacity
                                 key={spell.index}
@@ -1686,65 +1686,65 @@ export default function CharacterViewScreen() {
                                   isAtLimit && styles.disabledSpell,
                                 ]}
                                 onPress={() => {
-                                const isSelected = selectedSpells.some(s => s.index === spell.index);
-                                const spellcastingInfo = getSpellcastingInfo();
-                                
-                                if (isSelected) {
-                                  // Always allow deselection
-                                  setSelectedSpells(prev => prev.filter(s => s.index !== spell.index));
-                                } else {
-                                  // Check limits before adding
-                                  const currentLevelSelected = selectedSpells.filter(s => s.level === spell.level);
-                                  const maxAllowed = spell.level === 0 
-                                    ? spellcastingInfo?.cantripsKnown || 0
-                                    : spellcastingInfo?.spellsKnown || 0;
-                                  
-                                  if (currentLevelSelected.length < maxAllowed) {
-                                    setSelectedSpells(prev => [...prev, spell]);
+                                  const isSelected = selectedSpells.some(s => s.index === spell.index);
+                                  const spellcastingInfo = getSpellcastingInfo();
+
+                                  if (isSelected) {
+                                    // Always allow deselection
+                                    setSelectedSpells(prev => prev.filter(s => s.index !== spell.index));
                                   } else {
-                                    showAlert(
-                                      'Spell Limit Reached',
-                                      `You can only select ${maxAllowed} ${spell.level === 0 ? 'cantrips' : 'spells'} for this level.`,
-                                      undefined,
-                                      'warning'
-                                    );
+                                    // Check limits before adding
+                                    const currentLevelSelected = selectedSpells.filter(s => s.level === spell.level);
+                                    const maxAllowed = spell.level === 0
+                                      ? spellcastingInfo?.cantripsKnown || 0
+                                      : spellcastingInfo?.spellsKnown || 0;
+
+                                    if (currentLevelSelected.length < maxAllowed) {
+                                      setSelectedSpells(prev => [...prev, spell]);
+                                    } else {
+                                      showAlert(
+                                        'Spell Limit Reached',
+                                        `You can only select ${maxAllowed} ${spell.level === 0 ? 'cantrips' : 'spells'} for this level.`,
+                                        undefined,
+                                        'warning'
+                                      );
+                                    }
                                   }
-                                }
-                              }}
-                            >
-                              <View style={styles.spellHeader}>
-                                <View style={styles.spellHeaderLeft}>
-                                  <Text style={styles.spellCardName}>{spell.name}</Text>
-                                  <Text style={styles.spellCardSchool}>Casting Time: {spell.casting_time} {spell.concentration && ' (c)'}</Text>
+                                }}
+                              >
+                                <View style={styles.spellHeader}>
+                                  <View style={styles.spellHeaderLeft}>
+                                    <Text style={styles.spellCardName}>{spell.name}</Text>
+                                    <Text style={styles.spellCardSchool}>Casting Time: {spell.casting_time} {spell.concentration && ' (c)'}</Text>
+                                  </View>
+                                  <TouchableOpacity
+                                    style={styles.chevronButton}
+                                    onPress={(e) => {
+                                      e.stopPropagation();
+                                      toggleSpellExpanded(spell.index);
+                                    }}
+                                  >
+                                    {expandedSpells.has(spell.index) ? (
+                                      <ChevronUp size={20} color="#666666" />
+                                    ) : (
+                                      <ChevronDown size={20} color="#666666" />
+                                    )}
+                                  </TouchableOpacity>
                                 </View>
-                                <TouchableOpacity
-                                  style={styles.chevronButton}
-                                  onPress={(e) => {
-                                    e.stopPropagation();
-                                    toggleSpellExpanded(spell.index);
-                                  }}
-                                >
-                                  {expandedSpells.has(spell.index) ? (
-                                    <ChevronUp size={20} color="#666666" />
-                                  ) : (
-                                    <ChevronDown size={20} color="#666666" />
-                                  )}
-                                </TouchableOpacity>
-                              </View>
-                              {expandedSpells.has(spell.index) && (
-                                <View style={styles.spellDetails}>
-                                  <Text style={styles.spellProperty}>School: {typeof spell.school === 'object' ? spell.school.name : spell.school || ''}</Text>
-                                  <Text style={styles.spellProperty}>Range: {spell.range || 'Unknown'}</Text>
-                                  <Text style={styles.spellProperty}>Duration: {spell.duration || 'Unknown'}</Text>
-                                  {spell.concentration && (
-                                    <Text style={styles.spellProperty}>Concentration</Text>
-                                  )}
-                                  {spell.description && spell.description.map((desc, i) => (
-                                    <Text key={i} style={styles.spellDescription}>{desc}</Text>
-                                  ))}
-                                </View>
-                              )}
-                            </TouchableOpacity>
+                                {expandedSpells.has(spell.index) && (
+                                  <View style={styles.spellDetails}>
+                                    <Text style={styles.spellProperty}>School: {typeof spell.school === 'object' ? spell.school.name : spell.school || ''}</Text>
+                                    <Text style={styles.spellProperty}>Range: {spell.range || 'Unknown'}</Text>
+                                    <Text style={styles.spellProperty}>Duration: {spell.duration || 'Unknown'}</Text>
+                                    {spell.concentration && (
+                                      <Text style={styles.spellProperty}>Concentration</Text>
+                                    )}
+                                    {spell.description && spell.description.map((desc, i) => (
+                                      <Text key={i} style={styles.spellDescription}>{desc}</Text>
+                                    ))}
+                                  </View>
+                                )}
+                              </TouchableOpacity>
                             );
                           }) : (
                             <View style={styles.noSpellsContainer}>
@@ -1796,82 +1796,82 @@ export default function CharacterViewScreen() {
               </TouchableOpacity>
             </View>
             <View style={styles.modalBody}>
-                             <ScrollView style={styles.equipmentScrollView} showsVerticalScrollIndicator={false}>
-                 {selectedSlot && getEquippableItems(selectedSlot)
-                   .map((item) => (
-                                         <TouchableOpacity
-                       key={item.id}
-                       style={styles.equipmentShopItem}
-                       onPress={() => handleEquipFromSelection(item)}
-                     >
-                       <View style={styles.equipmentInfo}>
-                         <Text style={styles.equipmentName}>{item.name}</Text>
-                         <Text style={styles.equipmentDetails}>
-                           {item.equipment_category} • {item.weight} lb
-                           {/* Show AC for armor */}
-                           {selectedSlot === 'armor' && item.armor_class_base && (
-                             ` • AC ${item.armor_class_base}${item.armor_class_dex_bonus ? ' + Dex' : ''}`
-                           )}
-                           {/* Show damage for weapons */}
-                           {(selectedSlot === 'leftHand' || selectedSlot === 'rightHand') && item.damage_dice && (
-                             ` • ${item.damage_dice}${item.damage_type ? ` ${item.damage_type}` : ''}`
-                           )}
-                         </Text>
-                         {/* Show additional armor details */}
-                         {selectedSlot === 'armor' && (
-                           <View style={styles.armorDetails}>
-                             {item.armor_category && (
-                               <Text style={styles.equipmentProperty}>
-                                 Type: {item.armor_category}
-                               </Text>
-                             )}
-                             {item.str_minimum && (
-                               <Text style={styles.equipmentProperty}>
-                                 Str Requirement: {item.str_minimum}
-                               </Text>
-                             )}
-                             {item.stealth_disadvantage && (
-                               <Text style={styles.equipmentProperty}>
-                                 Stealth Disadvantage
-                               </Text>
-                             )}
-                           </View>
-                         )}
-                         {/* Show additional weapon details */}
-                         {(selectedSlot === 'leftHand' || selectedSlot === 'rightHand') && (
-                           <View style={styles.weaponDetails}>
-                             {item.weapon_category && (
-                               <Text style={styles.equipmentProperty}>
-                                 Type: {item.weapon_category}
-                               </Text>
-                             )}
-                             {item.range_normal && (
-                               <Text style={styles.equipmentProperty}>
-                                 Range: {item.range_normal}/{item.range_long || item.range_normal} ft
-                               </Text>
-                             )}
-                             {item.properties && item.properties.length > 0 && (
-                               <Text style={styles.equipmentProperty}>
-                                 Properties: {item.properties.map(prop => 
-                                   typeof prop === 'string' ? prop : prop.name || 'Unknown'
-                                 ).join(', ')}
-                               </Text>
-                             )}
-                           </View>
-                         )}
-                         {item.description && item.description.length > 0 && (
-                           <Text style={styles.equipmentDescription} numberOfLines={2}>
-                             {item.description[0]}
-                           </Text>
-                         )}
-                       </View>
-                     </TouchableOpacity>
+              <ScrollView style={styles.equipmentScrollView} showsVerticalScrollIndicator={false}>
+                {selectedSlot && getEquippableItems(selectedSlot)
+                  .map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.equipmentShopItem}
+                      onPress={() => handleEquipFromSelection(item)}
+                    >
+                      <View style={styles.equipmentInfo}>
+                        <Text style={styles.equipmentName}>{item.name}</Text>
+                        <Text style={styles.equipmentDetails}>
+                          {item.equipment_category} • {item.weight} lb
+                          {/* Show AC for armor */}
+                          {selectedSlot === 'armor' && item.armor_class_base && (
+                            ` • AC ${item.armor_class_base}${item.armor_class_dex_bonus ? ' + Dex' : ''}`
+                          )}
+                          {/* Show damage for weapons */}
+                          {(selectedSlot === 'leftHand' || selectedSlot === 'rightHand') && item.damage_dice && (
+                            ` • ${item.damage_dice}${item.damage_type ? ` ${item.damage_type}` : ''}`
+                          )}
+                        </Text>
+                        {/* Show additional armor details */}
+                        {selectedSlot === 'armor' && (
+                          <View style={styles.armorDetails}>
+                            {item.armor_category && (
+                              <Text style={styles.equipmentProperty}>
+                                Type: {item.armor_category}
+                              </Text>
+                            )}
+                            {item.str_minimum && (
+                              <Text style={styles.equipmentProperty}>
+                                Str Requirement: {item.str_minimum}
+                              </Text>
+                            )}
+                            {item.stealth_disadvantage && (
+                              <Text style={styles.equipmentProperty}>
+                                Stealth Disadvantage
+                              </Text>
+                            )}
+                          </View>
+                        )}
+                        {/* Show additional weapon details */}
+                        {(selectedSlot === 'leftHand' || selectedSlot === 'rightHand') && (
+                          <View style={styles.weaponDetails}>
+                            {item.weapon_category && (
+                              <Text style={styles.equipmentProperty}>
+                                Type: {item.weapon_category}
+                              </Text>
+                            )}
+                            {item.range_normal && (
+                              <Text style={styles.equipmentProperty}>
+                                Range: {item.range_normal}/{item.range_long || item.range_normal} ft
+                              </Text>
+                            )}
+                            {item.properties && item.properties.length > 0 && (
+                              <Text style={styles.equipmentProperty}>
+                                Properties: {item.properties.map(prop =>
+                                  typeof prop === 'string' ? prop : prop.name || 'Unknown'
+                                ).join(', ')}
+                              </Text>
+                            )}
+                          </View>
+                        )}
+                        {item.description && item.description.length > 0 && (
+                          <Text style={styles.equipmentDescription} numberOfLines={2}>
+                            {item.description[0]}
+                          </Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
                   ))}
-                                 {selectedSlot && getEquippableItems(selectedSlot).length === 0 && (
-                   <View style={styles.noSpellsContainer}>
-                     <Text style={styles.noSpellsText}>No available items for this slot</Text>
-                   </View>
-                 )}
+                {selectedSlot && getEquippableItems(selectedSlot).length === 0 && (
+                  <View style={styles.noSpellsContainer}>
+                    <Text style={styles.noSpellsText}>No available items for this slot</Text>
+                  </View>
+                )}
               </ScrollView>
             </View>
           </View>
@@ -1892,7 +1892,7 @@ export default function CharacterViewScreen() {
               <Text style={styles.deleteModalTitle}>Delete Character</Text>
             </View>
             <Text style={styles.deleteModalMessage}>
-              Are you sure you want to delete <Text style={styles.characterNameHighlight}>{character?.name}</Text>? 
+              Are you sure you want to delete <Text style={styles.characterNameHighlight}>{character?.name}</Text>?
               {'\n\n'}This action cannot be undone.
             </Text>
             <View style={styles.deleteModalButtons}>
