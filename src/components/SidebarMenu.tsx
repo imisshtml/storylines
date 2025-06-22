@@ -81,9 +81,10 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
 
   const handleJoinCampaign = () => {
     onClose();
-    if (onJoinCampaign) {
+    router.push('/join');
+    /*if (onJoinCampaign) {
       onJoinCampaign();
-    }
+    }*/
   };
 
   const handleTestNotification = async () => {
