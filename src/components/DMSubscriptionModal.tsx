@@ -62,9 +62,9 @@ export default function DMSubscriptionModal({ isVisible, onClose }: DMSubscripti
       
       if (success) {
         showAlert(
-          'Welcome, Dungeon Master!',
-          'Your DM subscription is now active. Time to create legendary adventures!',
-          [{ text: 'Start DMing!' }],
+          'Welcome, Storyteller!',
+          'Your Ultimate Host subscription is now active. Time to create legendary adventures!',
+          [{ text: 'Start Storytelling!' }],
           'success'
         );
         
