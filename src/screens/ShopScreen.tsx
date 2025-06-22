@@ -123,17 +123,17 @@ export default function ShopScreen() {
     try {
       // TODO: Implement RevenueCat purchase logic
       console.log(`Purchasing ${item.title}...`);
-      
+
       // Placeholder for RevenueCat integration
       // const product = await Purchases.getProducts([item.revenueCatId]);
       // const purchaseResult = await Purchases.purchaseProduct(product[0]);
-      
+
       // Simulate purchase delay
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       // Process the purchase in our database
       const success = await PurchaseManager.handlePurchaseSuccess(item.revenueCatId || item.id, user.id);
-      
+
       if (success) {
         showAlert(
           'Purchase Successful!',
@@ -172,9 +172,9 @@ export default function ShopScreen() {
     try {
       // TODO: Implement RevenueCat restore logic
       console.log('Restoring purchases...');
-      
+
       const success = await PurchaseManager.restorePurchases(user.id);
-      
+
       if (success) {
         showAlert(
           'Purchases Restored',
@@ -201,7 +201,7 @@ export default function ShopScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#121212" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
@@ -217,8 +217,8 @@ export default function ShopScreen() {
         {/* Featured Subscriptions */}
         <View style={styles.subscriptionsSection}>
           <Text style={styles.sectionTitle}>Premium Subscriptions</Text>
-          
-          {/* DM Subscription */}
+
+          {/* GM Subscription */}
           <TouchableOpacity
             style={styles.premiumCard}
             onPress={() => setShowDMModal(true)}
@@ -227,8 +227,8 @@ export default function ShopScreen() {
             <View style={styles.premiumContent}>
               <View style={styles.premiumLeft}>
                 <View style={styles.premiumImageContainer}>
-                  <Image 
-                    source={require('../../assets/images/dungeonmaster.png')} 
+                  <Image
+                    source={require('../../assets/images/gamemaster.png')}
                     style={styles.premiumImage}
                     resizeMode="contain"
                   />
@@ -236,10 +236,10 @@ export default function ShopScreen() {
                 <View style={styles.premiumInfo}>
                   <View style={styles.premiumHeader}>
                     <Crown size={20} color="#FFD700" />
-                    <Text style={styles.premiumTitle}>DM Subscription</Text>
+                    <Text style={styles.premiumTitle}>GM Subscription</Text>
                   </View>
                   <Text style={styles.premiumDescription}>
-                    Ultimate DM tools, unlimited campaigns, and exclusive content
+                    Ultimate GM tools, unlimited campaigns, and exclusive content
                   </Text>
                 </View>
               </View>
@@ -259,8 +259,8 @@ export default function ShopScreen() {
             <View style={styles.premiumContent}>
               <View style={styles.premiumLeft}>
                 <View style={styles.premiumImageContainer}>
-                  <Image 
-                    source={require('../../assets/images/adventurersPack.png')} 
+                  <Image
+                    source={require('../../assets/images/adventurersPack.png')}
                     style={styles.premiumImage}
                     resizeMode="contain"
                   />
@@ -298,8 +298,8 @@ export default function ShopScreen() {
                 <View style={styles.itemContent}>
                   <View style={styles.itemLeft}>
                     <View style={styles.itemImageContainer}>
-                      <Image 
-                        source={item.image} 
+                      <Image
+                        source={item.image}
                         style={styles.itemImage}
                         resizeMode="contain"
                       />
@@ -309,7 +309,7 @@ export default function ShopScreen() {
                       <Text style={styles.itemDescription}>{item.description}</Text>
                     </View>
                   </View>
-                  
+
                   <View style={styles.itemRight}>
                     {loadingItemId === item.id ? (
                       <View style={styles.itemLoadingContainer}>
@@ -356,7 +356,7 @@ export default function ShopScreen() {
         </View>
       </ScrollView>
 
-      {/* DM Subscription Modal */}
+      {/* GM Subscription Modal */}
       <DMSubscriptionModal
         isVisible={showDMModal}
         onClose={() => setShowDMModal(false)}
