@@ -2,7 +2,7 @@ import { atom } from 'jotai';
 
 export type StoryEvent = {
   id: string;
-  type: 'player' | 'dm' | 'system';
+  type: 'player' | 'gm' | 'system';
   content: string;
   timestamp: string;
   playerId?: string;

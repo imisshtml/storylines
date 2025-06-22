@@ -646,7 +646,7 @@ export default function InviteFriendsScreen() {
       }
       return {
         disabled: true,
-        text: 'Waiting for DM to Start',
+        text: 'Waiting for GM to Start',
         canStart: false
       };
     }

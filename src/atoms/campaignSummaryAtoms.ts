@@ -4,7 +4,7 @@ import { supabase } from '../config/supabase';
 export type ActionSummary = {
   summary: string;
   timestamp: string;
-  type: 'player' | 'dm' | 'system';
+  type: 'player' | 'gm' | 'system';
   author: string;
 };
 
@@ -119,7 +119,7 @@ export const addActionSummaryAtom = atom(
     campaignId: string;
     message: string;
     author: string;
-    messageType: 'player' | 'dm' | 'system';
+    messageType: 'player' | 'gm' | 'system';
     characterName?: string;
   }) => {
     try {

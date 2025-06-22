@@ -306,12 +306,12 @@ export default function StoryScreen() {
 
         console.log('✅ Successfully generated initial story, adding message to campaign');
 
-        // Add the initial story as a DM message
+        // Add the initial story as a GM message
         await addCampaignMessage({
           campaign_id: currentCampaign.id,
           message: data.response,
-          author: 'DM',
-          message_type: 'dm',
+          author: 'GM',
+          message_type: 'gm',
         });
 
         // Set the choices from the initial story
@@ -441,7 +441,7 @@ export default function StoryScreen() {
 
     try {
       // Determine message type based on input type
-      let messageType: 'player' | 'dm' | 'system' = 'player';
+      let messageType: 'player' | 'gm' | 'system' = 'player';
       let formattedMessage = action;
       let messageAuthor = playerName;
 
@@ -459,7 +459,7 @@ export default function StoryScreen() {
           }
           break;
         case 'ask':
-          formattedMessage = `[Asks DM] ${action}`;
+          formattedMessage = `[Asks GM] ${action}`;
           break;
       }
 
@@ -478,7 +478,7 @@ export default function StoryScreen() {
         difficulty: 10, // Default difficulty class
       });
 
-      // Only send to AI for non-whisper messages or DM questions
+      // Only send to AI for non-whisper messages or GM questions
       if (selectedInputType !== 'whisper') {
         // Prepare context for the AI
         const context = {
@@ -511,15 +511,15 @@ export default function StoryScreen() {
         const data = await response.json();
 
         if (!data.success) {
-          throw new Error(data.error || 'Failed to get DM response');
+          throw new Error(data.error || 'Failed to get GM response');
         }
 
-        // Add DM response to campaign history
+        // Add GM response to campaign history
         await addCampaignMessage({
           campaign_id: currentCampaign.id,
           message: data.response,
-          author: 'DM',
-          message_type: 'dm',
+          author: 'GM',
+          message_type: 'gm',
         });
 
         // Use choices from AI response
@@ -530,7 +530,7 @@ export default function StoryScreen() {
 
     } catch (error) {
       console.error('Error sending player action:', error);
-      setError(error instanceof Error ? error.message : 'Failed to get DM response');
+      setError(error instanceof Error ? error.message : 'Failed to get GM response');
       // Clear choices on error
       if (currentCampaign) {
         clearAiChoices(currentCampaign.id);
@@ -553,7 +553,7 @@ export default function StoryScreen() {
       user?.username || user?.email || 'Player'
     );
 
-    // Show choices again after DM responds (except for whispers)
+    // Show choices again after GM responds (except for whispers)
     if (selectedInputType !== 'whisper') {
       setTimeout(() => setShowChoices(true), 1000);
     }
@@ -569,7 +569,7 @@ export default function StoryScreen() {
       user?.username || user?.email || 'Player'
     );
 
-    // Show choices again after DM responds (except for whispers)
+    // Show choices again after GM responds (except for whispers)
     if (selectedInputType !== 'whisper') {
       setTimeout(() => setShowChoices(true), 1000);
     }
