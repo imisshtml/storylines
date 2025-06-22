@@ -19,27 +19,34 @@ import { userAtom } from '../atoms/authAtoms';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
+import { useLimitEnforcement } from '../hooks/useLimitEnforcement';
+import { fetchUserCapabilitiesAtom } from '../atoms/userCapabilitiesAtoms';
 
 export default function CharactersScreen() {
   const [characters] = useAtom(charactersAtom);
   const [campaigns] = useAtom(campaignsAtom);
   const [user] = useAtom(userAtom);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
+  const [, fetchCapabilities] = useAtom(fetchUserCapabilitiesAtom);
   const { isLoading, withLoading } = useLoading();
+  const { checkCharacterLimit, getCharacterLimitInfo } = useLimitEnforcement();
 
   useEffect(() => {
-    const loadCharacters = async () => {
+    const loadData = async () => {
       if (user) {
         try {
-          await withLoading(fetchCharacters, 'fetchCharacters')();
+          await withLoading(Promise.all([
+            fetchCharacters(),
+            fetchCapabilities()
+          ]), 'loadData')();
         } catch (error) {
-          console.error('Error loading characters:', error);
+          console.error('Error loading data:', error);
         }
       }
     };
 
-    loadCharacters();
-  }, [user, fetchCharacters, withLoading]);
+    loadData();
+  }, [user, fetchCharacters, fetchCapabilities, withLoading]);
 
   const handleBack = () => {
     router.back();
@@ -52,8 +59,11 @@ export default function CharactersScreen() {
     });
   };
 
-  const handleCreateCharacter = () => {
-    router.push('/creation');
+  const handleCreateCharacter = async () => {
+    const canCreate = await checkCharacterLimit();
+    if (canCreate) {
+      router.push('/creation');
+    }
   };
 
   const getCharacterCampaignName = (character: Character) => {
@@ -162,6 +172,8 @@ export default function CharactersScreen() {
     );
   };
 
+  const limitInfo = getCharacterLimitInfo();
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -193,9 +205,16 @@ export default function CharactersScreen() {
               <Text style={styles.emptyDescription}>
                 Create your first 5e character to begin your adventure!
               </Text>
+              <Text style={styles.limitText}>
+                Character Limit: {limitInfo.current}/{limitInfo.max}
+              </Text>
               <TouchableOpacity
-                style={styles.createFirstCharacterButton}
+                style={[
+                  styles.createFirstCharacterButton,
+                  !limitInfo.canCreate && styles.createButtonDisabled
+                ]}
                 onPress={handleCreateCharacter}
+                disabled={!limitInfo.canCreate}
               >
                 <Plus size={20} color="#fff" />
                 <Text style={styles.createFirstCharacterText}>Create Character</Text>
@@ -209,6 +228,12 @@ export default function CharactersScreen() {
                 </Text>
                 <Text style={styles.headerSubtext}>
                   Tap a character to view details and manage spells
+                </Text>
+                <Text style={styles.limitInfo}>
+                  Limit: {limitInfo.current}/{limitInfo.max}
+                  {!limitInfo.canCreate && (
+                    <Text style={styles.limitWarning}> (Limit reached)</Text>
+                  )}
                 </Text>
               </View>
 
@@ -460,5 +485,26 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
+  },
+  limitText: {
+    fontSize: 14,
+    color: '#888',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  limitInfo: {
+    fontSize: 12,
+    color: '#888',
+    fontFamily: 'Inter-Regular',
+    marginTop: 4,
+  },
+  limitWarning: {
+    color: '#FF5722',
+    fontFamily: 'Inter-Bold',
+  },
+  createButtonDisabled: {
+    backgroundColor: '#666',
+    shadowOpacity: 0,
   },
 });

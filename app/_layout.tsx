@@ -14,6 +14,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { View, Platform } from 'react-native';
 import { CustomAlertProvider } from '../src/components/CustomAlert';
+import { adManager } from '../src/utils/adManager';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -42,7 +43,7 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    // Initialize authentication and real-time subscriptions
+    // Initialize authentication, real-time subscriptions, and ads
     const initialize = async () => {
       try {
         await initializeAuth();
@@ -50,6 +51,10 @@ export default function RootLayout() {
         await initializeReadStatusRealtime();
         await new Promise(resolve => setTimeout(resolve, 1000));
         await initializeFriendshipsRealtime();
+        
+        // Initialize AdManager
+        await adManager.initialize();
+        console.log('AdManager initialized in app layout');
       } catch (error) {
         console.error(`[${Platform.OS}] [App Layout] Initialization error:`, error);
       }

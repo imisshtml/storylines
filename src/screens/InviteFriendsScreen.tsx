@@ -26,7 +26,7 @@ import {
   fetchCampaignInvitationsAtom,
   type Friendship
 } from '../atoms/friendsAtoms';
-import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, ChevronUp, X, Plus, Crown, Info, UserPlus, Clock, UserMinus } from 'lucide-react-native';
+import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, ChevronUp, X, Plus, Crown, Info, UserPlus, Clock, UserMinus, Trash2, LogOut } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as SMS from 'expo-sms';
@@ -555,6 +555,133 @@ export default function InviteFriendsScreen() {
     );
   };
 
+  // Handle campaign deletion (owner only)
+  const handleDeleteCampaign = async () => {
+    if (!currentCampaign || !user || !isOwner) {
+      return;
+    }
+
+    showAlert(
+      'Delete Campaign',
+      `Are you sure you want to delete "${currentCampaign.name}"? This action cannot be undone and will remove all players from the campaign.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // First, remove all characters from this campaign
+              const { error: charactersError } = await supabase
+                .from('characters')
+                .update({ campaign_id: null })
+                .eq('campaign_id', currentCampaign.uid);
+
+              if (charactersError) {
+                console.error('Error removing characters from campaign:', charactersError);
+                showAlert('Error', 'Failed to remove characters from campaign', [{ text: 'OK' }], 'error');
+                return;
+              }
+
+              // Delete campaign invitations
+              const { error: invitationsError } = await supabase
+                .from('campaign_invitations')
+                .delete()
+                .eq('campaign_id', currentCampaign.uid);
+
+              if (invitationsError) {
+                console.error('Error deleting campaign invitations:', invitationsError);
+                // Continue with campaign deletion even if invitations fail
+              }
+
+              // Finally, delete the campaign
+              const { error: campaignError } = await supabase
+                .from('campaigns')
+                .delete()
+                .eq('id', currentCampaign.id);
+
+              if (campaignError) {
+                console.error('Error deleting campaign:', campaignError);
+                showAlert('Error', 'Failed to delete campaign', [{ text: 'OK' }], 'error');
+                return;
+              }
+
+              showAlert(
+                'Campaign Deleted',
+                'The campaign has been successfully deleted.',
+                [{ text: 'OK', onPress: () => router.replace('/') }],
+                'success'
+              );
+            } catch (error) {
+              console.error('Error deleting campaign:', error);
+              showAlert('Error', 'Failed to delete campaign', [{ text: 'OK' }], 'error');
+            }
+          },
+        },
+      ],
+      'warning'
+    );
+  };
+
+  // Handle leaving campaign (non-owner players)
+  const handleLeaveCampaign = async () => {
+    if (!currentCampaign || !user || isOwner) {
+      return;
+    }
+
+    showAlert(
+      'Leave Campaign',
+      `Are you sure you want to leave "${currentCampaign.name}"? Your character will be removed from the campaign.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Remove user's character from the campaign
+              const { error: characterError } = await supabase
+                .from('characters')
+                .update({ campaign_id: null })
+                .eq('campaign_id', currentCampaign.uid)
+                .eq('user_id', user.id);
+
+              if (characterError) {
+                console.error('Error removing character from campaign:', characterError);
+                // Continue with leaving even if character removal fails
+              }
+
+              // Remove user from campaign players
+              const updatedPlayers = currentCampaign.players.filter(player => player.id !== user.id);
+
+              const { error: campaignError } = await supabase
+                .from('campaigns')
+                .update({ players: updatedPlayers })
+                .eq('id', currentCampaign.id);
+
+              if (campaignError) {
+                console.error('Error leaving campaign:', campaignError);
+                showAlert('Error', 'Failed to leave campaign', [{ text: 'OK' }], 'error');
+                return;
+              }
+
+              showAlert(
+                'Left Campaign',
+                'You have successfully left the campaign.',
+                [{ text: 'OK', onPress: () => router.replace('/') }],
+                'success'
+              );
+            } catch (error) {
+              console.error('Error leaving campaign:', error);
+              showAlert('Error', 'Failed to leave campaign', [{ text: 'OK' }], 'error');
+            }
+          },
+        },
+      ],
+      'warning'
+    );
+  };
+
   // Check if a friend has a pending invitation to the current campaign
   const hasPendingInvitation = (friendId: string) => {
     if (!currentCampaign) return false;
@@ -708,6 +835,17 @@ export default function InviteFriendsScreen() {
           <ArrowLeft color="#fff" size={24} />
         </View>
         <Text style={styles.title}>{currentCampaign.name}</Text>
+        <View style={styles.headerRight}>
+          {isOwner ? (
+            <TouchableOpacity onPress={handleDeleteCampaign} style={styles.headerActionButton}>
+              <Trash2 color="#ff4444" size={24} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={handleLeaveCampaign} style={styles.headerActionButton}>
+              <LogOut color="#ff4444" size={24} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {error && (
@@ -959,7 +1097,7 @@ export default function InviteFriendsScreen() {
               <View style={[styles.detailItem, styles.fullWidth]}>
                 <Text style={styles.detailLabel}>Excluded Content</Text>
                 <View style={styles.excludedTags}>
-                  {currentCampaign.exclude.map((tag, index) => (
+                  {currentCampaign.exclude.flat().map((tag, index) => (
                     <View key={index} style={styles.excludedTag}>
                       <Text style={styles.excludedTagText}>{tag}</Text>
                     </View>
@@ -1100,6 +1238,22 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     flex: 1,
     textAlign: 'center',
+  },
+  headerRight: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    right: 16,
+  },
+  headerActionButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
   },
   content: {
     flex: 1,

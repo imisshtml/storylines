@@ -8,6 +8,7 @@ import {
   performShortRest,
   performLongRest 
 } from '../atoms/characterAtoms';
+import { useAds } from '../hooks/useAds';
 
 interface RestManagerProps {
   character: Character;
@@ -15,6 +16,7 @@ interface RestManagerProps {
 }
 
 export default function RestManager({ character, onRestCompleted }: RestManagerProps) {
+  const { showInterstitial } = useAds();
   const needsShort = needsShortRest(character);
   const needsLong = needsLongRest(character);
 
@@ -51,6 +53,9 @@ export default function RestManager({ character, onRestCompleted }: RestManagerP
           text: 'Rest',
           onPress: async () => {
             try {
+              // Show interstitial ad before long rest
+              await showInterstitial('long_rest');
+              
               await performLongRest(character.id);
               onRestCompleted();
               Alert.alert('Long Rest Complete', 'All spell slots and abilities have been restored!');

@@ -1,12 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image, ScrollView } from 'react-native';
-import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary, Users, UserCog, Bell, ShoppingCart } from 'lucide-react-native';
+import { LogOut, X, User, Info, Landmark, Plus, Handshake, Binary, Users, UserCog, Bell, ShoppingCart } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
 import { friendRequestsReceivedAtom } from '../atoms/friendsAtoms';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
 import { sendTestNotification } from '../utils/notifications';
+import { useLimitEnforcement } from '../hooks/useLimitEnforcement';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.8;
@@ -25,6 +26,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
   const [friendRequestsReceived] = useAtom(friendRequestsReceivedAtom);
   const friendRequestCount = friendRequestsReceived.length;
+  const { checkCampaignLimit } = useLimitEnforcement();
 
   React.useEffect(() => {
     if (isVisible) {
@@ -71,12 +73,17 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
     return name.charAt(0).toUpperCase();
   };
 
-  const handleCreateCampaign = () => {
-    onClose();
-    setCurrentCampaign(null);
-    setTimeout(() => {
-      router.push('/create');
-    }, 50);
+  const handleCreateCampaign = async () => {
+    const canCreate = await checkCampaignLimit();
+    if (canCreate) {
+      onClose();
+      setCurrentCampaign(null);
+      setTimeout(() => {
+        router.push('/create');
+      }, 50);
+    } else {
+      onClose(); // Close sidebar even if limit reached
+    }
   };
 
   const handleJoinCampaign = () => {
@@ -99,7 +106,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
 
   const menuItems = [
     {
-      icon: <Users size={24} color="#fff" />,
+      icon: <Image source={require('../../assets/images/characters.png')} style={styles.img} />,
       title: 'My Characters',
       subtitle: 'View and Create 5e characters',
       onPress: () => {
@@ -108,19 +115,19 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       },
     },
     {
-      icon: <Plus size={24} color="#fff" />,
+      icon: <Image source={require('../../assets/images/create.png')} style={styles.img} />,
       title: 'Create Campaign',
       subtitle: 'Start a new adventure',
       onPress: handleCreateCampaign,
     },
     {
-      icon: <Binary size={24} color="#fff" />,
+      icon: <Image source={require('../../assets/images/join.png')} style={styles.img} />,
       title: 'Join a Campaign',
       subtitle: 'Join an existing campaign',
       onPress: handleJoinCampaign,
     },
     {
-      icon: <Handshake size={24} color="#fff" />,
+      icon: <Image source={require('../../assets/images/friends.png')} style={styles.img} />,
       title: 'Friends',
       subtitle: 'Every Hero needs a fellowship',
       onPress: () => {
@@ -130,8 +137,8 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       badge: friendRequestCount > 0 ? friendRequestCount : undefined,
     },
     {
-      icon: <ShoppingCart size={24} color="#fff" />,
-      title: 'Shop',
+      icon: <Image source={require('../../assets/images/market.png')} style={styles.img} />,
+      title: "The Goblin's Market",
       subtitle: 'Enhance your adventure',
       onPress: () => {
         onClose();
@@ -139,13 +146,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       },
     },
     {
-      icon: <Bell size={24} color="#fff" />,
-      title: 'Test Notification',
-      subtitle: 'Send a test push notification',
-      onPress: handleTestNotification,
-    },
-    {
-      icon: <UserCog size={24} color="#fff" />,
+      icon: <Image source={require('../../assets/images/account.png')} style={styles.img} />,
       title: 'Account & Settings',
       subtitle: 'Manage your account',
       onPress: () => {
@@ -154,7 +155,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       },
     },
     {
-      icon: <Info size={24} color="#fff" />,
+      icon: <Image source={require('../../assets/images/about.png')} style={styles.img} />,
       title: 'About',
       subtitle: 'App information',
       onPress: () => {
@@ -163,6 +164,14 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       },
     },
   ];
+  /*
+    {
+      icon: <Bell size={24} color="#fff" />,
+      title: 'Test Notification',
+      subtitle: 'Send a test push notification',
+      onPress: handleTestNotification,
+    },
+  */
 
   if (!isVisible) return null;
 
@@ -402,4 +411,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     textAlign: 'center',
   },
+  img: {
+    width: 40, 
+    height: 40
+  }
 });
