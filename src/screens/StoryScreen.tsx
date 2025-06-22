@@ -13,7 +13,7 @@ import {
   Modal,
   StatusBar,
 } from 'react-native';
-import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, MessageSquare, Drama, Ear, CircleHelp as HelpCircle } from 'lucide-react-native';
+import { Chrome as Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, MessageSquare, Drama, Ear, CircleHelp as HelpCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
