@@ -139,7 +139,7 @@ export default function HomeScreen() {
   };
 
   const handleJoinCampaign = () => {
-    setIsJoinModalVisible(true);
+    router.push('/join')
   };
 
   const handleAcceptCampaignInvitation = async (invitationId: string) => {
@@ -504,7 +504,7 @@ export default function HomeScreen() {
                         onPress={handleJoinCampaign}
                       >
                         <Users size={20} color="#fff" />
-                        <Text style={styles.buttonText}>Join via Code</Text>
+                        <Text style={styles.buttonText}>Join a Campaign</Text>
                       </TouchableOpacity>
                     </View>
                   </>

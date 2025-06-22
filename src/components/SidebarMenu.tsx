@@ -115,7 +115,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
     },
     {
       icon: <Binary size={24} color="#fff" />,
-      title: 'Join via Code',
+      title: 'Join a Campaign',
       subtitle: 'Join an existing campaign',
       onPress: handleJoinCampaign,
     },
