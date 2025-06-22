@@ -42,7 +42,6 @@ import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
 import BannerAd from '../components/BannerAd';
-import { BannerAdSize } from 'react-native-google-mobile-ads';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask';
 
@@ -634,7 +633,7 @@ export default function StoryScreen() {
     >
       <SafeAreaView style={styles.safeArea}>
         {/* Banner Ad */}
-        <BannerAd size={BannerAdSize.BANNER} style={styles.bannerAd} />
+        <BannerAd size="BANNER" />
         <View style={styles.header}>
           <TouchableOpacity onPress={handleHomePress} style={styles.headerButton}>
             <Home size={24} color="#2a2a2a" />

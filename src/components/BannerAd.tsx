@@ -1,68 +1,49 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { BannerAd as GoogleBannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
-import { useAtom } from 'jotai';
-import { userCapabilitiesAtom } from '../atoms/userCapabilitiesAtoms';
-import { adManager } from '../utils/adManager';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 
 interface BannerAdProps {
-  size?: BannerAdSize;
-  style?: any;
+  size?: string;
+  adsRemoved?: boolean;
 }
 
-export default function BannerAd({ size = BannerAdSize.BANNER, style }: BannerAdProps) {
-  const [userCapabilities] = useAtom(userCapabilitiesAtom);
-  const [adUnitId, setAdUnitId] = useState<string | undefined>(undefined);
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  useEffect(() => {
-    const initializeAd = async () => {
-      try {
-        await adManager.initialize();
-        const unitId = adManager.getBannerAdUnitId();
-        setAdUnitId(unitId);
-        setIsInitialized(true);
-      } catch (error) {
-        console.error('Failed to initialize banner ad:', error);
-      }
-    };
-
-    initializeAd();
-  }, []);
-
-  // Don't show ads if user has purchased ad removal
-  if (!adManager.shouldShowAds(userCapabilities.adsRemoved)) {
+// Mock BannerAd component for Expo Go compatibility
+export default function BannerAd({ size = 'BANNER', adsRemoved = false }: BannerAdProps) {
+  // Don't show anything if ads are removed
+  if (adsRemoved) {
     return null;
   }
 
-  // Don't show if ad unit ID is not available or not initialized
-  if (!adUnitId || !isInitialized) {
-    return null;
-  }
-
+  // In Expo Go, show a placeholder instead of real ads
   return (
-    <View style={[styles.container, style]}>
-      <GoogleBannerAd
-        unitId={adUnitId}
-        size={size}
-        requestOptions={{
-          requestNonPersonalizedAdsOnly: false,
-        }}
-        onAdLoaded={() => {
-          console.log('Banner ad loaded successfully');
-        }}
-        onAdFailedToLoad={(error) => {
-          console.error('Banner ad failed to load:', error);
-        }}
-      />
+    <View style={styles.mockAdContainer}>
+      <Text style={styles.mockAdText}>
+        [Mock Ad - {size}]
+      </Text>
+      <Text style={styles.mockAdSubtext}>
+        Ads disabled in Expo Go
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
+  mockAdContainer: {
+    height: 50,
+    backgroundColor: '#f0f0f0',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderStyle: 'dashed',
+    margin: 10,
+  },
+  mockAdText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  mockAdSubtext: {
+    fontSize: 10,
+    color: '#999',
   },
 }); 

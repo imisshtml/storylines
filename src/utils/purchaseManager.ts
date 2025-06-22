@@ -1,13 +1,29 @@
-import Purchases, { 
-  PurchasesOffering, 
-  PurchasesPackage, 
-  CustomerInfo,
-  PurchasesError,
-  PURCHASES_ERROR_CODE
-} from 'react-native-purchases';
+// Mock PurchaseManager for Expo Go compatibility
+// This replaces the RevenueCat functionality
+
 import { supabase } from '../config/supabase';
 
-// RevenueCat Product IDs - Update these with your actual product IDs from RevenueCat
+// Mock types to replace RevenueCat types
+export interface MockCustomerInfo {
+  activeSubscriptions: string[];
+  allPurchasedProductIdentifiers: string[];
+  latestExpirationDate: string | null;
+}
+
+export interface MockOffering {
+  identifier: string;
+  availablePackages: MockPackage[];
+}
+
+export interface MockPackage {
+  identifier: string;
+  product: {
+    identifier: string;
+    priceString: string;
+  };
+}
+
+// Mock Product IDs - same as before but for reference
 export const PRODUCT_IDS = {
   REMOVE_ADS: 'prod2355afb536',
   INCREASE_CHARACTERS: 'proded7232c986',
@@ -34,153 +50,121 @@ export class PurchaseManager {
     if (this.isInitialized) return;
 
     try {
-      // Configure RevenueCat with your API key
-      // TODO: Replace with your actual RevenueCat API key from:
-      // 1. Go to https://app.revenuecat.com/
-      // 2. Navigate to your app
-      // 3. Go to API Keys section
-      // 4. Copy the "Apple App Store" key for iOS or "Google Play Store" key for Android
-      // 5. For cross-platform, you can use the same key or platform-specific keys
-      await Purchases.configure({ 
-        apiKey: 'appl_cYcpLzydnEgWmanyfsJYAFySCyk', // Replace with actual key
-        appUserID: userId 
-      });
-
-      console.log('RevenueCat initialized successfully');
+      console.log('[PurchaseManager] Mock initialization - purchases disabled for Expo Go');
       this.isInitialized = true;
     } catch (error) {
-      console.error('Failed to initialize RevenueCat:', error);
+      console.error('Failed to initialize PurchaseManager:', error);
       throw error;
     }
   }
 
-  async getOfferings(): Promise<PurchasesOffering[]> {
-    try {
-      const offerings = await Purchases.getOfferings();
-      return Object.values(offerings.all);
-    } catch (error) {
-      console.error('Failed to get offerings:', error);
-      return [];
-    }
-  }
-
-  async purchaseProduct(productId: string): Promise<{ success: boolean; customerInfo?: CustomerInfo; error?: string }> {
-    try {
-      const offerings = await Purchases.getOfferings();
-      
-      // Debug: Log all available offerings and products
-      console.log('=== RevenueCat Debug Info ===');
-      console.log('Current offering:', offerings.current?.identifier);
-      console.log('All offerings:', Object.keys(offerings.all));
-      
-      Object.values(offerings.all).forEach(offering => {
-        console.log(`Offering "${offering.identifier}" packages:`, 
-          offering.availablePackages.map(pkg => ({
-            identifier: pkg.identifier,
-            productId: pkg.product.identifier,
-            price: pkg.product.priceString
-          }))
-        );
-      });
-      console.log('Looking for product:', productId);
-      console.log('============================');
-      
-      let packageToPurchase: PurchasesPackage | null = null;
-
-      // Find the package for the product ID
-      for (const offering of Object.values(offerings.all)) {
-        const foundPackage = offering.availablePackages.find(pkg => 
-          pkg.product.identifier === productId
-        );
-        if (foundPackage) {
-          packageToPurchase = foundPackage;
-          console.log('Found package:', foundPackage.identifier, 'in offering:', offering.identifier);
-          break;
-        }
-      }
-
-      if (!packageToPurchase) {
-        throw new Error(`Product ${productId} not found in offerings`);
-      }
-
-      const { customerInfo } = await Purchases.purchasePackage(packageToPurchase);
-      
-      // Update database with purchase
-      await this.updateDatabaseAfterPurchase(productId, customerInfo);
-
-      return { success: true, customerInfo };
-    } catch (error) {
-      console.error('Purchase failed:', error);
-      
-      if (error && typeof error === 'object' && 'code' in error) {
-        if ((error as any).code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) {
-          return { success: false, error: 'Purchase cancelled by user' };
-        }
-        return { success: false, error: (error as any).message || 'Purchase failed' };
-      }
-      
-      return { success: false, error: 'Purchase failed' };
-    }
-  }
-
-  async restorePurchases(): Promise<{ success: boolean; customerInfo?: CustomerInfo; error?: string }> {
-    try {
-      const customerInfo = await Purchases.restorePurchases();
-      
-      // Update database with restored purchases
-      await this.syncPurchasesWithDatabase(customerInfo);
-      
-      return { success: true, customerInfo };
-    } catch (error) {
-      console.error('Restore purchases failed:', error);
-      return { success: false, error: 'Failed to restore purchases' };
-    }
-  }
-
-  async getCustomerInfo(): Promise<CustomerInfo | null> {
-    try {
-      return await Purchases.getCustomerInfo();
-    } catch (error) {
-      console.error('Failed to get customer info:', error);
-      return null;
-    }
-  }
-
-  private async updateDatabaseAfterPurchase(productId: string, customerInfo: CustomerInfo): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('No authenticated user');
-
-    // Record the purchase transaction
-    const activeEntitlements = Object.keys(customerInfo.entitlements.active);
-    const latestTransaction = Object.values(customerInfo.allPurchaseDates)[0];
-
-    await supabase.from('purchases').insert({
-      user_id: user.id,
-      product_id: productId,
-      transaction_id: latestTransaction || new Date().toISOString(),
-      purchase_date: new Date().toISOString(),
-      is_active: true
-    });
-
-    // Update user capabilities based on purchase
-    await this.updateUserCapabilities(productId, user.id);
-
-    console.log(`Purchase recorded: ${productId}`);
-  }
-
-  private async syncPurchasesWithDatabase(customerInfo: CustomerInfo): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    // Get active entitlements
-    const activeEntitlements = Object.keys(customerInfo.entitlements.active);
+  async getOfferings(): Promise<MockOffering[]> {
+    console.log('[PurchaseManager] Mock offerings - would return real offerings if native');
     
-    // Update user profile based on active entitlements
-    for (const entitlement of activeEntitlements) {
-      await this.updateUserCapabilities(entitlement, user.id);
-    }
+    // Return mock offerings for testing
+    return [
+      {
+        identifier: 'default',
+        availablePackages: [
+          {
+            identifier: 'remove_ads',
+            product: {
+              identifier: PRODUCT_IDS.REMOVE_ADS,
+              priceString: '$1.99'
+            }
+          },
+          {
+            identifier: 'increase_characters',
+            product: {
+              identifier: PRODUCT_IDS.INCREASE_CHARACTERS,
+              priceString: '$1.99'
+            }
+          }
+        ]
+      }
+    ];
+  }
 
-    console.log('Purchases synced with database');
+  async purchaseProduct(productId: string): Promise<{ success: boolean; customerInfo?: MockCustomerInfo; error?: string }> {
+    console.log('[PurchaseManager] Mock purchase for product:', productId);
+    
+    // In Expo Go, simulate a successful purchase for testing
+    // In a real app, you'd want to handle this differently
+    try {
+      // Simulate the purchase process
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const mockCustomerInfo: MockCustomerInfo = {
+        activeSubscriptions: [],
+        allPurchasedProductIdentifiers: [productId],
+        latestExpirationDate: null
+      };
+
+      // Update database with mock purchase (optional for testing)
+      // await this.updateDatabaseAfterPurchase(productId, mockCustomerInfo);
+
+      return { 
+        success: true, 
+        customerInfo: mockCustomerInfo 
+      };
+    } catch (error) {
+      console.error('Mock purchase failed:', error);
+      return { 
+        success: false, 
+        error: 'Mock purchase failed - this would work with native RevenueCat' 
+      };
+    }
+  }
+
+  async restorePurchases(): Promise<{ success: boolean; customerInfo?: MockCustomerInfo; error?: string }> {
+    console.log('[PurchaseManager] Mock restore purchases');
+    
+    try {
+      const mockCustomerInfo: MockCustomerInfo = {
+        activeSubscriptions: [],
+        allPurchasedProductIdentifiers: [],
+        latestExpirationDate: null
+      };
+
+      return { success: true, customerInfo: mockCustomerInfo };
+    } catch (error) {
+      console.error('Mock restore failed:', error);
+      return { success: false, error: 'Mock restore failed' };
+    }
+  }
+
+  private async updateDatabaseAfterPurchase(productId: string, customerInfo: MockCustomerInfo): Promise<void> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
+      // Log the purchase
+      await supabase.from('purchases').insert({
+        user_id: user.id,
+        product_id: productId,
+        purchased_at: new Date().toISOString(),
+        status: 'completed',
+        revenue_cat_transaction_id: `mock_${Date.now()}`
+      });
+
+      // Update user capabilities
+      await this.updateUserCapabilities(productId, user.id);
+    } catch (error) {
+      console.error('Error updating database after purchase:', error);
+    }
+  }
+
+  private async syncPurchasesWithDatabase(customerInfo: MockCustomerInfo): Promise<void> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // In a real implementation, you'd sync all purchases
+      // For mock, we just log
+      console.log('[PurchaseManager] Would sync purchases with database');
+    } catch (error) {
+      console.error('Error syncing purchases with database:', error);
+    }
   }
 
   private async updateUserCapabilities(productId: string, userId: string): Promise<void> {
@@ -196,7 +180,6 @@ export class PurchaseManager {
         break;
       
       case PRODUCT_IDS.INCREASE_CHARACTERS:
-        // Increment character limit
         const { data: profile } = await supabase
           .from('profiles')
           .select('character_limit_purchases')
@@ -207,7 +190,6 @@ export class PurchaseManager {
         break;
       
       case PRODUCT_IDS.INCREASE_CAMPAIGNS:
-        // Increment campaign limit
         const { data: campaignProfile } = await supabase
           .from('profiles')
           .select('campaign_limit_purchases')
@@ -218,7 +200,6 @@ export class PurchaseManager {
         break;
       
       case PRODUCT_IDS.GROUP_SIZE:
-        // Increment group size purchases
         const { data: groupProfile } = await supabase
           .from('profiles')
           .select('group_size_purchases')
@@ -229,7 +210,6 @@ export class PurchaseManager {
         break;
       
       case PRODUCT_IDS.SCROLL_OF_REBIRTH:
-        // Add scroll to inventory
         await supabase.from('user_inventory').upsert({
           user_id: userId,
           item_type: 'scroll_of_rebirth',
@@ -238,16 +218,16 @@ export class PurchaseManager {
           onConflict: 'user_id,item_type',
           ignoreDuplicates: false
         });
-        return; // Don't update profile for consumables
+        return;
       
       case PRODUCT_IDS.DM_SUBSCRIPTION:
         updates.dm_subscription_active = true;
-        updates.dm_subscription_expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
+        updates.dm_subscription_expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
         break;
       
       case PRODUCT_IDS.ADVENTURERS_PACK:
         updates.adventurers_pack_active = true;
-        updates.adventurers_pack_expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
+        updates.adventurers_pack_expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
         break;
     }
 
@@ -259,26 +239,9 @@ export class PurchaseManager {
     }
   }
 
-  // Helper method to check if user has specific entitlement
-  async hasEntitlement(entitlementId: string): Promise<boolean> {
-    try {
-      const customerInfo = await this.getCustomerInfo();
-      return customerInfo?.entitlements.active[entitlementId] !== undefined;
-    } catch (error) {
-      console.error('Failed to check entitlement:', error);
-      return false;
-    }
-  }
-
-  // Helper method to get all active entitlements
-  async getActiveEntitlements(): Promise<string[]> {
-    try {
-      const customerInfo = await this.getCustomerInfo();
-      return Object.keys(customerInfo?.entitlements.active || {});
-    } catch (error) {
-      console.error('Failed to get active entitlements:', error);
-      return [];
-    }
+  static async handlePurchaseSuccess(productId: string, userId: string): Promise<boolean> {
+    console.log('[PurchaseManager] Mock handlePurchaseSuccess for:', productId);
+    return true;
   }
 }
 

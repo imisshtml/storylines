@@ -1,165 +1,162 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Modal, TouchableOpacity, Text, SafeAreaView } from 'react-native';
-import { X } from 'lucide-react-native';
-import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
-import { PurchasesOffering } from 'react-native-purchases';
-import { useAtom } from 'jotai';
-import { userAtom } from '../atoms/authAtoms';
-import { fetchUserCapabilitiesAtom } from '../atoms/userCapabilitiesAtoms';
-import { purchaseManager } from '../utils/purchaseManager';
-import { useCustomAlert } from './CustomAlert';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
-interface RevenueCatPaywallProps {
-  visible: boolean;
-  onClose: () => void;
-  offering?: PurchasesOffering; // Optional specific offering object
-  onPurchaseSuccess?: () => void;
-  onPurchaseError?: (error: string) => void;
+// Mock types to replace RevenueCat types
+export interface MockOffering {
+  identifier: string;
+  availablePackages: MockPackage[];
 }
 
-export default function RevenueCatPaywall({
-  visible,
-  onClose,
-  offering,
-  onPurchaseSuccess,
-  onPurchaseError
+export interface MockPackage {
+  identifier: string;
+  product: {
+    identifier: string;
+    priceString: string;
+  };
+}
+
+// Mock PAYWALL_RESULT enum
+export const PAYWALL_RESULT = {
+  NOT_PRESENTED: 0,
+  ERROR: 1,
+  CANCELLED: 2,
+  PURCHASED: 3,
+  RESTORED: 4,
+};
+
+interface RevenueCatPaywallProps {
+  offering?: MockOffering;
+  onPurchaseCompleted?: (result: number) => void;
+  onRestoreCompleted?: (result: number) => void;
+  onError?: (error: any) => void;
+}
+
+// Mock RevenueCat Paywall component for Expo Go compatibility
+export default function RevenueCatPaywall({ 
+  offering, 
+  onPurchaseCompleted, 
+  onRestoreCompleted, 
+  onError 
 }: RevenueCatPaywallProps) {
-  const [user] = useAtom(userAtom);
-  const [, fetchCapabilities] = useAtom(fetchUserCapabilitiesAtom);
-  const { showAlert } = useCustomAlert();
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  useEffect(() => {
-    const initializeRevenueCat = async () => {
-      if (user?.id && !isInitialized) {
-        try {
-          await purchaseManager.initialize(user.id);
-          setIsInitialized(true);
-        } catch (error) {
-          console.error('Failed to initialize RevenueCat for paywall:', error);
-        }
-      }
-    };
-
-    if (visible) {
-      initializeRevenueCat();
-    }
-  }, [visible, user?.id, isInitialized]);
-
-  const handlePurchaseCompleted = async (customerInfo: any) => {
-    console.log('Purchase completed from paywall:', customerInfo);
-    try {
-      await fetchCapabilities();
-      onPurchaseSuccess?.();
-      showAlert(
-        'Purchase Successful!',
-        'Thank you for your purchase! Your new features are now available.',
-        [{ text: 'Continue', onPress: onClose }],
-        'success'
-      );
-    } catch (error) {
-      console.error('Error refreshing capabilities after purchase:', error);
-    }
+  
+  const handleMockPurchase = (packageItem: MockPackage) => {
+    console.log('[RevenueCatPaywall] Mock purchase for:', packageItem.product.identifier);
+    
+    // Simulate purchase delay
+    setTimeout(() => {
+      onPurchaseCompleted?.(PAYWALL_RESULT.PURCHASED);
+    }, 1000);
   };
 
-  const handleRestoreCompleted = async (customerInfo: any) => {
-    console.log('Restore completed from paywall:', customerInfo);
-    try {
-      await fetchCapabilities();
-      showAlert(
-        'Purchases Restored!',
-        'Your previous purchases have been restored successfully.',
-        [{ text: 'Continue', onPress: onClose }],
-        'success'
-      );
-    } catch (error) {
-      console.error('Error refreshing capabilities after restore:', error);
-    }
+  const handleMockRestore = () => {
+    console.log('[RevenueCatPaywall] Mock restore purchases');
+    
+    // Simulate restore delay
+    setTimeout(() => {
+      onRestoreCompleted?.(PAYWALL_RESULT.RESTORED);
+    }, 1000);
   };
 
-  const handlePurchaseError = (error: any) => {
-    console.log('Purchase error from paywall:', error);
-    const errorMessage = 'There was an issue processing your purchase. Please try again.';
-    onPurchaseError?.(errorMessage);
-    showAlert(
-      'Purchase Failed',
-      errorMessage,
-      [{ text: 'OK' }],
-      'error'
+  if (!offering) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Mock Paywall</Text>
+        <Text style={styles.subtitle}>No offering available</Text>
+        <Text style={styles.note}>
+          RevenueCat disabled in Expo Go
+        </Text>
+      </View>
     );
-  };
-
-  if (!visible) {
-    return null;
   }
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      presentationStyle="fullScreen"
-      onRequestClose={onClose}
-    >
-      <View style={styles.container}>
-        {/* RevenueCat Paywall */}
-        <View style={styles.paywallContainer}>
-          {isInitialized ? (
-            <RevenueCatUI.Paywall
-              options={{
-                offering: offering,
-              }}
-              onPurchaseCompleted={handlePurchaseCompleted}
-              onRestoreCompleted={handleRestoreCompleted}
-              onPurchaseError={handlePurchaseError}
-              onDismiss={onClose}
-            />
-          ) : (
-            <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>Loading purchase options...</Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </Modal>
+    <View style={styles.container}>
+      <Text style={styles.title}>Mock Paywall</Text>
+      <Text style={styles.subtitle}>Choose your upgrade</Text>
+      
+      {offering.availablePackages.map((packageItem) => (
+        <TouchableOpacity
+          key={packageItem.identifier}
+          style={styles.packageButton}
+          onPress={() => handleMockPurchase(packageItem)}
+        >
+          <Text style={styles.packageTitle}>
+            {packageItem.identifier.replace(/_/g, ' ').toUpperCase()}
+          </Text>
+          <Text style={styles.packagePrice}>
+            {packageItem.product.priceString}
+          </Text>
+        </TouchableOpacity>
+      ))}
+      
+      <TouchableOpacity
+        style={styles.restoreButton}
+        onPress={handleMockRestore}
+      >
+        <Text style={styles.restoreText}>Restore Purchases</Text>
+      </TouchableOpacity>
+      
+      <Text style={styles.note}>
+        This is a mock paywall for Expo Go testing.
+        Real purchases would work with native RevenueCat.
+      </Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    paddingTop: 60,
-  },
-  headerSpacer: {
-    width: 24, // Same width as close button for centering
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#fff',
-    fontFamily: 'Inter-Bold',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  paywallContainer: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
+    padding: 20,
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  subtitle: {
     fontSize: 16,
-    color: '#ccc',
-    fontFamily: 'Inter-Regular',
+    color: '#666',
+    marginBottom: 30,
+    textAlign: 'center',
+  },
+  packageButton: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+    minWidth: 200,
+    alignItems: 'center',
+  },
+  packageTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  packagePrice: {
+    color: '#fff',
+    fontSize: 14,
+    marginTop: 5,
+  },
+  restoreButton: {
+    backgroundColor: '#f0f0f0',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  restoreText: {
+    color: '#007AFF',
+    fontSize: 14,
+  },
+  note: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 30,
+    maxWidth: 300,
   },
 }); 

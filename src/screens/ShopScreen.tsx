@@ -46,7 +46,7 @@ export default function ShopScreen() {
   const [user] = useAtom(userAtom);
   const [, fetchCapabilities] = useAtom(fetchUserCapabilitiesAtom);
   const [userCapabilities] = useAtom(userCapabilitiesAtom);
-  const { isPaywallVisible, showPaywall, hidePaywall, currentOffering } = usePaywall();
+  const { isVisible: isPaywallVisible, showPaywall, hidePaywall, offering: currentOffering } = usePaywall();
 
   // Load capabilities when component mounts
   useEffect(() => {
@@ -473,18 +473,27 @@ export default function ShopScreen() {
       />
 
       {/* RevenueCat Paywall */}
-      <RevenueCatPaywall
-        visible={isPaywallVisible}
-        onClose={hidePaywall}
-        offering={currentOffering}
-        onPurchaseSuccess={() => {
-          console.log('Purchase successful from RevenueCat paywall');
-          // Refresh capabilities will be handled by the paywall component
-        }}
-        onPurchaseError={(error) => {
-          console.error('Purchase failed from RevenueCat paywall:', error);
-        }}
-      />
+      {isPaywallVisible && (
+        <RevenueCatPaywall
+          offering={currentOffering}
+          onPurchaseCompleted={(result) => {
+            console.log('Purchase completed from RevenueCat paywall:', result);
+            hidePaywall();
+            // Refresh capabilities after purchase
+            fetchCapabilities();
+          }}
+          onRestoreCompleted={(result) => {
+            console.log('Restore completed from RevenueCat paywall:', result);
+            hidePaywall();
+            // Refresh capabilities after restore
+            fetchCapabilities();
+          }}
+          onError={(error: any) => {
+            console.error('Purchase failed from RevenueCat paywall:', error);
+            hidePaywall();
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
