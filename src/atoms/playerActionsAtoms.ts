@@ -11,7 +11,7 @@ export type PlayerActionData = {
 
 export type PlayerAction = {
   id: string;
-  campaign_uid: string;
+  campaign_id: string;
   character_id: string;
   user_id: string;
   action_type: 'base' | 'llm_generated' | 'contextual';
@@ -61,7 +61,7 @@ export const sortedPlayerActionsAtom = atom<PlayerAction[]>((get) => {
 // Fetch player actions for a specific campaign and user
 export const fetchPlayerActionsAtom = atom(
   null,
-  async (get, set, { campaignUid, userId }: { campaignUid: string; userId: string }) => {
+  async (get, set, { campaignId, userId }: { campaignId: string; userId: string }) => {
     try {
       set(playerActionsLoadingAtom, true);
       set(playerActionsErrorAtom, null);
@@ -69,7 +69,7 @@ export const fetchPlayerActionsAtom = atom(
       const { data, error } = await supabase
         .from('player_actions')
         .select('*')
-        .eq('campaign_uid', campaignUid)
+        .eq('campaign_id', campaignId)
         .eq('user_id', userId)
         .order('priority', { ascending: false })
         .order('created_at', { ascending: false });
@@ -136,16 +136,16 @@ export const executePlayerActionAtom = atom(
 // Initialize real-time subscription for player actions
 export const initializePlayerActionsRealtimeAtom = atom(
   null,
-  async (get, set, { campaignUid, userId }: { campaignUid: string; userId: string }) => {
+  async (get, set, { campaignId, userId }: { campaignId: string; userId: string }) => {
     const subscription = supabase
-      .channel(`player_actions:${campaignUid}:${userId}`)
+      .channel(`player_actions:${campaignId}:${userId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'player_actions',
-          filter: `campaign_uid=eq.${campaignUid} AND user_id=eq.${userId}`
+          filter: `campaign_id=eq.${campaignId} AND user_id=eq.${userId}`
         },
         (payload) => {
           const currentActions = get(playerActionsAtom);
@@ -202,28 +202,28 @@ export const aiChoicesAtom = atom<Record<string, string[]>>({});
 
 export const setAiChoicesAtom = atom(
   null,
-  (get, set, { campaignUid, choices }: { campaignUid: string; choices: string[] }) => {
+  (get, set, { campaignId, choices }: { campaignId: string; choices: string[] }) => {
     const currentChoices = get(aiChoicesAtom);
     set(aiChoicesAtom, {
       ...currentChoices,
-      [campaignUid]: choices
+      [campaignId]: choices
     });
   }
 );
 
 export const getAiChoicesAtom = atom((get) => {
-  return (campaignUid: string): string[] => {
+  return (campaignId: string): string[] => {
     const choices = get(aiChoicesAtom);
-    return choices[campaignUid] || [];
+    return choices[campaignId] || [];
   };
 });
 
 export const clearAiChoicesAtom = atom(
   null,
-  (get, set, campaignUid: string) => {
+  (get, set, campaignId: string) => {
     const currentChoices = get(aiChoicesAtom);
     const updatedChoices = { ...currentChoices };
-    delete updatedChoices[campaignUid];
+    delete updatedChoices[campaignId];
     set(aiChoicesAtom, updatedChoices);
   }
 );

@@ -112,12 +112,12 @@ export default function StoryScreen() {
     clearCampaignHistory();
 
     // Initial fetch of campaign history
-    fetchCampaignHistory(currentCampaign.uid);
+    fetchCampaignHistory(currentCampaign.id);
 
     // Initialize real-time subscription
     const initializeSubscription = async () => {
       try {
-        const unsubscribe = await initializeRealtimeSubscription(currentCampaign.uid);
+        const unsubscribe = await initializeRealtimeSubscription(currentCampaign.id);
         realtimeUnsubscribeRef.current = unsubscribe;
       } catch (error) {
         console.error('Error initializing realtime subscription:', error);
@@ -129,7 +129,7 @@ export default function StoryScreen() {
     // Mark campaign as read when entering
     if (currentCampaign.latest_message_id) {
       updateCampaignReadStatus({
-        campaignUid: currentCampaign.uid,
+        campaignId: currentCampaign.id,
         messageId: currentCampaign.latest_message_id,
       }).catch(error => {
         console.error('Error marking campaign as read on entry:', error);
@@ -147,16 +147,16 @@ export default function StoryScreen() {
         }
       }
     };
-  }, [currentCampaign?.uid, fetchCampaignHistory, initializeRealtimeSubscription, clearCampaignHistory, updateCampaignReadStatus]);
+  }, [currentCampaign?.id, fetchCampaignHistory, initializeRealtimeSubscription, clearCampaignHistory, updateCampaignReadStatus]);
 
   // Load player actions when campaign and user are available
   useEffect(() => {
     if (!currentCampaign || !user) return;
 
-    console.log('📋 Loading player actions for campaign:', currentCampaign.uid, 'user:', user.id);
+    console.log('📋 Loading player actions for campaign:', currentCampaign.id, 'user:', user.id);
 
     // Fetch player actions from database
-    fetchPlayerActions({ campaignUid: currentCampaign.uid, userId: user.id });
+    fetchPlayerActions({ campaignId: currentCampaign.id, userId: user.id });
 
     // Initialize real-time subscription for player actions
     const initializePlayerActionsSubscription = async () => {
@@ -168,7 +168,7 @@ export default function StoryScreen() {
         }
 
         const unsubscribe = await initializePlayerActionsRealtime({
-          campaignUid: currentCampaign.uid,
+          campaignId: currentCampaign.id,
           userId: user.id
         });
         playerActionsUnsubscribeRef.current = unsubscribe;
@@ -180,7 +180,7 @@ export default function StoryScreen() {
     initializePlayerActionsSubscription();
 
     // Log current AI choices for debugging
-    const existingAiChoices = getAiChoices(currentCampaign.uid);
+    const existingAiChoices = getAiChoices(currentCampaign.id);
     console.log('🎯 Existing AI choices for campaign:', existingAiChoices);
 
     // Cleanup function
@@ -194,7 +194,7 @@ export default function StoryScreen() {
         }
       }
     };
-  }, [currentCampaign?.uid, user?.id, fetchPlayerActions, initializePlayerActionsRealtime, getAiChoices]);
+  }, [currentCampaign?.id, user?.id, fetchPlayerActions, initializePlayerActionsRealtime, getAiChoices]);
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages are added
@@ -210,7 +210,7 @@ export default function StoryScreen() {
     if (currentCampaign && campaignHistory.length > 0) {
       const latestMessage = campaignHistory[campaignHistory.length - 1];
       updateCampaignReadStatus({
-        campaignUid: currentCampaign.uid,
+        campaignId: currentCampaign.id,
         messageId: latestMessage.id,
       }).catch(error => {
         console.error('Error updating read status:', error);
@@ -261,7 +261,7 @@ export default function StoryScreen() {
           await supabase
             .from('campaigns')
             .update({ status: 'waiting' })
-            .eq('uid', currentCampaign.uid);
+            .eq('uid', currentCampaign.id);
         }
 
         // Prepare context for the initial story generation
@@ -271,7 +271,7 @@ export default function StoryScreen() {
         };
 
         console.log('📡 Making API request to /api/story with:', {
-          campaignId: currentCampaign.uid,
+          campaignId: currentCampaign.id,
           playerId: user.id,
           message: 'Generate initial story introduction',
           playerAction: 'INITIAL_STORY_GENERATION'
@@ -284,7 +284,7 @@ export default function StoryScreen() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            campaignId: currentCampaign.uid,
+            campaignId: currentCampaign.id,
             playerId: user.id,
             message: 'Generate initial story introduction',
             context,
@@ -311,7 +311,7 @@ export default function StoryScreen() {
 
         // Add the initial story as a DM message
         await addCampaignMessage({
-          campaign_uid: currentCampaign.uid,
+          campaign_id: currentCampaign.id,
           message: data.response,
           author: 'DM',
           message_type: 'dm',
@@ -319,7 +319,7 @@ export default function StoryScreen() {
 
         // Set the choices from the initial story
         if (currentCampaign) {
-          setAiChoices({ campaignUid: currentCampaign.uid, choices: data.choices || [] });
+          setAiChoices({ campaignId: currentCampaign.id, choices: data.choices || [] });
         }
 
         console.log('✅ Initial story generation completed successfully');
@@ -343,7 +343,7 @@ export default function StoryScreen() {
   const getCurrentCharacter = (): Character | null => {
     if (!user || !currentCampaign) return null;
     return characters.find(char =>
-      char.user_id === user.id && char.campaign_id === currentCampaign.uid
+      char.user_id === user.id && char.campaign_id === currentCampaign.id
     ) || null;
   };
 
@@ -372,7 +372,7 @@ export default function StoryScreen() {
         type: 'ask',
         label: 'Ask',
         icon: <HelpCircle size={16} color="#2196F3" />,
-        placeholder: 'Ask the Dungeon Master...'
+        placeholder: 'Ask the Storyteller...'
       }
     ];
 
@@ -439,7 +439,7 @@ export default function StoryScreen() {
     setError(null);
     // Clear choices while loading
     if (currentCampaign) {
-      clearAiChoices(currentCampaign.uid);
+      clearAiChoices(currentCampaign.id);
     }
 
     try {
@@ -471,7 +471,7 @@ export default function StoryScreen() {
 
       // Add player message to campaign history (without dice_roll for now)
       await addCampaignMessage({
-        campaign_uid: currentCampaign.uid,
+        campaign_id: currentCampaign.id,
         message: formattedMessage,
         author: messageAuthor,
         message_type: messageType,
@@ -496,7 +496,7 @@ export default function StoryScreen() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            campaignId: currentCampaign.uid, // Use UID for database consistency
+            campaignId: currentCampaign.id, // Use UID for database consistency
             playerId: user.id, // Pass the user ID directly
             message: `Player action: ${action}`,
             context,
@@ -519,7 +519,7 @@ export default function StoryScreen() {
 
         // Add DM response to campaign history
         await addCampaignMessage({
-          campaign_uid: currentCampaign.uid,
+          campaign_id: currentCampaign.id,
           message: data.response,
           author: 'DM',
           message_type: 'dm',
@@ -527,7 +527,7 @@ export default function StoryScreen() {
 
         // Use choices from AI response
         if (currentCampaign) {
-          setAiChoices({ campaignUid: currentCampaign.uid, choices: data.choices || [] });
+          setAiChoices({ campaignId: currentCampaign.id, choices: data.choices || [] });
         }
       }
 
@@ -536,7 +536,7 @@ export default function StoryScreen() {
       setError(error instanceof Error ? error.message : 'Failed to get DM response');
       // Clear choices on error
       if (currentCampaign) {
-        clearAiChoices(currentCampaign.uid);
+        clearAiChoices(currentCampaign.id);
       }
     } finally {
       stopLoading('sendAction');
@@ -700,7 +700,7 @@ export default function StoryScreen() {
   };
 
   const databaseChoices = getDatabaseActionChoices();
-  const aiChoices = currentCampaign ? getAiChoices(currentCampaign.uid) : [];
+  const aiChoices = currentCampaign ? getAiChoices(currentCampaign.id) : [];
 
   const choicesToShow = aiChoices.length > 0
     ? aiChoices // Use AI-generated choices first
@@ -763,18 +763,16 @@ export default function StoryScreen() {
 
             {isLoading('initialStory') && (
               <View style={styles.loadingEvent}>
-                <ActivityIndicator size="small" color="#FFD700" isLoading={true} />
                 <Text style={styles.loadingEventText}>
-                  The Dungeon Master is preparing your adventure...
+                  The Storyteller is preparing your adventure...
                 </Text>
               </View>
             )}
 
             {isLoading('sendAction') && (
               <View style={styles.loadingEvent}>
-                <ActivityIndicator size="small" color="#FFD700" isLoading={true} />
                 <Text style={styles.loadingEventText}>
-                  The Dungeon Master is thinking...
+                  Your story is being woven...
                 </Text>
               </View>
             )}
@@ -783,7 +781,7 @@ export default function StoryScreen() {
               <View style={styles.errorContainer}>
                 <AlertCircle size={20} color="#f44336" />
                 <Text style={styles.errorText}>
-                  Failed to connect to Dungeon Master. Please try again.
+                  Failed to connect to Storyteller. Please try again.
                 </Text>
               </View>
             )}
@@ -849,11 +847,8 @@ export default function StoryScreen() {
               onPress={handleSend}
               disabled={!userInput.trim() || isLoading('sendAction')}
             >
-              {isLoading('sendAction') ? (
-                <ActivityIndicator size="small" color="#666" isLoading={true} />
-              ) : (
-                <Forward size={24} color={userInput.trim() ? '#fff' : '#666'} />
-              )}
+
+              <Forward size={24} color={userInput.trim() ? '#fff' : '#666'} />
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

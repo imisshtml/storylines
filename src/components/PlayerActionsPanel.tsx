@@ -30,7 +30,7 @@ import {
 } from '../atoms/playerActionsAtoms';
 
 interface PlayerActionsPanelProps {
-  campaignUid: string;
+  campaignId: string;
   userId: string;
   currentGameMode?: 'exploration' | 'combat' | 'social' | 'rest';
   onActionExecute?: (action: PlayerAction) => void;
@@ -38,7 +38,7 @@ interface PlayerActionsPanelProps {
 }
 
 const PlayerActionsPanel: React.FC<PlayerActionsPanelProps> = ({
-  campaignUid,
+  campaignId,
   userId,
   currentGameMode = 'exploration',
   onActionExecute,
@@ -56,15 +56,15 @@ const PlayerActionsPanel: React.FC<PlayerActionsPanelProps> = ({
   const cleanupIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!campaignUid || !userId) return;
+    if (!campaignId || !userId) return;
 
     // Initial fetch
-    fetchActions({ campaignUid, userId });
+    fetchActions({ campaignId, userId });
 
     // Initialize realtime subscription
     const initializeSubscription = async () => {
       try {
-        const unsubscribe = await initializeRealtime({ campaignUid, userId });
+        const unsubscribe = await initializeRealtime({ campaignId, userId });
         realtimeUnsubscribeRef.current = unsubscribe;
       } catch (error) {
         console.error('Error initializing player actions realtime:', error);
@@ -93,7 +93,7 @@ const PlayerActionsPanel: React.FC<PlayerActionsPanelProps> = ({
         cleanupIntervalRef.current = null;
       }
     };
-  }, [campaignUid, userId, fetchActions, initializeRealtime, cleanupExpired]);
+  }, [campaignId, userId, fetchActions, initializeRealtime, cleanupExpired]);
 
   const getActionIcon = (actionType: string) => {
     switch (actionType) {
@@ -148,7 +148,7 @@ const PlayerActionsPanel: React.FC<PlayerActionsPanelProps> = ({
     try {
       const result = await executeAction({
         action,
-        campaignId: campaignUid
+        campaignId: campaignId
       });
 
       if (result.success) {

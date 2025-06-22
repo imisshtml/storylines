@@ -126,7 +126,7 @@ export default function FriendsScreen() {
           console.error('Error loading initial data:', error);
         }
       };
-      
+
       withLoading(loadInitialData, 'initialLoad')();
     }
   }, [user, fetchFriends, fetchRequestsReceived, fetchRequestsSent, fetchInvitations, withLoading]);
@@ -541,8 +541,8 @@ export default function FriendsScreen() {
             <UserX size={48} color="#666" />
             <Text style={styles.emptyStateTitle}>No Users Found</Text>
             <Text style={styles.emptyStateText}>
-              {searchQuery.includes('@') 
-                ? 'No exact match found for this email address.' 
+              {searchQuery.includes('@')
+                ? 'No exact match found for this email address.'
                 : 'Try searching with a different username.'}
             </Text>
           </View>
@@ -568,9 +568,9 @@ export default function FriendsScreen() {
                 onPress={() => handleSendFriendRequest(userProfile.id)}
                 disabled={isLoading('sendFriendRequest')}
               >
-                <ActivityIndicator 
-                  isLoading={isLoading('sendFriendRequest')} 
-                  size="small" 
+                <ActivityIndicator
+                  isLoading={isLoading('sendFriendRequest')}
+                  size="small"
                   color="#fff"
                 >
                   <UserPlus size={16} color="#fff" />
@@ -599,9 +599,9 @@ export default function FriendsScreen() {
         {renderTabButton('search', 'Search')}
       </View>
 
-      <ActivityIndicator 
-        isLoading={isLoading('initialLoad')} 
-        text="Loading friends data..." 
+      <ActivityIndicator
+        isLoading={isLoading('initialLoad')}
+        text="Loading friends data..."
         style={styles.content}
       >
         <View style={styles.content}>
@@ -629,9 +629,9 @@ export default function FriendsScreen() {
                 <X size={24} color="#fff" />
               </TouchableOpacity>
             </View>
-            <ActivityIndicator 
-              isLoading={isLoading('sendCampaignInvite')} 
-              text="Sending invitation..." 
+            <ActivityIndicator
+              isLoading={isLoading('sendCampaignInvite')}
+              text="Sending invitation..."
               style={styles.modalBody}
             >
               <ScrollView style={styles.modalBody}>
@@ -646,13 +646,13 @@ export default function FriendsScreen() {
                 ) : (
                   getAvailableCampaigns().map((campaign) => {
                     const isPending = selectedFriend?.friend_profile ?
-                      hasPendingInvitation(selectedFriend.friend_profile.id, campaign.uid) :
+                      hasPendingInvitation(selectedFriend.friend_profile.id, campaign.id) :
                       false;
 
                     return (
                       <TouchableOpacity
                         key={campaign.id}
-                        onPress={isPending ? undefined : () => handleSendCampaignInvite(campaign.uid)}
+                        onPress={isPending ? undefined : () => handleSendCampaignInvite(campaign.id)}
                         style={[
                           styles.campaignOption,
                           isPending && styles.campaignOptionDisabled

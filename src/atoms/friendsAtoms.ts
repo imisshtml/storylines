@@ -219,9 +219,9 @@ export const searchUsersAtom = atom(
 
       // Check if query is an exact email address
       const isExactEmail = query.includes('@');
-      
+
       let users: UserProfile[] = [];
-      
+
       if (isExactEmail) {
         // Exact email match search
         const { data: emailUsers, error: emailError } = await supabase
@@ -229,12 +229,12 @@ export const searchUsersAtom = atom(
           .select('id, username, email')
           .neq('id', user.id) // Exclude current user
           .ilike('email', query.toLowerCase());
-        
+
         if (emailError) {
           console.error('Email search error:', emailError);
           throw emailError;
         }
-        
+
         // Mark these results as email matches
         users = (emailUsers || []).map(user => ({
           ...user,
@@ -248,12 +248,12 @@ export const searchUsersAtom = atom(
           .select('id, username, email')
           .neq('id', user.id) // Exclude current user
           .ilike('username', searchPattern);
-        
+
         if (usernameError) {
           console.error('Username search error:', usernameError);
           throw usernameError;
         }
-        
+
         // Mark these results as username matches
         users = (usernameUsers || []).map(user => ({
           ...user,
@@ -520,7 +520,7 @@ export const respondToCampaignInvitationAtom = atom(
             const { error: campaignError } = await supabase
               .from('campaigns')
               .update({ players: updatedPlayers })
-              .eq('uid', invitation.campaign.uid);
+              .eq('uid', invitation.campaign.id);
             if (campaignError) throw campaignError;
           }
           // Set current campaign in atom (for /invite screen)
