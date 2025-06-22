@@ -7,7 +7,7 @@ export type CampaignMessage = {
   campaign_id: string;
   message: string;
   author: string;
-  message_type: 'player' | 'dm' | 'system';
+  message_type: 'player' | 'gm' | 'system';
   timestamp: string;
   created_at: string;
   dice_roll?: number; // Optional dice roll result
@@ -56,7 +56,7 @@ export const addCampaignMessageAtom = atom(
     campaign_id: string;
     message: string;
     author: string;
-    message_type: 'player' | 'dm' | 'system';
+    message_type: 'player' | 'gm' | 'system';
     dice_roll?: number;
     difficulty?: number;
     character_id?: string;
