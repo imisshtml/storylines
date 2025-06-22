@@ -41,6 +41,8 @@ import EnhancedStoryChoices from '../components/EnhancedStoryChoices';
 import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
+import { supabase } from '../config/supabase';
+import { useCustomAlert } from '../components/CustomAlert';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask';
 
@@ -62,6 +64,7 @@ export default function StoryScreen() {
   const [showChoices, setShowChoices] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { isLoading, startLoading, stopLoading } = useLoading();
+  const { showAlert } = useCustomAlert();
 
   // Input type selection
   const [selectedInputType, setSelectedInputType] = useState<InputType>('say');
@@ -583,6 +586,94 @@ export default function StoryScreen() {
     setIsCharacterSheetVisible(true);
   };
 
+  const handleLeaveCampaign = () => {
+    if (!currentCampaign || !user) return;
+
+    showAlert(
+      'Leave Campaign',
+      'Are you sure you want to leave this campaign? Your character will be unassigned from the campaign.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave Campaign',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              startLoading('leaveCampaign');
+
+              // Get current character
+              const currentCharacter = getCurrentCharacter();
+
+              // Remove player from campaign players array
+              const updatedPlayers = currentCampaign.players.filter(player => player.id !== user.id);
+
+              // Update campaign in database
+              const { error: campaignError } = await supabase
+                .from('campaigns')
+                .update({ players: updatedPlayers })
+                .eq('id', currentCampaign.id);
+
+              if (campaignError) {
+                throw campaignError;
+              }
+
+              // If user is the owner, append 'quit' to their ID in the owner field
+              if (currentCampaign.owner === user.id) {
+                const { error: ownerError } = await supabase
+                  .from('campaigns')
+                  .update({ owner: `${user.id}_quit` })
+                  .eq('id', currentCampaign.id);
+
+                if (ownerError) {
+                  throw ownerError;
+                }
+              }
+
+              // If the player had a character assigned, unassign it
+              if (currentCharacter) {
+                const { error: characterError } = await supabase
+                  .from('characters')
+                  .update({ campaign_id: null })
+                  .eq('id', currentCharacter.id);
+
+                if (characterError) {
+                  throw characterError;
+                }
+              }
+
+              // Show success message
+              showAlert(
+                'Left Campaign',
+                'You have successfully left the campaign.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      // Navigate back to home
+                      router.replace('/home');
+                    }
+                  }
+                ],
+                'success'
+              );
+            } catch (error) {
+              console.error('Error leaving campaign:', error);
+              showAlert(
+                'Error',
+                'Failed to leave campaign. Please try again.',
+                undefined,
+                'error'
+              );
+            } finally {
+              stopLoading('leaveCampaign');
+            }
+          }
+        }
+      ],
+      'warning'
+    );
+  };
+
   if (!currentCampaign) {
     return (
       <ActivityIndicator
@@ -713,6 +804,7 @@ export default function StoryScreen() {
                 style={styles.inputTypeButton}
                 onPress={() => setShowInputTypeDropdown(!showInputTypeDropdown)}
               >
+                {currentInputOption?.icon}
                 <Text style={styles.inputTypeText}>{currentInputOption?.label}</Text>
                 <ChevronDown size={16} color="#888" />
               </TouchableOpacity>
@@ -731,6 +823,7 @@ export default function StoryScreen() {
                       ]}
                       onPress={() => handleInputTypeSelect(option)}
                     >
+                      {option.icon}
                       <Text style={styles.inputTypeOptionText}>{option.label}</Text>
                     </TouchableOpacity>
                   ))}
@@ -797,7 +890,21 @@ export default function StoryScreen() {
                 </TouchableOpacity>
               </View>
               {currentCharacter ? (
-                <CharacterView character={currentCharacter} />
+                <View style={styles.characterViewContainer}>
+                  <CharacterView character={currentCharacter} />
+                  
+                  <TouchableOpacity
+                    style={styles.leaveCampaignButton}
+                    onPress={handleLeaveCampaign}
+                    disabled={isLoading('leaveCampaign')}
+                  >
+                    {isLoading('leaveCampaign') ? (
+                      <ActivityIndicator size="small" color="#fff" isLoading={true} />
+                    ) : (
+                      <Text style={styles.leaveCampaignButtonText}>Leave Campaign</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               ) : (
                 <View style={styles.noCharacterContainer}>
                   <Text style={styles.noCharacterText}>
@@ -1005,7 +1112,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   bottomSheet: {
-    backgroundColor: '#fff',
+    backgroundColor: '#1a1a1a',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     height: '90%',
@@ -1036,6 +1143,9 @@ const styles = StyleSheet.create({
   sheetHeader: {
     // padding: 16,
   },
+  characterViewContainer: {
+    flex: 1,
+  },
   noCharacterContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1057,6 +1167,18 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   selectCharacterButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
+  leaveCampaignButton: {
+    backgroundColor: '#f44336',
+    borderRadius: 8,
+    paddingVertical: 12,
+    margin: 16,
+    alignItems: 'center',
+  },
+  leaveCampaignButtonText: {
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Bold',
