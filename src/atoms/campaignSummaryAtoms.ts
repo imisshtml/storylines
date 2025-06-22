@@ -10,7 +10,7 @@ export type ActionSummary = {
 
 export type CampaignSummary = {
   id: string;
-  campaign_uid: string;
+  campaign_id: string;
   action_summaries: ActionSummary[];
   summary_count: number;
   created_at: string;
@@ -25,7 +25,7 @@ export const campaignSummaryErrorAtom = atom<string | null>(null);
 // Fetch campaign summaries for a specific campaign
 export const fetchCampaignSummaryAtom = atom(
   null,
-  async (get, set, campaignUid: string) => {
+  async (get, set, campaignId: string) => {
     try {
       set(campaignSummaryLoadingAtom, true);
       set(campaignSummaryErrorAtom, null);
@@ -33,7 +33,7 @@ export const fetchCampaignSummaryAtom = atom(
       const { data, error } = await supabase
         .from('campaign_summaries')
         .select('*')
-        .eq('campaign_uid', campaignUid)
+        .eq('campaign_id', campaignId)
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
@@ -86,16 +86,16 @@ function getTimeAgo(timestamp: string): string {
 // Initialize real-time subscription for campaign summaries
 export const initializeCampaignSummaryRealtimeAtom = atom(
   null,
-  async (get, set, campaignUid: string) => {
+  async (get, set, campaignId: string) => {
     const subscription = supabase
-      .channel(`campaign_summaries:${campaignUid}`)
+      .channel(`campaign_summaries:${campaignId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'campaign_summaries',
-          filter: `campaign_uid=eq.${campaignUid}`
+          filter: `campaign_id=eq.${campaignId}`
         },
         (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
@@ -115,8 +115,8 @@ export const initializeCampaignSummaryRealtimeAtom = atom(
 // Add a new action summary (for debugging/manual testing)
 export const addActionSummaryAtom = atom(
   null,
-  async (get, set, { campaignUid, message, author, messageType, characterName }: {
-    campaignUid: string;
+  async (get, set, { campaignId, message, author, messageType, characterName }: {
+    campaignId: string;
     message: string;
     author: string;
     messageType: 'player' | 'dm' | 'system';
@@ -125,7 +125,7 @@ export const addActionSummaryAtom = atom(
     try {
       // This would typically be handled by the backend
       // But we can add it here for testing purposes
-      console.log('Adding action summary:', { campaignUid, message, author, messageType, characterName });
+      console.log('Adding action summary:', { campaignId, message, author, messageType, characterName });
     } catch (error) {
       console.error('Error adding action summary:', error);
     }

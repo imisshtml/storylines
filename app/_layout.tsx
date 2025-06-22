@@ -89,6 +89,7 @@ export default function RootLayout() {
               <Stack.Screen name="invite" />
               <Stack.Screen name="create" />
               <Stack.Screen name="characters" />
+              <Stack.Screen name="join" />
               <Stack.Screen
                 name="story"
                 options={{

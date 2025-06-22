@@ -88,9 +88,10 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
 
   const handleJoinCampaign = () => {
     onClose();
-    if (onJoinCampaign) {
+    router.push('/join');
+    /*if (onJoinCampaign) {
       onJoinCampaign();
-    }
+    }*/
   };
 
   const handleTestNotification = async () => {
@@ -121,7 +122,7 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
     },
     {
       icon: <Image source={require('../../assets/images/join.png')} style={styles.img} />,
-      title: 'Join via Code',
+      title: 'Join a Campaign',
       subtitle: 'Join an existing campaign',
       onPress: handleJoinCampaign,
     },

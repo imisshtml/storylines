@@ -18,13 +18,13 @@ import { useAtom } from 'jotai';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
-import { 
-  friendsAtom, 
-  fetchFriendsAtom, 
+import {
+  friendsAtom,
+  fetchFriendsAtom,
   sendCampaignInvitationAtom,
   campaignInvitationsAtom,
   fetchCampaignInvitationsAtom,
-  type Friendship 
+  type Friendship
 } from '../atoms/friendsAtoms';
 import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, ChevronUp, X, Plus, Crown, Info, UserPlus, Clock, UserMinus, Trash2, LogOut } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -70,7 +70,7 @@ export default function InviteFriendsScreen() {
       const { data, error } = await supabase
         .from('characters')
         .select('*')
-        .eq('campaign_id', currentCampaign.uid);
+        .eq('campaign_id', currentCampaign.id);
 
       if (error) {
         console.error('Error fetching campaign characters:', error);
@@ -90,7 +90,7 @@ export default function InviteFriendsScreen() {
       const { data, error } = await supabase
         .from('campaign_invitations')
         .select('*')
-        .eq('campaign_id', currentCampaign.uid)
+        .eq('campaign_id', currentCampaign.id)
         .eq('inviter_id', user.id)
         .eq('status', 'pending');
 
@@ -166,7 +166,7 @@ export default function InviteFriendsScreen() {
           event: '*',
           schema: 'public',
           table: 'characters',
-          filter: `campaign_id=eq.${currentCampaign.uid}`,
+          filter: `campaign_id=eq.${currentCampaign.id}`,
         },
         (payload) => {
           setTimeout(() => {
@@ -270,7 +270,7 @@ export default function InviteFriendsScreen() {
           race: charData.race,
           level: charData.level,
           user_id: playerId,
-          campaign_id: currentCampaign.uid,
+          campaign_id: currentCampaign.id,
           // Add default values for other required Character fields
           background: '',
           abilities: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
@@ -295,7 +295,7 @@ export default function InviteFriendsScreen() {
         } as Character;
       }
     }
-    
+
     // Fall back to database query
     const character = campaignCharacters.find(char => char.user_id === playerId);
     return character || null;
@@ -360,7 +360,7 @@ export default function InviteFriendsScreen() {
         // Assign new character to campaign
         const { error: assignError } = await supabase
           .from('characters')
-          .update({ campaign_id: currentCampaign.uid })
+          .update({ campaign_id: currentCampaign.id })
           .eq('id', characterToAssign.id)
           .eq('user_id', userId);
 
@@ -425,7 +425,7 @@ export default function InviteFriendsScreen() {
       pathname: '/creation',
       params: {
         returnToCampaign: currentCampaign?.id || '',
-        campaignUid: currentCampaign?.uid || '',
+        campaignId: currentCampaign?.id || '',
       }
     });
   };
@@ -449,10 +449,10 @@ export default function InviteFriendsScreen() {
 
     try {
       await sendCampaignInvitation({
-        campaignId: currentCampaign.uid,
+        campaignId: currentCampaign.id,
         friendId: friendId,
       });
-      
+
       // Show success alert
       showAlert(
         'Invitation Sent!',
@@ -460,7 +460,7 @@ export default function InviteFriendsScreen() {
         undefined,
         'success'
       );
-      
+
       // Refresh invitations to update pending status
       fetchCampaignInvitations();
       fetchSentInvitations();
@@ -685,9 +685,9 @@ export default function InviteFriendsScreen() {
   // Check if a friend has a pending invitation to the current campaign
   const hasPendingInvitation = (friendId: string) => {
     if (!currentCampaign) return false;
-    
-    return sentInvitations.some(invitation => 
-      invitation.campaign_id === currentCampaign.uid &&
+
+    return sentInvitations.some(invitation =>
+      invitation.campaign_id === currentCampaign.id &&
       invitation.invitee_id === friendId &&
       invitation.status === 'pending'
     );
@@ -696,10 +696,10 @@ export default function InviteFriendsScreen() {
   // Filter friends who are not already in the campaign
   const getInvitableFriends = () => {
     if (!currentCampaign) return [];
-    
+
     const campaignPlayerIds = currentCampaign.players.map(p => p.id);
-    return friends.filter(friend => 
-      friend.friend_profile && 
+    return friends.filter(friend =>
+      friend.friend_profile &&
       !campaignPlayerIds.includes(friend.friend_profile.id)
     );
   };
@@ -928,7 +928,7 @@ export default function InviteFriendsScreen() {
                           <Text style={styles.noCharacterText}>No Character</Text>
                         )}
                       </View>
-                      
+
                       {/* Remove Player Button - Only show for owner and not for the owner themselves */}
                       {isOwner && player.id !== currentCampaign.owner && (
                         <TouchableOpacity
@@ -947,7 +947,7 @@ export default function InviteFriendsScreen() {
         </View>
         {/* Collapsible Invite Players Section */}
         <View style={styles.inviteSection}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.inviteSectionHeader}
             onPress={() => setIsInviteSectionOpen(!isInviteSectionOpen)}
           >
@@ -969,7 +969,7 @@ export default function InviteFriendsScreen() {
                   </Text>
                 </View>
               )}
-              
+
               <View style={styles.codeContainer}>
                 <Text style={styles.codeLabel}>Invite Code</Text>
                 <View style={styles.codeBox}>

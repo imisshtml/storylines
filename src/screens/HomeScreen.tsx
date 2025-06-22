@@ -96,7 +96,7 @@ export default function HomeScreen() {
       if (campaign.latest_message_id) {
         try {
           await updateCampaignReadStatus({
-            campaignUid: campaign.uid,
+            campaignId: campaign.id,
             messageId: campaign.latest_message_id,
           });
         } catch (error) {
@@ -104,7 +104,7 @@ export default function HomeScreen() {
         }
       }
 
-      if (campaign.status === 'creation') {
+      if (campaign.status === 'creation' || campaign.status === 'open') {
         router.push('/invite');
       } else {
         // Handle other campaign states
@@ -141,7 +141,7 @@ export default function HomeScreen() {
   };
 
   const handleJoinCampaign = () => {
-    setIsJoinModalVisible(true);
+    router.push('/join')
   };
 
   const handleAcceptCampaignInvitation = async (invitationId: string) => {
@@ -230,15 +230,15 @@ export default function HomeScreen() {
 
   const getCharacterCampaignName = (character: Character) => {
     if (character.campaign_id) {
-      // Find the campaign by campaign_id (which should match campaign.uid)
+      // Find the campaign by campaign_id (which should match campaign.id)
       const campaign = campaigns.find(c => c.uid === character.campaign_id);
       return campaign ? campaign.name : 'Unknown Campaign';
     }
     return 'No Campaign Set';
   };
 
-  const getCharacterForCampaign = (campaignUid: string) => {
-    return characters.find(character => character.campaign_id === campaignUid);
+  const getCharacterForCampaign = (campaignId: string) => {
+    return characters.find(character => character.campaign_id === campaignId);
   };
 
   // Helper function to check if user is the owner of a campaign
@@ -451,7 +451,7 @@ export default function HomeScreen() {
                             <Text style={styles.campaignTitle}>{campaign.name}</Text>
                           </View>
                           {(() => {
-                            const campaignCharacter = getCharacterForCampaign(campaign.uid);
+                            const campaignCharacter = getCharacterForCampaign(campaign.id);
                             return campaignCharacter ? (
                               <Image
                                 source={getCharacterAvatar(campaignCharacter)}
@@ -467,12 +467,12 @@ export default function HomeScreen() {
                             <Crown size={14} color="#FFD700" />
                           </View>
                         )}
-                        {campaign.status === 'creation'
-                          ? 'In Creation'
+                        {(campaign.status === 'creation' || campaign.status === 'open')
+                          ? `Players: ${campaign.players.length}/${campaign.limit} • Waiting to Start`
                           : `Players: ${campaign.players.length} • ${campaign.status === 'waiting' ? 'Waiting' : 'In Progress'}`
                         }
                       </Text>
-                      {campaign.status === 'creation' && isOwner(campaign) ? (
+                      {(campaign.status === 'creation' || campaign.status === 'open') && isOwner(campaign) ? (
                         <View style={styles.creationButtonsContainer}>
                           <TouchableOpacity
                             style={styles.campaignButton}
@@ -494,7 +494,7 @@ export default function HomeScreen() {
                           style={styles.continueButton}
                           onPress={() => handleCampaignPress(campaign.id)}
                         >
-                          {campaign.status === 'creation' ? (
+                          {(campaign.status === 'creation' || campaign.status === 'open') ? (
                             <>
                               <Users size={20} color="#fff" />
                               <Text style={styles.buttonText}>Waiting for Start</Text>
@@ -533,7 +533,7 @@ export default function HomeScreen() {
                         onPress={handleJoinCampaign}
                       >
                         <Users size={20} color="#fff" style={styles.gap}/>
-                        <Text style={styles.buttonText}>Join via Code</Text>
+                        <Text style={styles.buttonText}>Join a Campaign</Text>
                       </TouchableOpacity>
                     </View>
                   </>
