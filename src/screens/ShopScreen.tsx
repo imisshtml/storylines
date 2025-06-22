@@ -436,7 +436,7 @@ export default function ShopScreen() {
           
           {__DEV__ && (
             <TouchableOpacity
-              style={[styles.restoreButton, { backgroundColor: '#2196F3', marginTop: 10 }]}
+              style={[styles.restoreButton, { backgroundColor: 'rgba(76, 175, 80, 0.3)', marginTop: 10 }]}
               onPress={handleTestOfferings}
               activeOpacity={0.7}
             >
