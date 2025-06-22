@@ -190,6 +190,10 @@ export default function HomeScreen() {
     }
   };
 
+  const handleCreateCharacter = async () => {
+    router.push('/creation');
+  };
+
   const handleCreateCampaign = async () => {
     const canCreate = await checkCampaignLimit();
     if (canCreate) {
@@ -295,6 +299,26 @@ export default function HomeScreen() {
             <View style={styles.campaignsContainer}>
               <ScrollView style={styles.campaignsScrollView} showsVerticalScrollIndicator={false}>
                 {/* Characters Section */}
+                {characters.length === 0 && (
+                  <>
+                    <View style={styles.noCampaignsContainer}>
+                      <Text style={styles.noCampaigns}>No Characters</Text>
+                      <Text style={styles.noCampaignsSubtext}>
+                        Create a new character to play in a 5e Adventure!
+                      </Text>
+                    </View>
+                    <View style={styles.characterActionButton}>
+                      <TouchableOpacity
+                        style={styles.createButton}
+                        onPress={handleCreateCharacter}
+                      >
+                        <UserPlus size={20} color="#fff" style={styles.gap} />
+                        <Text style={styles.buttonText}>Create Character</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.divider}/>
+                  </>
+                )}
                 {characters.length > 0 && (
                   <View style={styles.charactersSection}>
                     <ScrollView
@@ -436,14 +460,6 @@ export default function HomeScreen() {
                             ) : null;
                           })()}
                         </View>
-                        {campaign.status === 'creation' && isOwner(campaign) && (
-                          <TouchableOpacity
-                            style={styles.settingsButton}
-                            onPress={() => handleSettingsPress(campaign.id)}
-                          >
-                            <Settings size={20} color="#888" />
-                          </TouchableOpacity>
-                        )}
                       </View>
                       <Text style={styles.campaignDetails}>
                         {isOwner(campaign) && (
@@ -507,7 +523,7 @@ export default function HomeScreen() {
                         style={styles.createButton}
                         onPress={handleCreateCampaign}
                       >
-                        <Plus size={20} color="#fff" />
+                        <Plus size={20} color="#fff" style={styles.gap} />
                         <Text style={styles.buttonText}>Create Campaign</Text>
                       </TouchableOpacity>
                     </View>
@@ -516,7 +532,7 @@ export default function HomeScreen() {
                         style={styles.joinButton}
                         onPress={handleJoinCampaign}
                       >
-                        <Users size={20} color="#fff" />
+                        <Users size={20} color="#fff" style={styles.gap}/>
                         <Text style={styles.buttonText}>Join via Code</Text>
                       </TouchableOpacity>
                     </View>
@@ -551,7 +567,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
   header: {
     flexDirection: 'row',
@@ -739,11 +755,11 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   noCampaignsContainer: {
-    backgroundColor: 'rgba(42, 42, 42, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     borderRadius: 12,
     padding: 24,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 0,
   },
   noCampaigns: {
     color: '#fff',
@@ -760,7 +776,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   campaignCard: {
-    backgroundColor: 'rgba(42, 42, 42, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -888,13 +904,24 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   campaignActionButtons: {
-    paddingTop: 20,
+    paddingTop: 10,
     gap: 12,
+    //flexDirection: 'row'
+  },
+  characterActionButton: {
+    paddingTop: 10,
+    gap: 12,
+    marginBottom: 30,
     //flexDirection: 'row'
   },
   charactersGrid: {
     flexDirection: 'row',
     gap: 12,
+  },
+  divider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e2e2',
+    marginBottom: 24
   },
   characterCard: {
     //backgroundColor: 'rgba(42, 42, 42, 0.8)',
@@ -1066,5 +1093,7 @@ const styles = StyleSheet.create({
   playerText: {
     color: '#4CAF50',
   },
-
+  gap: {
+    marginRight: 10
+  }
 });
