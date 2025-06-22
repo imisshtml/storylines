@@ -4,7 +4,7 @@ import { supabase } from '../config/supabase';
 export type CampaignReadStatus = {
   id: string;
   user_id: string;
-  campaign_uid: string;
+  campaign_id: string;
   last_read_message_id: number | null;
   updated_at: string;
 };
@@ -32,9 +32,9 @@ export const fetchCampaignReadStatusAtom = atom(
 
       if (error) throw error;
 
-      // Convert array to object keyed by campaign_uid for easy lookup
+      // Convert array to object keyed by campaign_id for easy lookup
       const statusMap = (data || []).reduce((acc, status) => {
-        acc[status.campaign_uid] = status;
+        acc[status.campaign_id] = status;
         return acc;
       }, {} as Record<string, CampaignReadStatus>);
 
@@ -51,7 +51,7 @@ export const fetchCampaignReadStatusAtom = atom(
 // Update read status for a specific campaign
 export const updateCampaignReadStatusAtom = atom(
   null,
-  async (get, set, { campaignUid, messageId }: { campaignUid: string; messageId: number }) => {
+  async (get, set, { campaignId, messageId }: { campaignId: string; messageId: number }) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -61,7 +61,7 @@ export const updateCampaignReadStatusAtom = atom(
         .from('campaign_read_status')
         .select('id')
         .eq('user_id', user.id)
-        .eq('campaign_uid', campaignUid)
+        .eq('campaign_id', campaignId)
         .single();
 
       let data, error;
@@ -74,7 +74,7 @@ export const updateCampaignReadStatusAtom = atom(
             last_read_message_id: messageId,
           })
           .eq('user_id', user.id)
-          .eq('campaign_uid', campaignUid)
+          .eq('campaign_id', campaignId)
           .select()
           .single();
 
@@ -86,7 +86,7 @@ export const updateCampaignReadStatusAtom = atom(
           .from('campaign_read_status')
           .insert({
             user_id: user.id,
-            campaign_uid: campaignUid,
+            campaign_id: campaignId,
             last_read_message_id: messageId,
           })
           .select()
@@ -102,7 +102,7 @@ export const updateCampaignReadStatusAtom = atom(
       const currentStatuses = get(campaignReadStatusAtom);
       set(campaignReadStatusAtom, {
         ...currentStatuses,
-        [campaignUid]: data,
+        [campaignId]: data,
       });
     } catch (error) {
       set(campaignReadStatusErrorAtom, (error as Error).message);
@@ -114,12 +114,12 @@ export const updateCampaignReadStatusAtom = atom(
 // Get the latest message ID for a campaign
 export const getLatestMessageIdAtom = atom(
   null,
-  async (get, set, campaignUid: string): Promise<number | null> => {
+  async (get, set, campaignId: string): Promise<number | null> => {
     try {
       const { data, error } = await supabase
         .from('campaign_history')
         .select('id')
-        .eq('campaign_uid', campaignUid)
+        .eq('campaign_id', campaignId)
         .order('id', { ascending: false })
         .limit(1)
         .single();
@@ -138,9 +138,9 @@ export const getLatestMessageIdAtom = atom(
 
 // Check if a campaign has unread messages
 export const hasUnreadMessagesAtom = atom(
-  (get) => (campaignUid: string, latestMessageId: number | null): boolean => {
+  (get) => (campaignId: string, latestMessageId: number | null): boolean => {
     const readStatuses = get(campaignReadStatusAtom);
-    const readStatus = readStatuses[campaignUid];
+    const readStatus = readStatuses[campaignId];
 
     // If there's no latest message, there's nothing to read
     if (!latestMessageId) {
@@ -204,13 +204,13 @@ export const initializeCampaignReadStatusRealtimeAtom = atom(
           const currentStatuses = get(campaignReadStatusAtom);
 
           if (payload.eventType === 'DELETE') {
-            const { [payload.old.campaign_uid]: deleted, ...rest } = currentStatuses;
+            const { [payload.old.campaign_id]: deleted, ...rest } = currentStatuses;
             set(campaignReadStatusAtom, rest);
           } else {
             const updatedStatus = payload.new as CampaignReadStatus;
             set(campaignReadStatusAtom, {
               ...currentStatuses,
-              [updatedStatus.campaign_uid]: updatedStatus,
+              [updatedStatus.campaign_id]: updatedStatus,
             });
           }
         }
