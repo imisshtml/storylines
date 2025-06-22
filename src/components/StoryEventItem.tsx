@@ -36,13 +36,13 @@ export default function StoryEventItem({ message }: StoryEventItemProps) {
             avatar: message.character_avatar,
             name: message.character_name,
           };
-          
+
           const avatarSource = getCharacterAvatarUrl(mockCharacter as any);
-          
+
           return (
             <View style={styles.avatarContainer}>
-              <Image 
-                source={avatarSource} 
+              <Image
+                source={avatarSource}
                 style={styles.characterAvatar}
                 onError={(error) => {
                   console.error('Avatar load error:', error);
@@ -99,14 +99,14 @@ export default function StoryEventItem({ message }: StoryEventItemProps) {
       <View style={[styles.header, eventStyles.header]}>
         {getEventIcon()}
         <Text style={styles.headerText}>
-          {message.message_type === 'dm' ? 'Dungeon Master' : 
-           message.message_type === 'player' ? (message.character_name || message.author) : 
-           'System'}
+          {message.message_type === 'dm' ? 'Storyteller' :
+            message.message_type === 'player' ? (message.character_name || message.author) :
+              'System'}
         </Text>
         <Text style={styles.timestamp}>
-          {new Date(message.timestamp).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
+          {new Date(message.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
           })}
         </Text>
       </View>
@@ -116,9 +116,9 @@ export default function StoryEventItem({ message }: StoryEventItemProps) {
         </Text>
         {testDiceRoll && (
           <View style={styles.diceContainer}>
-            <DiceRoll 
-              rollResult={testDiceRoll} 
-              size={100} 
+            <DiceRoll
+              rollResult={testDiceRoll}
+              size={100}
               isRolling={false} // For now, always show result immediately for testing
               difficulty={message.difficulty || 10}
             />

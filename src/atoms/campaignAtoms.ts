@@ -38,12 +38,12 @@ export const campaignsLoadingAtom = atom(true);
 export const campaignsErrorAtom = atom<string | null>(null);
 
 // Helper function to get latest message ID for a campaign
-const getLatestMessageId = async (campaignUid: string): Promise<number | null> => {
+const getLatestMessageId = async (campaignId: string): Promise<number | null> => {
   try {
     const { data, error } = await supabase
       .from('campaign_history')
       .select('id')
-      .eq('campaign_uid', campaignUid)
+      .eq('campaign_id', campaignId)
       .order('id', { ascending: false })
       .limit(1)
       .single();
@@ -54,18 +54,18 @@ const getLatestMessageId = async (campaignUid: string): Promise<number | null> =
 
     return data?.id || null;
   } catch (error) {
-    console.error('Error fetching latest message ID for campaign:', campaignUid, error);
+    console.error('Error fetching latest message ID for campaign:', campaignId, error);
     return null;
   }
 };
 
 // Helper function to check if campaign has unread messages
 const hasUnreadMessages = (
-  campaignUid: string,
+  campaignId: string,
   latestMessageId: number | null,
   readStatuses: Record<string, any>
 ): boolean => {
-  const readStatus = readStatuses[campaignUid];
+  const readStatus = readStatuses[campaignId];
 
   // If there's no latest message, there's nothing to read
   if (!latestMessageId) {
@@ -133,15 +133,15 @@ export const fetchCampaignsAtom = atom(
 
       // Convert read statuses to a map for easy lookup
       const readStatusMap = (readStatuses || []).reduce((acc, status) => {
-        acc[status.campaign_uid] = status;
+        acc[status.campaign_id] = status;
         return acc;
       }, {} as Record<string, any>);
 
       // Enhance campaigns with notification data
       const enhancedCampaigns = await Promise.all(
         userCampaigns.map(async (campaign) => {
-          const latestMessageId = await getLatestMessageId(campaign.uid);
-          const hasUnread = hasUnreadMessages(campaign.uid, latestMessageId, readStatusMap);
+          const latestMessageId = await getLatestMessageId(campaign.id);
+          const hasUnread = hasUnreadMessages(campaign.id, latestMessageId, readStatusMap);
 
           return {
             ...campaign,
@@ -172,11 +172,26 @@ export const upsertCampaignAtom = atom(
       set(campaignsLoadingAtom, true);
       set(campaignsErrorAtom, null);
 
+      // If adventure is provided, look up the adventure_id
+      let adventureId = null;
+      if (campaign.adventure) {
+        const { data: adventure, error: adventureError } = await supabase
+          .from('adventures')
+          .select('id')
+          .eq('slug', campaign.adventure)
+          .single();
+
+        if (!adventureError && adventure) {
+          adventureId = adventure.id;
+        }
+      }
+
       // Clean the campaign data to only include fields that exist in the database
       const cleanCampaignData = {
         id: campaign.id,
         name: campaign.name,
         adventure: campaign.adventure,
+        adventure_id: adventureId,
         level: campaign.level,
         tone: campaign.tone,
         exclude: campaign.exclude,
