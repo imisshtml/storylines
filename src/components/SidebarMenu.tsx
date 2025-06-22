@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image, ScrollView } from 'react-native';
-import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary, Users, UserCog, Bell } from 'lucide-react-native';
+import { LogOut, X, User, Info, UserPlus, Plus, Handshake, Binary, Users, UserCog, Bell, ShoppingCart } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { signOutAtom, userAtom } from '../atoms/authAtoms';
 import { router } from 'expo-router';
@@ -127,6 +127,15 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
         router.push('/friends');
       },
       badge: friendRequestCount > 0 ? friendRequestCount : undefined,
+    },
+    {
+      icon: <ShoppingCart size={24} color="#fff" />,
+      title: 'Shop',
+      subtitle: 'Enhance your adventure',
+      onPress: () => {
+        onClose();
+        router.push('/shop');
+      },
     },
     {
       icon: <Bell size={24} color="#fff" />,
