@@ -8,15 +8,15 @@ import Purchases, {
 import { supabase } from '../config/supabase';
 
 // RevenueCat Product IDs - Update these with your actual product IDs from RevenueCat
-const PRODUCT_IDS = {
-  REMOVE_ADS: 'remove_ads',
-  INCREASE_CHARACTERS: 'increase_characters',
-  INCREASE_CAMPAIGNS: 'increase_campaigns', 
-  ACCESS_ALL_ADVENTURES: 'access_all_adventures',
+export const PRODUCT_IDS = {
+  REMOVE_ADS: 'prod2355afb536',
+  INCREASE_CHARACTERS: 'proded7232c986',
+  INCREASE_CAMPAIGNS: 'prod99b2b546bd',
+  ACCESS_ALL_ADVENTURES: 'prod100afcaa33',
   GROUP_SIZE: 'group_size',
-  SCROLL_OF_REBIRTH: 'scroll_of_rebirth',
-  DM_SUBSCRIPTION: 'dm_subscription_monthly',
-  ADVENTURERS_PACK: 'adventurers_pack_monthly'
+  SCROLL_OF_REBIRTH: 'prod35985e127b',
+  DM_SUBSCRIPTION: 'prod340862bac9',
+  ADVENTURERS_PACK: 'prod8b4bd9634c'
 };
 
 export class PurchaseManager {
@@ -67,6 +67,24 @@ export class PurchaseManager {
   async purchaseProduct(productId: string): Promise<{ success: boolean; customerInfo?: CustomerInfo; error?: string }> {
     try {
       const offerings = await Purchases.getOfferings();
+      
+      // Debug: Log all available offerings and products
+      console.log('=== RevenueCat Debug Info ===');
+      console.log('Current offering:', offerings.current?.identifier);
+      console.log('All offerings:', Object.keys(offerings.all));
+      
+      Object.values(offerings.all).forEach(offering => {
+        console.log(`Offering "${offering.identifier}" packages:`, 
+          offering.availablePackages.map(pkg => ({
+            identifier: pkg.identifier,
+            productId: pkg.product.identifier,
+            price: pkg.product.priceString
+          }))
+        );
+      });
+      console.log('Looking for product:', productId);
+      console.log('============================');
+      
       let packageToPurchase: PurchasesPackage | null = null;
 
       // Find the package for the product ID
@@ -76,6 +94,7 @@ export class PurchaseManager {
         );
         if (foundPackage) {
           packageToPurchase = foundPackage;
+          console.log('Found package:', foundPackage.identifier, 'in offering:', offering.identifier);
           break;
         }
       }

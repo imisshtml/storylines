@@ -16,7 +16,7 @@ import { router } from 'expo-router';
 import { useCustomAlert } from '../components/CustomAlert';
 import DMSubscriptionModal from '../components/DMSubscriptionModal';
 import AdventurerPackModal from '../components/AdventurerPackModal';
-import { PurchaseManager, purchaseManager } from '../utils/purchaseManager';
+import { PurchaseManager, purchaseManager, PRODUCT_IDS } from '../utils/purchaseManager';
 import { useAtom } from 'jotai';
 import { userAtom } from '../atoms/authAtoms';
 import { fetchUserCapabilitiesAtom, userCapabilitiesAtom } from '../atoms/userCapabilitiesAtoms';
@@ -80,7 +80,7 @@ export default function ShopScreen() {
       price: '$1.99',
       image: require('../../assets/images/noAds.png'),
       type: 'one_time',
-      revenueCatId: 'prod2355afb536',
+      revenueCatId: PRODUCT_IDS.REMOVE_ADS,
     },
     {
       id: 'character_limit',
@@ -89,7 +89,7 @@ export default function ShopScreen() {
       price: '$1.99',
       image: require('../../assets/images/increaseCharacters.png'),
       type: 'one_time',
-      revenueCatId: 'proded7232c986',
+      revenueCatId: PRODUCT_IDS.INCREASE_CHARACTERS,
     },
     {
       id: 'campaign_limit',
@@ -98,7 +98,7 @@ export default function ShopScreen() {
       price: '$1.99',
       image: require('../../assets/images/increaseCampaigns.png'),
       type: 'one_time',
-      revenueCatId: 'prod99b2b546bd',
+      revenueCatId: PRODUCT_IDS.INCREASE_CAMPAIGNS,
     },
     {
       id: 'all_adventures',
@@ -107,7 +107,7 @@ export default function ShopScreen() {
       price: '$4.99',
       image: require('../../assets/images/allAdventures.png'),
       type: 'one_time',
-      revenueCatId: 'prod100afcaa33',
+      revenueCatId: PRODUCT_IDS.ACCESS_ALL_ADVENTURES,
     },
     {
       id: 'scroll_rebirth',
@@ -116,7 +116,7 @@ export default function ShopScreen() {
       price: '$0.99',
       image: require('../../assets/images/scrollRevive.png'),
       type: 'one_time',
-      revenueCatId: 'prod35985e127b',
+      revenueCatId: PRODUCT_IDS.SCROLL_OF_REBIRTH,
     },
   ];
   /*
@@ -222,6 +222,33 @@ export default function ShopScreen() {
       showAlert('Restore Failed', 'Something went wrong. Please try again.', [{ text: 'OK' }], 'error');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleTestOfferings = async () => {
+    try {
+      const offerings = await purchaseManager.getOfferings();
+      console.log('=== OFFERINGS TEST ===');
+      console.log('Found offerings:', offerings.length);
+      offerings.forEach(offering => {
+        console.log(`Offering: ${offering.identifier}`);
+        console.log('Packages:', offering.availablePackages.map(pkg => ({
+          id: pkg.identifier,
+          productId: pkg.product.identifier,
+          price: pkg.product.priceString
+        })));
+      });
+      console.log('=====================');
+      
+      showAlert(
+        'Offerings Test', 
+        `Found ${offerings.length} offerings. Check console for details.`,
+        [{ text: 'OK' }],
+        'info'
+      );
+    } catch (error) {
+      console.error('Offerings test error:', error);
+      showAlert('Offerings Test Failed', 'Could not load offerings. Check console.', [{ text: 'OK' }], 'error');
     }
   };
 
@@ -406,6 +433,16 @@ export default function ShopScreen() {
           <Text style={styles.restoreNote}>
             Already purchased? Tap here to restore your previous purchases.
           </Text>
+          
+          {__DEV__ && (
+            <TouchableOpacity
+              style={[styles.restoreButton, { backgroundColor: '#2196F3', marginTop: 10 }]}
+              onPress={handleTestOfferings}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.restoreButtonText}>Test Offerings (Dev)</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Footer */}

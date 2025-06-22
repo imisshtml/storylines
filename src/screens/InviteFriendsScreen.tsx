@@ -1097,7 +1097,7 @@ export default function InviteFriendsScreen() {
               <View style={[styles.detailItem, styles.fullWidth]}>
                 <Text style={styles.detailLabel}>Excluded Content</Text>
                 <View style={styles.excludedTags}>
-                  {currentCampaign.exclude.map((tag, index) => (
+                  {currentCampaign.exclude.flat().map((tag, index) => (
                     <View key={index} style={styles.excludedTag}>
                       <Text style={styles.excludedTagText}>{tag}</Text>
                     </View>
