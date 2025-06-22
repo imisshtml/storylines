@@ -273,7 +273,7 @@ export default function ShopScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#121212" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
@@ -287,7 +287,7 @@ export default function ShopScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Featured Subscriptions */}
         <View style={styles.subscriptionsSection}>
-          {/* DM Subscription */}
+          {/* GM Subscription */}
           <TouchableOpacity
             style={styles.premiumCard}
             onPress={() => showPaywall()}
@@ -296,8 +296,8 @@ export default function ShopScreen() {
             <View style={styles.premiumContent}>
               <View style={styles.premiumLeft}>
                 <View style={styles.premiumImageContainer}>
-                  <Image 
-                    source={require('../../assets/images/dungeonmaster.png')} 
+                  <Image
+                    source={require('../../assets/images/gamemaster.png')}
                     style={styles.premiumImage}
                     resizeMode="contain"
                   />
@@ -328,8 +328,8 @@ export default function ShopScreen() {
             <View style={styles.premiumContent}>
               <View style={styles.premiumLeft}>
                 <View style={styles.premiumImageContainer}>
-                  <Image 
-                    source={require('../../assets/images/adventurersPack.png')} 
+                  <Image
+                    source={require('../../assets/images/adventurersPack.png')}
                     style={styles.premiumImage}
                     resizeMode="contain"
                   />
@@ -453,7 +453,7 @@ export default function ShopScreen() {
         </View>
       </ScrollView>
 
-      {/* DM Subscription Modal */}
+      {/* GM Subscription Modal */}
       <DMSubscriptionModal
         isVisible={showDMModal}
         onClose={() => setShowDMModal(false)}

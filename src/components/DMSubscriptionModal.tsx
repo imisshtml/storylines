@@ -49,17 +49,17 @@ export default function DMSubscriptionModal({ isVisible, onClose }: DMSubscripti
     try {
       // TODO: Implement RevenueCat subscription logic
       console.log('Subscribing to DM Subscription...');
-      
+
       // Placeholder for RevenueCat integration
       // const product = await Purchases.getProducts(['dm_subscription']);
       // const purchaseResult = await Purchases.purchaseProduct(product[0]);
-      
+
       // Simulate subscription delay
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       // Process the subscription in our database
       const success = await PurchaseManager.handlePurchaseSuccess('dm_subscription', user.id);
-      
+
       if (success) {
         showAlert(
           'Welcome, Storyteller!',
@@ -67,7 +67,7 @@ export default function DMSubscriptionModal({ isVisible, onClose }: DMSubscripti
           [{ text: 'Start Storytelling!' }],
           'success'
         );
-        
+
         onClose();
       } else {
         throw new Error('Failed to process subscription');
@@ -106,8 +106,8 @@ export default function DMSubscriptionModal({ isVisible, onClose }: DMSubscripti
           {/* Hero Section */}
           <View style={styles.heroSection}>
             <View style={styles.iconContainer}>
-              <Image 
-                source={require('../../assets/images/dungeonmaster.png')} 
+              <Image
+                source={require('../../assets/images/gamemaster.png')}
                 style={styles.heroIcon}
                 resizeMode="contain"
               />
@@ -157,7 +157,7 @@ export default function DMSubscriptionModal({ isVisible, onClose }: DMSubscripti
                 </>
               )}
             </TouchableOpacity>
-            
+
             <Text style={styles.disclaimer}>
               Cancel anytime. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period.
             </Text>

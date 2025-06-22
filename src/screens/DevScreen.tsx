@@ -148,7 +148,7 @@ export default function DevScreen() {
         return {
           container: styles.aiMessage,
           text: styles.aiMessageText,
-          label: 'AI DM',
+          label: 'AI GM',
           icon: '🎲',
         };
       case 'system':
