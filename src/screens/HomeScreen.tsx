@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Play, Users, Settings, Menu, Crown, UserCheck, Star, Circle, Bell, Plus, UserPlus } from 'lucide-react-native';
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, ScrollView, Image } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, ScrollView, Image, Linking } from 'react-native';
 import { useAtom } from 'jotai';
 import { campaignsAtom, currentCampaignAtom, fetchCampaignsAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
@@ -25,6 +25,7 @@ import { useCustomAlert } from '../components/CustomAlert';
 import { initializeNotificationListeners, requestNotificationPermissions } from '../utils/notifications';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
+import { useLimitEnforcement } from '../hooks/useLimitEnforcement';
 
 export default function HomeScreen() {
   const [campaigns] = useAtom(campaignsAtom);
@@ -46,6 +47,7 @@ export default function HomeScreen() {
   const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
   const { showAlert } = useCustomAlert();
   const { isLoading, withLoading } = useLoading();
+  const { checkCampaignLimit } = useLimitEnforcement();
 
   // Fetch characters and read status when component mounts or user changes
   useEffect(() => {
@@ -142,6 +144,20 @@ export default function HomeScreen() {
     router.push('/join')
   };
 
+  const handleBoltPress = async () => {
+    try {
+      const url = 'https://bolt.new/';
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        console.log('Cannot open URL:', url);
+      }
+    } catch (error) {
+      console.error('Error opening URL:', error);
+    }
+  };
+
   const handleAcceptCampaignInvitation = async (invitationId: string) => {
     try {
       await respondToCampaignInvitation({ invitationId, response: 'accepted' });
@@ -188,13 +204,20 @@ export default function HomeScreen() {
     }
   };
 
-  const handleCreateCampaign = () => {
-    // Clear current campaign data to ensure new campaign starts fresh
-    setCurrentCampaign(null);
-    // Small delay to ensure state is cleared before navigation
-    setTimeout(() => {
-      router.push('/create');
-    }, 50);
+  const handleCreateCharacter = async () => {
+    router.push('/creation');
+  };
+
+  const handleCreateCampaign = async () => {
+    const canCreate = await checkCampaignLimit();
+    if (canCreate) {
+      // Clear current campaign data to ensure new campaign starts fresh
+      setCurrentCampaign(null);
+      // Small delay to ensure state is cleared before navigation
+      setTimeout(() => {
+        router.push('/create');
+      }, 50);
+    }
   };
 
   const getCharacterAvatar = (character: Character) => {
@@ -290,6 +313,26 @@ export default function HomeScreen() {
             <View style={styles.campaignsContainer}>
               <ScrollView style={styles.campaignsScrollView} showsVerticalScrollIndicator={false}>
                 {/* Characters Section */}
+                {characters.length === 0 && (
+                  <>
+                    <View style={styles.noCampaignsContainer}>
+                      <Text style={styles.noCampaigns}>No Characters</Text>
+                      <Text style={styles.noCampaignsSubtext}>
+                        Create a new character to play in a 5e Adventure!
+                      </Text>
+                    </View>
+                    <View style={styles.characterActionButton}>
+                      <TouchableOpacity
+                        style={styles.createButton}
+                        onPress={handleCreateCharacter}
+                      >
+                        <UserPlus size={20} color="#fff" style={styles.gap} />
+                        <Text style={styles.buttonText}>Create Character</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.divider}/>
+                  </>
+                )}
                 {characters.length > 0 && (
                   <View style={styles.charactersSection}>
                     <ScrollView
@@ -494,7 +537,7 @@ export default function HomeScreen() {
                         style={styles.createButton}
                         onPress={handleCreateCampaign}
                       >
-                        <Plus size={20} color="#fff" />
+                        <Plus size={20} color="#fff" style={styles.gap} />
                         <Text style={styles.buttonText}>Create Campaign</Text>
                       </TouchableOpacity>
                     </View>
@@ -503,7 +546,7 @@ export default function HomeScreen() {
                         style={styles.joinButton}
                         onPress={handleJoinCampaign}
                       >
-                        <Users size={20} color="#fff" />
+                        <Users size={20} color="#fff" style={styles.gap}/>
                         <Text style={styles.buttonText}>Join a Campaign</Text>
                       </TouchableOpacity>
                     </View>
@@ -514,6 +557,18 @@ export default function HomeScreen() {
           </View>
         </View>
       </ActivityIndicator>
+
+      <TouchableOpacity 
+        style={styles.boltLogo}
+        onPress={handleBoltPress}
+        activeOpacity={0.7}
+      >
+        <Image 
+          source={require('../../assets/images/logotext_poweredby_360w.png')} 
+          style={styles.boltLogoImage}
+          resizeMode="contain"
+        />
+      </TouchableOpacity>
 
       <SidebarMenu
         isVisible={isSidebarVisible}
@@ -538,7 +593,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
   header: {
     flexDirection: 'row',
@@ -726,11 +781,11 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   noCampaignsContainer: {
-    backgroundColor: 'rgba(42, 42, 42, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     borderRadius: 12,
     padding: 24,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 0,
   },
   noCampaigns: {
     color: '#fff',
@@ -747,7 +802,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   campaignCard: {
-    backgroundColor: 'rgba(42, 42, 42, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -875,13 +930,24 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   campaignActionButtons: {
-    paddingTop: 20,
+    paddingTop: 10,
     gap: 12,
+    //flexDirection: 'row'
+  },
+  characterActionButton: {
+    paddingTop: 10,
+    gap: 12,
+    marginBottom: 30,
     //flexDirection: 'row'
   },
   charactersGrid: {
     flexDirection: 'row',
     gap: 12,
+  },
+  divider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e2e2',
+    marginBottom: 24
   },
   characterCard: {
     //backgroundColor: 'rgba(42, 42, 42, 0.8)',
@@ -1053,5 +1119,20 @@ const styles = StyleSheet.create({
   playerText: {
     color: '#4CAF50',
   },
-
+  gap: {
+    marginRight: 10
+  },
+  boltLogo: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 90,
+    height: 90,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  boltLogoImage: {
+    width: '100%',
+    height: '100%',
+  },
 });

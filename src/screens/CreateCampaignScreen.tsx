@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Platform, StatusBar, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView } from 'react-native';
-import { CircleAlert as AlertCircle, Save, ArrowLeft, ChevronDown, Trash2 } from 'lucide-react-native';
+import { CircleAlert as AlertCircle, Save, ArrowLeft, ChevronDown, Trash2, Lock } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { campaignsLoadingAtom, campaignsErrorAtom, currentCampaignAtom, upsertCampaignAtom, type Campaign } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
@@ -8,6 +8,8 @@ import { router } from 'expo-router';
 import AdventureSelectSheet, { type Adventure, ADVENTURES } from '../components/AdventureSelectSheet';
 import { supabase } from '../config/supabase';
 import { useCustomAlert } from '../components/CustomAlert';
+import { useLimitEnforcement } from '../hooks/useLimitEnforcement';
+import { fetchUserCapabilitiesAtom } from '../atoms/userCapabilitiesAtoms';
 
 type Tone = 'serious' | 'humorous' | 'grimdark';
 type ContentLevel = 'kids' | 'teens' | 'adults';
@@ -48,6 +50,8 @@ export default function CreateCampaignScreen() {
   const [, upsertCampaign] = useAtom(upsertCampaignAtom);
   const [user] = useAtom(userAtom);
   const { showAlert } = useCustomAlert();
+  const { getGroupSizeLimit } = useLimitEnforcement();
+  const [, fetchCapabilities] = useAtom(fetchUserCapabilitiesAtom);
 
   const [campaignName, setCampaignName] = useState('');
   const [selectedAdventure, setSelectedAdventure] = useState<Adventure | null>(null);
@@ -60,21 +64,32 @@ export default function CreateCampaignScreen() {
   const [isAdventureSheetVisible, setIsAdventureSheetVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [capabilitiesLoaded, setCapabilitiesLoaded] = useState(false);
 
   const isEditing = currentCampaign !== null;
+  const maxGroupSize = getGroupSizeLimit();
 
-  // Helper functions to convert between slider value and RPFocus enum
-  const rpFocusOptions: RPFocus[] = ['heavy_rp', 'rp_focused', 'balanced', 'combat_focused', 'heavy_combat'];
+  // Fetch capabilities when component mounts
+  useEffect(() => {
+    const loadCapabilities = async () => {
+      if (user?.id && !capabilitiesLoaded) {
+        try {
+          await fetchCapabilities();
+          setCapabilitiesLoaded(true);
+        } catch (error) {
+          console.error('Error loading capabilities:', error);
+          setCapabilitiesLoaded(true); // Set to true anyway to avoid infinite loading
+        }
+      }
+    };
 
-  const getRpFocusFromValue = (value: number): RPFocus => {
-    return rpFocusOptions[Math.round(value)] || 'balanced';
-  };
-
-  const getValueFromRpFocus = (focus: RPFocus): number => {
-    return rpFocusOptions.indexOf(focus);
-  };
+    loadCapabilities();
+  }, [user?.id, fetchCapabilities, capabilitiesLoaded]);
 
   useEffect(() => {
+    // Only initialize form after capabilities are loaded
+    if (!capabilitiesLoaded) return;
+
     if (currentCampaign && isEditing) {
       // Only populate form if we're editing an existing campaign
       setCampaignName(currentCampaign.name);
@@ -83,7 +98,7 @@ export default function CreateCampaignScreen() {
       setExcludedTags(currentCampaign.exclude || []);
       setContentLevel(currentCampaign.content_level);
       setRpFocusValue(getValueFromRpFocus(currentCampaign.rp_focus));
-      setPlayerLimit(currentCampaign.limit || 3);
+      setPlayerLimit(Math.min(currentCampaign.limit || 3, maxGroupSize));
       // Set the selected adventure from the campaign's adventure ID
       const adventure = ADVENTURES.find((a: Adventure) => a.id === currentCampaign.adventure);
       if (adventure) {
@@ -97,10 +112,21 @@ export default function CreateCampaignScreen() {
       setExcludedTags([]);
       setContentLevel('adults');
       setRpFocusValue(2); // balanced
-      setPlayerLimit(3);
+      setPlayerLimit(Math.min(3, maxGroupSize));
       setSelectedAdventure(null);
     }
-  }, [currentCampaign, isEditing]);
+  }, [currentCampaign, isEditing, maxGroupSize, capabilitiesLoaded]);
+
+  // Helper functions to convert between slider value and RPFocus enum
+  const rpFocusOptions: RPFocus[] = ['heavy_rp', 'rp_focused', 'balanced', 'combat_focused', 'heavy_combat'];
+
+  const getRpFocusFromValue = (value: number): RPFocus => {
+    return rpFocusOptions[Math.round(value)] || 'balanced';
+  };
+
+  const getValueFromRpFocus = (focus: RPFocus): number => {
+    return rpFocusOptions.indexOf(focus);
+  };
 
   const handleBack = () => {
     setCurrentCampaign(null);
@@ -324,26 +350,62 @@ export default function CreateCampaignScreen() {
         <View style={styles.section}>
           <Text style={styles.label}>Player Limit</Text>
           <View style={styles.playerLimitContainer}>
-            {[1, 2, 3, 4, 5, 6, 7].map(limit => (
-              <TouchableOpacity
-                key={limit}
-                style={[
-                  styles.playerLimitButton,
-                  playerLimit === limit && styles.selectedPlayerLimit
-                ]}
-                onPress={() => setPlayerLimit(limit)}
-              >
-                <Text style={[
-                  styles.playerLimitText,
-                  playerLimit === limit && styles.selectedPlayerLimitText
-                ]}>
-                  {limit}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {[1, 2, 3, 4, 5, 6, 7].map(limit => {
+              const isLocked = limit > maxGroupSize;
+              return (
+                <TouchableOpacity
+                  key={limit}
+                  style={[
+                    styles.playerLimitButton,
+                    playerLimit === limit && styles.selectedPlayerLimit,
+                    isLocked && styles.lockedPlayerLimit
+                  ]}
+                  onPress={() => {
+                    if (!isLocked) {
+                      setPlayerLimit(limit);
+                    } else {
+                      showAlert(
+                        'Group Size Limit Reached',
+                        `You can only create campaigns with up to ${maxGroupSize} players. Purchase &quot;Group Size +2&quot; in the shop to increase your limit.`,
+                        [
+                          {
+                            text: 'Go to Shop',
+                            onPress: () => {
+                              router.push('/shop');
+                            },
+                          },
+                          {
+                            text: 'Cancel',
+                            style: 'cancel',
+                          },
+                        ],
+                        'warning'
+                      );
+                    }
+                  }}
+                  disabled={isLocked}
+                >
+                  {isLocked && (
+                    <Lock size={12} color="#666" style={styles.lockIcon} />
+                  )}
+                  <Text style={[
+                    styles.playerLimitText,
+                    playerLimit === limit && styles.selectedPlayerLimitText,
+                    isLocked && styles.lockedPlayerLimitText
+                  ]}>
+                    {limit}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
           <Text style={styles.playerLimitDescription}>
             Maximum number of players (including yourself) that can join this campaign.
+            {maxGroupSize < 7 && (
+              <Text style={styles.upgradeHint}>
+                {' '}Purchase &quot;Group Size +2&quot; in the shop to increase your limit to {Math.min(maxGroupSize + 2, 7)} players.
+              </Text>
+            )}
           </Text>
         </View>
 
@@ -792,6 +854,8 @@ const styles = StyleSheet.create({
     padding: 12,
     marginHorizontal: 2,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   selectedPlayerLimit: {
     backgroundColor: '#4CAF50',
@@ -828,6 +892,23 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     textAlign: 'center',
+    fontFamily: 'Inter-Regular',
+  },
+  lockedPlayerLimit: {
+    backgroundColor: '#1a1a1a',
+    opacity: 0.6,
+  },
+  lockedPlayerLimitText: {
+    color: '#666',
+  },
+  lockIcon: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+  },
+  upgradeHint: {
+    color: '#999',
+    fontSize: 12,
     fontFamily: 'Inter-Regular',
   },
 });

@@ -8,25 +8,42 @@
     "scheme": "storylines",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/sl_logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000",
+      "imageWidth": 650
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.imisshtml.storylines",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/sl_icon_1024.png",
         "backgroundColor": "#050908"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.imisshtml.storylines"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/storylines_splash.jpg",
-          "imageWidth": 1024,
-          "resizeMode": "cover",
-          "backgroundColor": "#050908"
+          "image": "./assets/images/sl_logo.png",
+          "resizeMode": "stretch",
+          "backgroundColor": "#000000",
+          "imageWidth": 650,
+          "dark": {
+            "image": "./assets/images/sl_logo.png",
+            "resizeMode": "stretch",
+            "backgroundColor": "#000000",
+            "imageWidth": 650
+          }
         }
       ]
     ],

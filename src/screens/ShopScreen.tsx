@@ -11,17 +11,18 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { ArrowLeft, ShoppingCart, Crown } from 'lucide-react-native';
+import { ArrowLeft, ShoppingCart, Crown, Check } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useCustomAlert } from '../components/CustomAlert';
 import DMSubscriptionModal from '../components/DMSubscriptionModal';
 import AdventurerPackModal from '../components/AdventurerPackModal';
-import { PurchaseManager } from '../utils/purchaseManager';
+import { PurchaseManager, purchaseManager, PRODUCT_IDS } from '../utils/purchaseManager';
 import { useAtom } from 'jotai';
 import { userAtom } from '../atoms/authAtoms';
-
-// TODO: Import RevenueCat
-// import Purchases from 'react-native-purchases';
+import { fetchUserCapabilitiesAtom, userCapabilitiesAtom } from '../atoms/userCapabilitiesAtoms';
+import ScrollSelectionModal from '../components/ScrollSelectionModal';
+import RevenueCatPaywall from '../components/RevenueCatPaywall';
+import { usePaywall } from '../hooks/usePaywall';
 
 interface ShopItem {
   id: string;
@@ -39,54 +40,74 @@ export default function ShopScreen() {
   const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
   const [showDMModal, setShowDMModal] = useState(false);
   const [showAdventurerModal, setShowAdventurerModal] = useState(false);
+  const [showScrollModal, setShowScrollModal] = useState(false);
+  const [capabilitiesLoaded, setCapabilitiesLoaded] = useState(false);
   const { showAlert } = useCustomAlert();
   const [user] = useAtom(userAtom);
+  const [, fetchCapabilities] = useAtom(fetchUserCapabilitiesAtom);
+  const [userCapabilities] = useAtom(userCapabilitiesAtom);
+  const { isVisible: isPaywallVisible, showPaywall, hidePaywall, offering: currentOffering } = usePaywall();
+
+  // Load capabilities when component mounts
+  useEffect(() => {
+    const loadCapabilities = async () => {
+      if (user?.id) {
+        try {
+          await fetchCapabilities();
+          // Initialize RevenueCat
+          await purchaseManager.initialize(user.id);
+        } catch (error) {
+          console.error('Failed to load capabilities or initialize RevenueCat:', error);
+        } finally {
+          setCapabilitiesLoaded(true);
+        }
+      }
+    };
+
+    loadCapabilities();
+  }, [user?.id, fetchCapabilities]);
+
+  // Debug: Log capabilities changes
+  useEffect(() => {
+    console.log('ShopScreen: User capabilities updated:', userCapabilities);
+  }, [userCapabilities]);
 
   const shopItems: ShopItem[] = [
     {
       id: 'remove_ads',
       title: 'Remove Ads',
       description: 'Enjoy uninterrupted gameplay without advertisements',
-      price: '$0.99',
+      price: '$1.99',
       image: require('../../assets/images/noAds.png'),
       type: 'one_time',
-      revenueCatId: 'remove_ads',
+      revenueCatId: PRODUCT_IDS.REMOVE_ADS,
     },
     {
       id: 'character_limit',
-      title: 'Character Limit +2',
-      description: 'Create 2 additional characters for your adventures',
-      price: '$0.99',
+      title: 'Character Limit +3',
+      description: 'Create 3 additional characters for your adventures',
+      price: '$1.99',
       image: require('../../assets/images/increaseCharacters.png'),
       type: 'one_time',
-      revenueCatId: 'character_limit_2',
+      revenueCatId: PRODUCT_IDS.INCREASE_CHARACTERS,
     },
     {
       id: 'campaign_limit',
-      title: 'Campaign Limit +2',
-      description: 'Host 2 additional campaigns simultaneously',
-      price: '$0.99',
+      title: 'Campaign Limit +3',
+      description: 'Host and/or Join 3 additional campaigns',
+      price: '$1.99',
       image: require('../../assets/images/increaseCampaigns.png'),
       type: 'one_time',
-      revenueCatId: 'campaign_limit_2',
+      revenueCatId: PRODUCT_IDS.INCREASE_CAMPAIGNS,
     },
     {
       id: 'all_adventures',
       title: 'Access All Adventures',
       description: 'Unlock all premium adventure modules and content',
-      price: '$2.99',
+      price: '$4.99',
       image: require('../../assets/images/allAdventures.png'),
       type: 'one_time',
-      revenueCatId: 'all_adventures',
-    },
-    {
-      id: 'group_size',
-      title: 'Group Size +2',
-      description: 'Increase your maximum party size by 2 players',
-      price: '$0.99',
-      image: require('../../assets/images/increaseGroup.png'),
-      type: 'one_time',
-      revenueCatId: 'group_size_2',
+      revenueCatId: PRODUCT_IDS.ACCESS_ALL_ADVENTURES,
     },
     {
       id: 'scroll_rebirth',
@@ -95,63 +116,84 @@ export default function ShopScreen() {
       price: '$0.99',
       image: require('../../assets/images/scrollRevive.png'),
       type: 'one_time',
-      revenueCatId: 'scroll_rebirth',
+      revenueCatId: PRODUCT_IDS.SCROLL_OF_REBIRTH,
     },
   ];
+  /*
+  DM prod340862bac9
+  AP prod8b4bd9634c
+  {
+      id: 'group_size',
+      title: 'Group Size +2',
+      description: 'Increase your maximum party size by 2 players',
+      price: '$0.99',
+      image: require('../../assets/images/increaseGroup.png'),
+      type: 'one_time',
+      revenueCatId: 'group_size_2',
+    },
+  */
+
+  // Check if an item is purchased
+  const isItemPurchased = (itemId: string): boolean => {
+    console.log(`ShopScreen: Checking if ${itemId} is purchased. adsRemoved:`, userCapabilities.adsRemoved);
+    
+    switch (itemId) {
+      case 'remove_ads':
+        return userCapabilities.adsRemoved;
+      case 'all_adventures':
+        return userCapabilities.allAdventuresUnlocked;
+      case 'group_size':
+        // Group size can be purchased twice, so check if at max (7 players)
+        return userCapabilities.groupSizeLimit >= 5;
+      case 'character_limit':
+        // Character limit purchases are stackable, so we don't mark as "purchased"
+        return false;
+      case 'campaign_limit':
+        // Campaign limit purchases are stackable, so we don't mark as "purchased"
+        return false;
+      case 'scroll_rebirth':
+        // Scrolls are consumable, so never mark as "purchased"
+        return false;
+      default:
+        return false;
+    }
+  };
+
+  // Get purchase status text
+  const getPurchaseStatusText = (itemId: string): string => {
+    if (isItemPurchased(itemId)) {
+      return 'Purchased';
+    }
+    return '';
+  };
 
   const handleBack = () => {
     router.back();
   };
 
-  const handlePurchase = async (item: ShopItem) => {
-    if (item.id === 'dm_subscription') {
-      setShowDMModal(true);
-      return;
-    }
-
+  const handlePurchase = async (productId: string) => {
     if (!user?.id) {
-      showAlert(
-        'Authentication Required',
-        'Please log in to make purchases.',
-        [{ text: 'OK' }],
-        'error'
-      );
+      showAlert('Authentication Error', 'Please log in to make purchases.', [{ text: 'OK' }], 'error');
       return;
     }
 
-    setLoadingItemId(item.id);
+    setLoadingItemId(productId);
+
     try {
-      // TODO: Implement RevenueCat purchase logic
-      console.log(`Purchasing ${item.title}...`);
-
-      // Placeholder for RevenueCat integration
-      // const product = await Purchases.getProducts([item.revenueCatId]);
-      // const purchaseResult = await Purchases.purchaseProduct(product[0]);
-
-      // Simulate purchase delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Process the purchase in our database
-      const success = await PurchaseManager.handlePurchaseSuccess(item.revenueCatId || item.id, user.id);
-
-      if (success) {
-        showAlert(
-          'Purchase Successful!',
-          `${item.title} has been added to your account.`,
-          [{ text: 'Continue' }],
-          'success'
-        );
+      const result = await purchaseManager.purchaseProduct(productId);
+      
+      if (result.success) {
+        showAlert('Purchase Successful!', 'Your purchase has been completed.', [{ text: 'OK' }], 'success');
+        // Refresh capabilities to reflect new purchase
+        await fetchCapabilities();
       } else {
-        throw new Error('Failed to process purchase');
+        if (result.error !== 'Purchase cancelled by user') {
+          showAlert('Purchase Failed', result.error || 'Something went wrong. Please try again.', [{ text: 'OK' }], 'error');
+        }
       }
     } catch (error) {
       console.error('Purchase error:', error);
-      showAlert(
-        'Purchase Failed',
-        'There was an issue processing your purchase. Please try again.',
-        [{ text: 'OK' }],
-        'error'
-      );
+      showAlert('Purchase Failed', 'Something went wrong. Please try again.', [{ text: 'OK' }], 'error');
     } finally {
       setLoadingItemId(null);
     }
@@ -159,44 +201,74 @@ export default function ShopScreen() {
 
   const handleRestorePurchases = async () => {
     if (!user?.id) {
-      showAlert(
-        'Authentication Required',
-        'Please log in to restore purchases.',
-        [{ text: 'OK' }],
-        'error'
-      );
+      showAlert('Authentication Error', 'Please log in to restore purchases.', [{ text: 'OK' }], 'error');
       return;
     }
 
     setIsLoading(true);
+
     try {
-      // TODO: Implement RevenueCat restore logic
-      console.log('Restoring purchases...');
-
-      const success = await PurchaseManager.restorePurchases(user.id);
-
-      if (success) {
-        showAlert(
-          'Purchases Restored',
-          'Your previous purchases have been restored successfully.',
-          [{ text: 'OK' }],
-          'success'
-        );
+      const result = await purchaseManager.restorePurchases();
+      
+      if (result.success) {
+        showAlert('Purchases Restored!', 'Your previous purchases have been restored.', [{ text: 'OK' }], 'success');
+        // Refresh capabilities to reflect restored purchases
+        await fetchCapabilities();
       } else {
-        throw new Error('Failed to restore purchases');
+        showAlert('Restore Failed', result.error || 'No purchases found to restore.', [{ text: 'OK' }], 'error');
       }
     } catch (error) {
       console.error('Restore error:', error);
-      showAlert(
-        'Restore Failed',
-        'Unable to restore purchases. Please try again.',
-        [{ text: 'OK' }],
-        'error'
-      );
+      showAlert('Restore Failed', 'Something went wrong. Please try again.', [{ text: 'OK' }], 'error');
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleTestOfferings = async () => {
+    try {
+      const offerings = await purchaseManager.getOfferings();
+      console.log('=== OFFERINGS TEST ===');
+      console.log('Found offerings:', offerings.length);
+      offerings.forEach(offering => {
+        console.log(`Offering: ${offering.identifier}`);
+        console.log('Packages:', offering.availablePackages.map(pkg => ({
+          id: pkg.identifier,
+          productId: pkg.product.identifier,
+          price: pkg.product.priceString
+        })));
+      });
+      console.log('=====================');
+      
+      showAlert(
+        'Offerings Test', 
+        `Found ${offerings.length} offerings. Check console for details.`,
+        [{ text: 'OK' }],
+        'info'
+      );
+    } catch (error) {
+      console.error('Offerings test error:', error);
+      showAlert('Offerings Test Failed', 'Could not load offerings. Check console.', [{ text: 'OK' }], 'error');
+    }
+  };
+
+  const handleScrollModalSuccess = () => {
+    // Refresh capabilities after scroll is assigned
+    fetchCapabilities();
+  };
+
+  // Show loading while capabilities are being fetched
+  if (!capabilitiesLoaded) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#121212" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.loadingText}>Loading shop...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -207,21 +279,18 @@ export default function ShopScreen() {
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ArrowLeft color="#fff" size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Shop</Text>
+        <Text style={styles.headerTitle}>The Goblin's Market</Text>
         <View style={styles.headerRight}>
-          <ShoppingCart size={24} color="#4CAF50" />
         </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Featured Subscriptions */}
         <View style={styles.subscriptionsSection}>
-          <Text style={styles.sectionTitle}>Premium Subscriptions</Text>
-
           {/* GM Subscription */}
           <TouchableOpacity
             style={styles.premiumCard}
-            onPress={() => setShowDMModal(true)}
+            onPress={() => showPaywall()}
             activeOpacity={0.8}
           >
             <View style={styles.premiumContent}>
@@ -236,10 +305,10 @@ export default function ShopScreen() {
                 <View style={styles.premiumInfo}>
                   <View style={styles.premiumHeader}>
                     <Crown size={20} color="#FFD700" />
-                    <Text style={styles.premiumTitle}>GM Subscription</Text>
+                    <Text style={styles.premiumTitle}>Ultimate Host</Text>
                   </View>
                   <Text style={styles.premiumDescription}>
-                    Ultimate GM tools, unlimited campaigns, and exclusive content
+                    Make the most of your campaigns for you and your players!
                   </Text>
                 </View>
               </View>
@@ -284,48 +353,66 @@ export default function ShopScreen() {
 
         {/* Shop Items */}
         <View style={styles.itemsSection}>
-          <Text style={styles.sectionTitle}>One-Time Purchases</Text>
+          <View style={styles.divider} />
           <View style={styles.itemsGrid}>
-            {shopItems.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.shopItem, loadingItemId === item.id && styles.shopItemLoading]}
-                onPress={() => handlePurchase(item)}
-                disabled={loadingItemId === item.id}
-                activeOpacity={0.8}
-              >
-                {/* Content */}
-                <View style={styles.itemContent}>
-                  <View style={styles.itemLeft}>
-                    <View style={styles.itemImageContainer}>
-                      <Image
-                        source={item.image}
-                        style={styles.itemImage}
-                        resizeMode="contain"
-                      />
-                    </View>
-                    <View style={styles.itemInfo}>
-                      <Text style={styles.itemTitle}>{item.title}</Text>
-                      <Text style={styles.itemDescription}>{item.description}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.itemRight}>
-                    {loadingItemId === item.id ? (
-                      <View style={styles.itemLoadingContainer}>
-                        <ActivityIndicator size="small" color="#4CAF50" />
+            {shopItems.map((item) => {
+              const isPurchased = isItemPurchased(item.id);
+              const statusText = getPurchaseStatusText(item.id);
+              
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.shopItem, 
+                    loadingItemId === item.id && styles.shopItemLoading,
+                    isPurchased && styles.shopItemPurchased
+                  ]}
+                  onPress={() => handlePurchase(item.id)}
+                  disabled={loadingItemId === item.id || isPurchased}
+                  activeOpacity={isPurchased ? 1 : 0.8}
+                >
+                  {/* Content */}
+                  <View style={styles.itemContent}>
+                    <View style={styles.itemLeft}>
+                      <View style={styles.itemImageContainer}>
+                        <Image 
+                          source={item.image} 
+                          style={[styles.itemImage, isPurchased && styles.itemImagePurchased]}
+                          resizeMode="contain"
+                        />
                       </View>
-                    ) : (
-                      <View style={styles.itemPriceContainer}>
-                        <Text style={styles.itemPrice}>
-                          {item.price}
+                      <View style={styles.itemInfo}>
+                        <Text style={[styles.itemTitle, isPurchased && styles.itemTitlePurchased]}>
+                          {item.title}
+                        </Text>
+                        <Text style={[styles.itemDescription, isPurchased && styles.itemDescriptionPurchased]}>
+                          {item.description}
                         </Text>
                       </View>
-                    )}
+                    </View>
+                    
+                    <View style={styles.itemRight}>
+                      {loadingItemId === item.id ? (
+                        <View style={styles.itemLoadingContainer}>
+                          <ActivityIndicator size="small" color="#4CAF50" />
+                        </View>
+                      ) : isPurchased ? (
+                        <View style={styles.purchasedContainer}>
+                          <Check size={16} color="#4CAF50" />
+                          <Text style={styles.purchasedText}>Purchased</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.itemPriceContainer}>
+                          <Text style={styles.itemPrice}>
+                            {item.price}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -346,6 +433,16 @@ export default function ShopScreen() {
           <Text style={styles.restoreNote}>
             Already purchased? Tap here to restore your previous purchases.
           </Text>
+          
+          {__DEV__ && (
+            <TouchableOpacity
+              style={[styles.restoreButton, { backgroundColor: 'rgba(76, 175, 80, 0.3)', marginTop: 10 }]}
+              onPress={handleTestOfferings}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.restoreButtonText}>Test Offerings (Dev)</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Footer */}
@@ -367,6 +464,36 @@ export default function ShopScreen() {
         isVisible={showAdventurerModal}
         onClose={() => setShowAdventurerModal(false)}
       />
+
+      {/* Scroll Selection Modal */}
+      <ScrollSelectionModal
+        isVisible={showScrollModal}
+        onClose={() => setShowScrollModal(false)}
+        onSuccess={handleScrollModalSuccess}
+      />
+
+      {/* RevenueCat Paywall */}
+      {isPaywallVisible && (
+        <RevenueCatPaywall
+          offering={currentOffering}
+          onPurchaseCompleted={(result) => {
+            console.log('Purchase completed from RevenueCat paywall:', result);
+            hidePaywall();
+            // Refresh capabilities after purchase
+            fetchCapabilities();
+          }}
+          onRestoreCompleted={(result) => {
+            console.log('Restore completed from RevenueCat paywall:', result);
+            hidePaywall();
+            // Refresh capabilities after restore
+            fetchCapabilities();
+          }}
+          onError={(error: any) => {
+            console.error('Purchase failed from RevenueCat paywall:', error);
+            hidePaywall();
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -474,6 +601,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#ccc',
     lineHeight: 18,
+    paddingRight: 2,
   },
   premiumPriceContainer: {
     alignItems: 'flex-end',
@@ -511,6 +639,10 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     transform: [{ scale: 0.98 }],
   },
+  shopItemPurchased: {
+    opacity: 0.5,
+    transform: [{ scale: 0.98 }],
+  },
   itemContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -536,6 +668,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
   },
+  itemImagePurchased: {
+    opacity: 0.5,
+  },
   itemInfo: {
     flex: 1,
   },
@@ -545,11 +680,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 4,
   },
+  itemTitlePurchased: {
+    opacity: 0.5,
+  },
   itemDescription: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#ccc',
     lineHeight: 18,
+  },
+  itemDescriptionPurchased: {
+    opacity: 0.5,
   },
   itemRight: {
     alignItems: 'flex-end',
@@ -578,6 +719,16 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  purchasedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  purchasedText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#4CAF50',
   },
   restoreSection: {
     padding: 16,
@@ -616,4 +767,20 @@ const styles = StyleSheet.create({
     maxWidth: 300,
     lineHeight: 16,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    marginTop: 16,
+  },
+  divider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#2f2f2f',
+    marginBottom: 24
+  }
 });

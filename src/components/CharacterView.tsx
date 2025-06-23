@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import SpellSlotTracker from './SpellSlotTracker';
 import AbilityUsageTracker from './AbilityUsageTracker';
 import { useCustomAlert } from './CustomAlert';
+import { useAds } from '../hooks/useAds';
 
 type CoreStat = {
   name: string;
@@ -77,6 +78,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
   const [showLeaveCampaignModal, setShowLeaveCampaignModal] = useState(false);
   const { showAlert } = useCustomAlert();
   const [, fetchCampaigns] = useAtom(fetchCampaignsAtom);
+  const { showInterstitial } = useAds();
 
   // Load character features when character changes
   useEffect(() => {
@@ -859,18 +861,17 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
   };
 
   const confirmLeaveCampaign = async () => {
-    if (!character?.campaign_id) {
-      setShowLeaveCampaignModal(false);
-      return;
-    }
+    setShowLeaveCampaignModal(false);
 
     try {
-      console.info('Starting leave campaign process for character:', character.id, 'campaign:', character.campaign_id);
+      // Show interstitial ad before leaving campaign
+      await showInterstitial('leave_campaign');
+
+      console.log('Starting leave campaign process for character:', character.id, 'campaign:', character.campaign_id);
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         console.error('No authenticated user found');
-        setShowLeaveCampaignModal(false);
         return;
       }
 
@@ -888,7 +889,6 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
 
       if (!campaign) {
         console.error('Campaign not found');
-        setShowLeaveCampaignModal(false);
         return;
       }
 

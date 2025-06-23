@@ -41,6 +41,7 @@ import EnhancedStoryChoices from '../components/EnhancedStoryChoices';
 import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
+import BannerAd from '../components/BannerAd';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask';
 
@@ -498,6 +499,8 @@ export default function StoryScreen() {
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
+        {/* Banner Ad */}
+        <BannerAd size="BANNER" />
         <View style={styles.header}>
           <TouchableOpacity onPress={handleHomePress} style={styles.headerButton}>
             <Home size={24} color="#2a2a2a" />
@@ -925,5 +928,11 @@ const styles = StyleSheet.create({
   },
   playerActionsPanel: {
     marginVertical: 16,
+  },
+  bannerAd: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
   },
 });

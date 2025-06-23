@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { LogIn, UserPlus, Eye, EyeOff, Phone, Zap } from 'lucide-react-native';
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, Image } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, Image, Linking } from 'react-native';
 import { useAtom } from 'jotai';
 import { signInAtom, signUpAtom, authLoadingAtom, authErrorAtom } from '../atoms/authAtoms';
 import ActivityIndicator from '../components/ActivityIndicator';
@@ -82,6 +82,20 @@ export default function LoginScreen() {
   const handleTitlePress = () => {
     // Only navigate to dev screen in development mode
     router.push('/dev');
+  };
+
+  const handleBoltPress = async () => {
+    try {
+      const url = 'https://bolt.new/';
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        console.log('Cannot open URL:', url);
+      }
+    } catch (error) {
+      console.error('Error opening URL:', error);
+    }
   };
 
   return (
@@ -246,13 +260,17 @@ export default function LoginScreen() {
         </View>
       </ActivityIndicator>
 
-      {/* Fixed Footer */}
-      <View style={styles.footer}>
-        <View style={styles.builtWithContainer}>
-          <Text style={styles.builtWithText}>Built on Bolt</Text>
-          <Zap size={16} color="#FFD700" />
-        </View>
-      </View>
+      <TouchableOpacity 
+        style={styles.boltLogo}
+        onPress={handleBoltPress}
+        activeOpacity={0.7}
+      >
+        <Image 
+          source={require('../../assets/images/logotext_poweredby_360w.png')} 
+          style={styles.boltLogoImage}
+          resizeMode="contain"
+        />
+      </TouchableOpacity>
     </ImageBackground>
   );
 }
@@ -394,28 +412,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
   },
-  footer: {
+  boltLogo: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    bottom: 20,
+    right: 20,
+    width: 90,
+    height: 90,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 20,
-    paddingHorizontal: 20,
   },
-  builtWithContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  builtWithText: {
-    color: '#888',
-    fontSize: 14,
-    fontFamily: 'Inter-Bold',
-    fontStyle: 'italic',
+  boltLogoImage: {
+    width: '100%',
+    height: '100%',
   },
 });
