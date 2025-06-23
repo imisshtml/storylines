@@ -150,8 +150,6 @@ export default function StoryScreen() {
   useEffect(() => {
     if (!currentCampaign || !user) return;
 
-    console.log('📋 Loading player actions for campaign:', currentCampaign.id, 'user:', user.id);
-
     // Fetch player actions from database
     fetchPlayerActions({ campaignId: currentCampaign.id, userId: user.id });
 
@@ -175,10 +173,6 @@ export default function StoryScreen() {
     };
 
     initializePlayerActionsSubscription();
-
-    // Log current AI choices for debugging
-    const existingAiChoices = getAiChoices(currentCampaign.id);
-    console.log('🎯 Existing AI choices for campaign:', existingAiChoices);
 
     // Cleanup function
     return () => {
@@ -214,127 +208,6 @@ export default function StoryScreen() {
       });
     }
   }, [campaignHistory, currentCampaign, updateCampaignReadStatus]);
-
-  // Add new useEffect to generate initial story when campaign has no history
-  useEffect(() => {
-    const generateInitialStory = async () => {
-      console.log('🔍 generateInitialStory called with:', {
-        currentCampaign: currentCampaign?.name,
-        user: user?.username,
-        campaignHistoryLength: campaignHistory.length,
-        isLoading: isLoading('initialStory'),
-        campaignStatus: currentCampaign?.status
-      });
-
-      if (!currentCampaign || !user || campaignHistory.length > 0 || isLoading('initialStory')) {
-        console.log('🚫 Early return from generateInitialStory:', {
-          hasCurrentCampaign: !!currentCampaign,
-          hasUser: !!user,
-          campaignHistoryLength: campaignHistory.length,
-          isLoading: isLoading('initialStory')
-        });
-        return;
-      }
-
-      // Generate initial story for campaigns in 'creation', 'waiting' or 'in_progress' status
-      if (currentCampaign.status !== 'creation' && currentCampaign.status !== 'waiting' && currentCampaign.status !== 'in_progress') {
-        console.log('🚫 Campaign status not eligible for initial story:', currentCampaign.status);
-        return;
-      }
-
-      console.log('🎭 Generating initial story for campaign:', currentCampaign.name);
-
-      try {
-        startLoading('initialStory');
-        setError(null);
-
-        // If campaign is still in 'creation' status, transition it to 'waiting'
-        if (currentCampaign.status === 'creation') {
-          console.log('🔄 Transitioning campaign from creation to waiting status');
-
-          // Update campaign status directly using Supabase
-          // The real-time subscription will update our state
-          const { supabase } = await import('../config/supabase');
-          await supabase
-            .from('campaigns')
-            .update({ status: 'waiting' })
-            .eq('uid', currentCampaign.id);
-        }
-
-        // Prepare context for the initial story generation
-        const context = {
-          campaign: currentCampaign,
-          storyHistory: [], // Empty history for initial story
-        };
-
-        console.log('📡 Making API request to /api/story with:', {
-          campaignId: currentCampaign.id,
-          playerId: user.id,
-          message: 'Generate initial story introduction',
-          playerAction: 'INITIAL_STORY_GENERATION'
-        });
-
-        // Send request to generate initial story
-        const response = await fetch('/api/story', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            campaignId: currentCampaign.id,
-            playerId: user.id,
-            message: 'Generate initial story introduction',
-            context,
-            playerAction: 'INITIAL_STORY_GENERATION',
-          }),
-        });
-
-        console.log('📡 API response status:', response.status, response.statusText);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ API error response:', errorText);
-          throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
-        }
-
-        const data = await response.json();
-        console.log('📡 API response data:', data);
-
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to generate initial story');
-        }
-
-        console.log('✅ Successfully generated initial story, adding message to campaign');
-
-        // Add the initial story as a GM message
-        await addCampaignMessage({
-          campaign_id: currentCampaign.id,
-          message: data.response,
-          author: 'GM',
-          message_type: 'gm',
-        });
-
-        // Set the choices from the initial story
-        if (currentCampaign) {
-          setAiChoices({ campaignId: currentCampaign.id, choices: data.choices || [] });
-        }
-
-        console.log('✅ Initial story generation completed successfully');
-
-      } catch (error) {
-        console.error('❌ Error generating initial story:', error);
-        // Don't show error to user for initial story generation failure
-        // Just let them start with the welcome message
-      } finally {
-        stopLoading('initialStory');
-      }
-    };
-
-    // Add a small delay to ensure all other useEffects have run
-    const timeoutId = setTimeout(generateInitialStory, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [currentCampaign, user, campaignHistory.length, isLoading, startLoading, stopLoading, addCampaignMessage, setAiChoices]);
 
   // Get current user's character for this campaign
   const getCurrentCharacter = (): Character | null => {
@@ -421,12 +294,6 @@ export default function StoryScreen() {
   const sendPlayerAction = async (action: string, playerId: string = 'player1', playerName: string = 'Player') => {
     if (!currentCampaign || !action.trim()) return;
 
-    console.log('🎭 Player action - User data:', {
-      userId: user?.id,
-      userEmail: user?.email,
-      username: user?.username
-    });
-
     if (!user?.id) {
       setError('You need to be logged in to play. Please sign in again.');
       return;
@@ -493,7 +360,7 @@ export default function StoryScreen() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            campaignId: currentCampaign.id, // Use UID for database consistency
+            campaignId: currentCampaign.id, // Use ID for database consistency
             playerId: user.id, // Pass the user ID directly
             message: `Player action: ${action}`,
             context,
@@ -576,7 +443,7 @@ export default function StoryScreen() {
   };
 
   const handleHomePress = () => {
-    router.back();
+    router.replace('/home');
   };
 
   const handleCharacterPress = () => {
@@ -596,7 +463,7 @@ export default function StoryScreen() {
   // Use dynamic choices from AI, database actions, or fallback to defaults
   const getDatabaseActionChoices = () => {
     if (!playerActions || playerActions.length === 0) {
-      console.log('🎬 No player actions available');
+      console.info('🎬 No player actions available');
       return [];
     }
 

@@ -11,14 +11,6 @@ export async function POST(request: Request) {
 
     // Use the Node.js middleware service to add campaign summary
     const middlewareUrl = process.env.MIDDLEWARE_SERVICE_URL || 'http://localhost:3001';
-    console.log('🔗 Middleware URL:', middlewareUrl);
-
-    console.log('📝 Adding campaign summary via API:', {
-      campaignId,
-      author,
-      messageType,
-      characterName
-    });
 
     const middlewareResponse = await fetch(`${middlewareUrl}/api/campaign/summary`, {
       method: 'POST',
