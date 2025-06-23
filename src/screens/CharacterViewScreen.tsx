@@ -2136,6 +2136,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    justifyContent: 'space-between'
   },
   abilityCard: {
     backgroundColor: '#2a2a2a',

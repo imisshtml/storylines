@@ -63,15 +63,24 @@ export default function LevelUpModal() {
       if (error) throw error;
       setFullCharacter(character);
 
-      // Fetch class features for the new level
-      const { data: features, error: featuresError } = await supabase
-        .from('features')
-        .select('*')
-        .eq('class_index', character.class.toLowerCase())
-        .eq('level', currentCharacter.newLevel);
-
-      if (featuresError) throw featuresError;
-      setNewFeatures(features || []);
+      // Fetch class features for ALL levels gained (not just the new level)
+      const levelsToFetch = [];
+      for (let level = currentCharacter.previousLevel + 1; level <= currentCharacter.newLevel; level++) {
+        levelsToFetch.push(level);
+      }
+      
+      const featurePromises = levelsToFetch.map(level => 
+        supabase
+          .from('features')
+          .select('*')
+          .eq('class_index', character.class.toLowerCase())
+          .eq('level', level)
+      );
+      
+      const featureResults = await Promise.all(featurePromises);
+      const allFeatures = featureResults.flatMap(result => result.data || []);
+      
+      setNewFeatures(allFeatures);
 
       // Calculate hit points gained based on class hit die
       calculateHitPointsGained(character);
@@ -128,9 +137,11 @@ export default function LevelUpModal() {
     // Calculate Constitution modifier
     const conModifier = Math.floor((character.abilities.constitution - 10) / 2);
     
-    // For level up, we'll give max hit points (hit die + con modifier)
-    const gained = hitDie + conModifier;
-    setHitPointsGained(gained);
+    // Calculate hit points for ALL levels gained (not just one level)
+    const levelsGained = currentCharacter!.newLevel - currentCharacter!.previousLevel;
+    const totalGained = levelsGained * (hitDie + conModifier);
+    
+    setHitPointsGained(totalGained);
   };
 
   const isSpellcaster = (className: string): boolean => {
@@ -176,9 +187,9 @@ export default function LevelUpModal() {
 
   // Helper function to get spells known for a class at a given level
   const getSpellsKnownForLevel = (className: string, characterLevel: number, spellLevel: number): number => {
-    // More accurate D&D spell progression
+    // More accurate D&D spell progression - this should represent TOTAL spells known at this level
     if (spellLevel === 0) {
-      // Cantrips progression
+      // Cantrips progression - total cantrips known at this level
       switch (className.toLowerCase()) {
         case 'bard':
         case 'sorcerer':
@@ -197,24 +208,43 @@ export default function LevelUpModal() {
       }
     }
     
-    // Leveled spells - for level up, allow learning new spells
-    // This is simplified but more accurate than before
+    // Leveled spells - total spells known at this level (not just gained)
     switch (className.toLowerCase()) {
       case 'bard':
         if (spellLevel === 1) {
-          if (characterLevel === 2) return 5; // Bards get 5 level 1 spells at level 2
+          if (characterLevel >= 5) return 8;
+          if (characterLevel >= 4) return 7;
           if (characterLevel >= 3) return 6;
+          if (characterLevel >= 2) return 5;
           return 4;
         }
-        return 2; // Other spell levels
+        if (spellLevel === 2) {
+          if (characterLevel >= 6) return 3;
+          if (characterLevel >= 4) return 2;
+          if (characterLevel >= 3) return 2;
+          return 0;
+        }
+        if (spellLevel === 3) {
+          if (characterLevel >= 8) return 2;
+          if (characterLevel >= 6) return 1;
+          return 0;
+        }
+        return characterLevel >= (spellLevel * 2 + 1) ? 1 : 0; // Simplified for higher levels
       case 'sorcerer':
+        // Sorcerers know fewer spells
         if (spellLevel === 1) {
+          if (characterLevel >= 4) return 4;
           if (characterLevel >= 3) return 4;
           return 2;
         }
-        return 1; // Sorcerers learn fewer spells
+        return characterLevel >= (spellLevel * 2 + 1) ? 1 : 0; // Simplified
       default:
-        return 2; // Default for other classes
+        // Default progression for other classes
+        if (spellLevel === 1) {
+          if (characterLevel >= 3) return 6;
+          return 4;
+        }
+        return 2; // Default for other spell levels
     }
   };
 
@@ -342,12 +372,20 @@ export default function LevelUpModal() {
       <View style={styles.summaryCard}>
         <Text style={styles.summaryHeader}>
           {currentCharacter!.name} is now level {currentCharacter!.newLevel}!
+          {currentCharacter!.newLevel - currentCharacter!.previousLevel > 1 && (
+            <Text style={styles.multiLevelText}>
+              {'\n'}(Gained {currentCharacter!.newLevel - currentCharacter!.previousLevel} levels!)
+            </Text>
+          )}
         </Text>
         
         <View style={styles.summaryItem}>
           <Heart size={20} color="#E91E63" />
           <Text style={styles.summaryText}>
             Hit Points: {fullCharacter!.max_hitpoints} → {(fullCharacter!.max_hitpoints || 0) + hitPointsGained}
+            {currentCharacter!.newLevel - currentCharacter!.previousLevel > 1 && (
+              <Text style={styles.multiLevelGain}> (+{hitPointsGained} total)</Text>
+            )}
           </Text>
         </View>
         
@@ -1202,5 +1240,15 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
+  },
+  multiLevelText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#888',
+  },
+  multiLevelGain: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#4CAF50',
   },
 });
