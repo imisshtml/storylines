@@ -34,10 +34,10 @@ export default function RootLayout() {
   // Global connection monitoring - runs once and persists across all navigation
   useConnectionMonitor({
     onConnectionLost: () => {
-      console.log('Global connection lost - this will persist across all screens');
+      console.info('Global connection lost - this will persist across all screens');
     },
     onConnectionRestored: () => {
-      console.log('Global connection restored');
+      console.info('Global connection restored');
     },
     checkInterval: 120000 // Check every 2 minutes (less aggressive)
   });

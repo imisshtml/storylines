@@ -13,16 +13,15 @@ import {
   Modal,
   Image,
 } from 'react-native';
-import { 
-  ArrowLeft, 
-  Search, 
-  Users, 
-  Key, 
-  Crown, 
-  ChevronRight, 
+import {
+  ArrowLeft,
+  Search,
+  Users,
+  Key,
+  Crown,
+  ChevronRight,
   Info,
   UserPlus,
-  Clock,
   X
 } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -37,7 +36,6 @@ import { charactersAtom, Character } from '../atoms/characterAtoms';
 
 type Campaign = {
   id: string;
-  uid: string;
   name: string;
   adventure: string;
   level: number;
@@ -64,7 +62,7 @@ export default function JoinScreen() {
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [characters] = useAtom(charactersAtom);
   const [campaignCharacters, setCampaignCharacters] = useState<Character[]>([]);
-  
+
   const [inviteCode, setInviteCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(true);
@@ -73,7 +71,7 @@ export default function JoinScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [showCampaignModal, setShowCampaignModal] = useState(false);
-  
+
   const { showAlert } = useCustomAlert();
 
   const fetchCampaignCharacters = useCallback(async (campaignId: string) => {
@@ -150,7 +148,7 @@ export default function JoinScreen() {
 
   const fetchOpenCampaigns = async () => {
     if (!user) return;
-    
+
     setIsLoadingCampaigns(true);
     try {
       // Fetch campaigns with status 'open'
@@ -158,7 +156,7 @@ export default function JoinScreen() {
         .from('campaigns')
         .select('*')
         .eq('status', 'open');
-      
+
       if (error) {
         console.error('Error fetching open campaigns:', error);
         throw error;
@@ -186,29 +184,29 @@ export default function JoinScreen() {
         ...campaign,
         owner_profile: profileMap[campaign.owner]
       })) || [];
-      
+
       // Filter out campaigns where the user is already a player
       const filteredCampaigns = campaignsWithProfiles.filter(campaign => {
         // Skip if user is the owner
         if (campaign.owner === user.id) return false;
-        
+
         // Skip if user is already a player
         const isPlayer = campaign.players.some((player: any) => player.id === user.id);
         if (isPlayer) return false;
-        
+
         // Skip if campaign is at player limit
         if (campaign.players.length >= (campaign.limit || 3)) return false;
-        
+
         return true;
       });
-      
+
       // Sort campaigns: priority first, then by created_at
       const sortedCampaigns = filteredCampaigns.sort((a, b) => {
         if (a.priority && !b.priority) return -1;
         if (!a.priority && b.priority) return 1;
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
-      
+
       setOpenCampaigns(sortedCampaigns);
     } catch (error) {
       console.error('Error fetching open campaigns:', error);
@@ -447,7 +445,7 @@ export default function JoinScreen() {
 
   const filteredCampaigns = openCampaigns.filter(campaign => {
     if (!searchQuery.trim()) return true;
-    
+
     const query = searchQuery.toLowerCase();
     return (
       campaign.name.toLowerCase().includes(query) ||
@@ -472,7 +470,7 @@ export default function JoinScreen() {
             <Key size={20} color="#4CAF50" />
             <Text style={styles.sectionTitle}>Join by Invite Code</Text>
           </View>
-          
+
           <View style={styles.codeInputContainer}>
             <TextInput
               style={[
@@ -489,7 +487,7 @@ export default function JoinScreen() {
               autoCorrect={false}
               editable={!isLoading}
             />
-            
+
             <TouchableOpacity
               style={[
                 styles.joinButton,
@@ -508,7 +506,7 @@ export default function JoinScreen() {
               )}
             </TouchableOpacity>
           </View>
-          
+
           {error && (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{error}</Text>
@@ -522,7 +520,7 @@ export default function JoinScreen() {
             <Users size={20} color="#4CAF50" />
             <Text style={styles.sectionTitle}>Open Campaigns</Text>
           </View>
-          
+
           <View style={styles.searchContainer}>
             <Search size={20} color="#666" />
             <TextInput
@@ -533,7 +531,7 @@ export default function JoinScreen() {
               placeholderTextColor="#666"
             />
           </View>
-          
+
           {isLoadingCampaigns ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#4CAF50" />
@@ -565,16 +563,16 @@ export default function JoinScreen() {
                       <Text style={styles.priorityText}>FEATURED</Text>
                     </View>
                   )}
-                  
+
                   <View style={styles.campaignHeader}>
                     <Text style={styles.campaignName}>{campaign.name}</Text>
                     <ChevronRight size={20} color="#4CAF50" />
                   </View>
-                  
+
                   <Text style={styles.campaignAdventure}>
                     {getAdventureTitle(campaign.adventure)}
                   </Text>
-                  
+
                   <View style={styles.campaignDetails}>
                     <View style={styles.campaignDetail}>
                       <Text style={styles.detailLabel}>Host:</Text>
@@ -582,14 +580,14 @@ export default function JoinScreen() {
                         {campaign.owner_profile?.username || 'Unknown'}
                       </Text>
                     </View>
-                    
+
                     <View style={styles.campaignDetail}>
                       <Text style={styles.detailLabel}>Players:</Text>
                       <Text style={styles.detailValue}>
                         {campaign.players.length}/{campaign.limit || 3}
                       </Text>
                     </View>
-                    
+
                     <View style={styles.campaignDetail}>
                       <Text style={styles.detailLabel}>Content:</Text>
                       <Text style={styles.detailValue}>
@@ -615,18 +613,18 @@ export default function JoinScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Campaign Details</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setShowCampaignModal(false)}
               >
                 <X size={24} color="#fff" />
               </TouchableOpacity>
             </View>
-            
+
             {selectedCampaign && (
               <ScrollView style={styles.modalBody}>
                 <Text style={styles.modalCampaignName}>{selectedCampaign.name}</Text>
-                
+
                 <View style={styles.adventureCard}>
                   <Text style={styles.adventureTitle}>
                     {getAdventureTitle(selectedCampaign.adventure)}
@@ -635,7 +633,7 @@ export default function JoinScreen() {
                     {ADVENTURES.find(adv => adv.id === selectedCampaign.adventure)?.description || 'No description available.'}
                   </Text>
                 </View>
-                
+
                 {/* Players Section */}
                 <View style={styles.playersCard}>
                   <View style={styles.playersHeader}>
@@ -648,7 +646,7 @@ export default function JoinScreen() {
                     {selectedCampaign.players.map((player, index) => {
                       const playerCharacter = getPlayerCharacter(player.id, selectedCampaign);
                       const isOwner = player.id === selectedCampaign.owner;
-                      
+
                       return (
                         <View key={player.id} style={styles.playerItem}>
                           <View style={styles.playerInfo}>
@@ -661,7 +659,7 @@ export default function JoinScreen() {
                               {player.name || `Player ${index + 1}`}
                             </Text>
                           </View>
-                          
+
                           <View style={styles.characterInfo}>
                             {playerCharacter ? (
                               <View style={styles.playerCharacterContainer}>
@@ -687,7 +685,7 @@ export default function JoinScreen() {
                     })}
                   </View>
                 </View>
-                
+
                 <View style={styles.detailsGrid}>
                   <View style={styles.detailItem}>
                     <Text style={styles.detailItemLabel}>Players</Text>
@@ -695,21 +693,21 @@ export default function JoinScreen() {
                       {selectedCampaign.players.length}/{selectedCampaign.limit || 3}
                     </Text>
                   </View>
-                  
+
                   <View style={styles.detailItem}>
                     <Text style={styles.detailItemLabel}>Content Level</Text>
                     <Text style={styles.detailItemValue}>
                       {getContentLevelDisplay(selectedCampaign.content_level)}
                     </Text>
                   </View>
-                  
+
                   <View style={styles.detailItem}>
                     <Text style={styles.detailItemLabel}>Tone</Text>
                     <Text style={styles.detailItemValue}>
                       {selectedCampaign.tone.charAt(0).toUpperCase() + selectedCampaign.tone.slice(1)}
                     </Text>
                   </View>
-                  
+
                   <View style={styles.detailItem}>
                     <Text style={styles.detailItemLabel}>Focus</Text>
                     <Text style={styles.detailItemValue}>
@@ -717,7 +715,7 @@ export default function JoinScreen() {
                     </Text>
                   </View>
                 </View>
-                
+
                 {/* Excluded Content Section */}
                 {selectedCampaign?.exclude && selectedCampaign?.exclude.length > 0 && (() => {
                   // Flatten the exclude array in case it's nested
@@ -738,7 +736,7 @@ export default function JoinScreen() {
                     </View>
                   ) : null;
                 })()}
-                
+
                 <TouchableOpacity
                   style={[
                     styles.joinCampaignButton,
@@ -756,7 +754,7 @@ export default function JoinScreen() {
                     </>
                   )}
                 </TouchableOpacity>
-                
+
                 <View style={styles.campaignInfoNote}>
                   <Info size={16} color="#888" />
                   <Text style={styles.campaignInfoNoteText}>

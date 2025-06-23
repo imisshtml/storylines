@@ -245,7 +245,7 @@ export default function HomeScreen() {
   const getCharacterCampaignName = (character: Character) => {
     if (character.campaign_id) {
       // Find the campaign by campaign_id (which should match campaign.id)
-      const campaign = campaigns.find(c => c.uid === character.campaign_id);
+      const campaign = campaigns.find(c => c.id === character.campaign_id);
       return campaign ? campaign.name : 'Unknown Campaign';
     }
     return 'No Campaign Set';

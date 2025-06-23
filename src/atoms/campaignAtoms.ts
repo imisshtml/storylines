@@ -16,10 +16,11 @@ export type Campaign = {
   rp_focus: 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heavy_combat';
   limit?: number; // Player limit for the campaign
   created_at?: string;
-  uid: string;
   // Add fields for notification tracking
   latest_message_id?: number | null;
   has_unread?: boolean;
+  // Add field for intro generation tracking
+  intro_generated?: boolean;
 };
 
 export type Player = {

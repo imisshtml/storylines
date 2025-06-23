@@ -28,12 +28,12 @@ export default function DevScreen() {
     {
       id: '1',
       type: 'system',
-      content: 'Developer AI Testing Interface initialized. Set a campaign UUID and start testing!',
+      content: 'Developer AI Testing Interface initialized. Set a campaign ID and start testing!',
       timestamp: new Date().toISOString(),
     }
   ]);
   const [userInput, setUserInput] = useState('');
-  const [campaignUuid, setCampaignUuid] = useState('test-campaign-123');
+  const [campaignId, setCampaignId] = useState('test-campaign-123');
   const [isLoading, setIsLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -68,7 +68,7 @@ export default function DevScreen() {
       // Create mock campaign context for testing
       const mockContext = {
         campaign: {
-          id: campaignUuid,
+          id: campaignId,
           name: 'Dev Test Campaign',
           tone: 'serious',
           content_level: 'adults',
@@ -84,7 +84,7 @@ export default function DevScreen() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          campaignId: campaignUuid,
+          campaignId: campaignId,
           message: `Dev test: ${message}`,
           context: mockContext,
           playerAction: message,
@@ -179,13 +179,13 @@ export default function DevScreen() {
       <View style={styles.configSection}>
         <View style={styles.configRow}>
           <Settings size={16} color="#4CAF50" />
-          <Text style={styles.configLabel}>Campaign UUID:</Text>
+          <Text style={styles.configLabel}>Campaign ID:</Text>
         </View>
         <TextInput
-          style={styles.uuidInput}
-          value={campaignUuid}
-          onChangeText={setCampaignUuid}
-          placeholder="Enter campaign UUID for testing"
+          style={styles.idInput}
+          value={campaignId}
+          onChangeText={setCampaignId}
+          placeholder="Enter campaign ID for testing"
           placeholderTextColor="#666"
         />
       </View>
@@ -262,7 +262,7 @@ export default function DevScreen() {
       <View style={styles.footer}>
         <MessageSquare size={16} color="#666" />
         <Text style={styles.footerText}>
-          Messages: {messages.length} | Campaign: {campaignUuid}
+          Messages: {messages.length} | Campaign: {campaignId}
         </Text>
       </View>
     </SafeAreaView>
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     marginLeft: 8,
   },
-  uuidInput: {
+  idInput: {
     backgroundColor: '#1a1a1a',
     borderRadius: 8,
     padding: 12,

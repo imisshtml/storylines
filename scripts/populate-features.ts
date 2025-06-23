@@ -30,17 +30,15 @@ async function populateFeatures() {
   try {
     // Fetch all features from D&D API
     const data = await fetchWithRetry('https://www.dnd5eapi.co/api/features');
-    console.log(`Found ${data.results.length} features to fetch`);
 
     const features = [];
-    
+
     // Fetch feature details sequentially with delay
     for (const feature of data.results) {
       try {
         await delay(100); // Add 100ms delay between requests
         const featureData = await fetchWithRetry(`https://www.dnd5eapi.co${feature.url}`);
-        console.log(`Fetched feature: ${feature.index}`);
-        
+
         // Transform the data to match our schema
         const transformedFeature = {
           index: featureData.index,
@@ -54,7 +52,7 @@ async function populateFeatures() {
           api_updated_at: featureData.updated_at ? new Date(featureData.updated_at).toISOString() : null,
           created_at: new Date().toISOString()
         };
-        
+
         features.push(transformedFeature);
       } catch (error) {
         console.error(`Error fetching feature ${feature.index}:`, error);
@@ -71,12 +69,10 @@ async function populateFeatures() {
 
       if (error) {
         console.error('Error inserting batch:', error);
-      } else {
-        console.log(`Inserted batch ${i / batchSize + 1} (${batch.length} features)`);
       }
     }
 
-    console.log(`Finished populating features table with ${features.length} features`);
+    console.info(`✅ Finished populating features table with ${features.length} features`);
   } catch (error) {
     console.error('Error:', error);
   }
