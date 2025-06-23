@@ -87,11 +87,17 @@ export const completeLevelUpProcessAtom = atom(
   null,
   async (get, set, characterId: string) => {
     try {
+      // Get the current level first
+      const { data: currentLevel, error: levelError } = await supabase
+        .rpc('get_character_level', { character_id: characterId });
+
+      if (levelError) throw levelError;
+
       // Update the character's previous_level to match current level
       const { error } = await supabase
         .from('characters')
         .update({ 
-          previous_level: supabase.rpc('get_character_level', { character_id: characterId })
+          previous_level: currentLevel
         })
         .eq('id', characterId);
 
@@ -111,9 +117,8 @@ export const completeLevelUpProcessAtom = atom(
         set(isLevelUpModalVisibleAtom, false);
       }
       
-      // Refresh characters list
-      const [, fetchCharacters] = get(fetchCharactersAtom);
-      await fetchCharacters();
+      // Refresh characters list  
+      await set(fetchCharactersAtom);
     } catch (error) {
       console.error('Error completing level up process:', error);
     }

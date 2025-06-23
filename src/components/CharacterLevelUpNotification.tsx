@@ -1,12 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ImageBackground } from 'react-native';
 import { useAtom } from 'jotai';
 import { 
   charactersToLevelUpAtom, 
   startLevelUpProcessAtom,
   LevelUpCharacter
 } from '../atoms/levelUpAtoms';
-import { ArrowUp, X } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 
 interface CharacterLevelUpNotificationProps {
   isVisible: boolean;
@@ -39,24 +39,26 @@ export default function CharacterLevelUpNotification({
   return (
     <Modal
       visible={isVisible}
-      transparent={true}
+      transparent={false}
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <X size={20} color="#fff" />
-          </TouchableOpacity>
+      <ImageBackground
+        source={require('../../assets/images/levelup.jpg')}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      >
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <X size={24} color="#fff" />
+        </TouchableOpacity>
+
+        <View style={styles.contentContainer}>
+          <Text style={styles.characterName}>
+            {character.name}
+          </Text>
           
-          <View style={styles.levelUpIcon}>
-            <ArrowUp size={32} color="#fff" />
-          </View>
-          
-          <Text style={styles.title}>Level Up Available!</Text>
-          
-          <Text style={styles.message}>
-            {character.name} has reached level {character.newLevel}!
+          <Text style={styles.levelText}>
+            has reached level {character.newLevel}!
           </Text>
           
           <Text style={styles.classInfo}>
@@ -85,100 +87,112 @@ export default function CharacterLevelUpNotification({
             </Text>
           )}
         </View>
-      </View>
+      </ImageBackground>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  backgroundImage: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    padding: 24,
-    width: '90%',
-    maxWidth: 400,
-    alignItems: 'center',
-    position: 'relative',
+    paddingTop: 100,
   },
   closeButton: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    top: 60,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10,
   },
-  levelUpIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#FF9800',
-    justifyContent: 'center',
+  contentContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    borderRadius: 20,
+    padding: 32,
+    margin: 20,
     alignItems: 'center',
-    marginBottom: 16,
+    minWidth: '80%',
   },
-  title: {
-    fontSize: 24,
+  characterName: {
+    fontSize: 32,
     fontFamily: 'Inter-Bold',
     color: '#fff',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  message: {
-    fontSize: 18,
-    fontFamily: 'Inter-Regular',
-    color: '#ccc',
     marginBottom: 8,
     textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+  },
+  levelText: {
+    fontSize: 24,
+    fontFamily: 'Inter-Regular',
+    color: '#FFD700',
+    marginBottom: 16,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   classInfo: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Inter-Regular',
     color: '#4CAF50',
-    marginBottom: 24,
+    marginBottom: 32,
     textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   buttonContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 16,
     marginBottom: 16,
   },
   laterButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    backgroundColor: '#333',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   laterButtonText: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Inter-Bold',
     color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   levelUpButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
     backgroundColor: '#FF9800',
+    shadowColor: '#FF9800',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   levelUpButtonText: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Inter-Bold',
     color: '#000',
   },
   additionalInfo: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Inter-Regular',
-    color: '#888',
+    color: '#ccc',
     textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
 });
