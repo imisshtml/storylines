@@ -63,6 +63,7 @@ export default function CreateCampaignScreen() {
   const [playerLimit, setPlayerLimit] = useState(3);
   const [isAdventureSheetVisible, setIsAdventureSheetVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
   const [capabilitiesLoaded, setCapabilitiesLoaded] = useState(false);
 
   const isEditing = currentCampaign !== null;
@@ -118,11 +119,11 @@ export default function CreateCampaignScreen() {
 
   // Helper functions to convert between slider value and RPFocus enum
   const rpFocusOptions: RPFocus[] = ['heavy_rp', 'rp_focused', 'balanced', 'combat_focused', 'heavy_combat'];
-  
+
   const getRpFocusFromValue = (value: number): RPFocus => {
     return rpFocusOptions[Math.round(value)] || 'balanced';
   };
-  
+
   const getValueFromRpFocus = (focus: RPFocus): number => {
     return rpFocusOptions.indexOf(focus);
   };
@@ -152,6 +153,8 @@ export default function CreateCampaignScreen() {
     if (!campaignName || !selectedAdventure || !selectedTone || !user) return;
 
     try {
+      setIsInitializing(!isEditing); // Show loading for new campaigns
+
       const campaignData: Partial<Campaign> = {
         name: campaignName,
         adventure: selectedAdventure.id,
@@ -178,9 +181,49 @@ export default function CreateCampaignScreen() {
 
       const savedCampaign = await upsertCampaign(campaignData);
       setCurrentCampaign(savedCampaign);
+
+      // Initialize campaign progress (including intro generation) if this is a new campaign
+      if (!isEditing) {
+        try {
+          const requestBody = {
+            campaignId: savedCampaign.id,
+            adventureSlug: selectedAdventure.id,
+          };
+
+          console.log('📡 [CREATE CAMPAIGN] Making API request to /api/campaignProgress/initialize with:', requestBody);
+
+          const response = await fetch('/api/campaignProgress/initialize', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+          });
+
+          console.log('📡 [CREATE CAMPAIGN] API response status:', response.status, response.statusText);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ [CREATE CAMPAIGN] Failed to initialize campaign progress:', {
+              status: response.status,
+              statusText: response.statusText,
+              error: errorText
+            });
+          } else {
+            const responseData = await response.json();
+            console.log('✅ [CREATE CAMPAIGN] Campaign progress initialized successfully:', responseData);
+          }
+        } catch (error) {
+          console.error('❌ [CREATE CAMPAIGN] Error initializing campaign progress:', error);
+        } finally {
+          setIsInitializing(false);
+        }
+      }
+
       router.push('/invite');
     } catch (err) {
       console.error('Error saving campaign:', err);
+      setIsInitializing(false);
     }
   };
 
@@ -192,25 +235,25 @@ export default function CreateCampaignScreen() {
       'Are you sure you want to delete this campaign? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             try {
               setIsDeleting(true);
-              
+
               // Delete the campaign from Supabase
               const { error } = await supabase
                 .from('campaigns')
                 .delete()
                 .eq('id', currentCampaign.id);
-              
+
               if (error) throw error;
-              
+
               // Clear current campaign and navigate back to home
               setCurrentCampaign(null);
               router.replace('/home');
-              
+
               // Show success message
               showAlert(
                 'Campaign Deleted',
@@ -240,6 +283,19 @@ export default function CreateCampaignScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
+
+  // Show full screen loader when initializing new campaign
+  if (isInitializing) {
+    return (
+      <View style={styles.initializingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text style={styles.initializingTitle}>Creating Your Adventure</Text>
+        <Text style={styles.initializingText}>
+          We&apos;re generating your campaign introduction and setting up your adventure world. This may take a moment...
+        </Text>
       </View>
     );
   }
@@ -423,11 +479,11 @@ export default function CreateCampaignScreen() {
             </View>
             <View style={styles.customSlider}>
               <View style={styles.sliderTrack}>
-                <View 
+                <View
                   style={[
-                    styles.sliderThumb, 
+                    styles.sliderThumb,
                     { left: `${(rpFocusValue / 4) * 100}%` }
-                  ]} 
+                  ]}
                 />
                 {[0, 1, 2, 3, 4].map((value) => (
                   <TouchableOpacity
@@ -816,6 +872,26 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 14,
     marginTop: 0,
+    fontFamily: 'Inter-Regular',
+  },
+  initializingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#121212',
+  },
+  initializingTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+    fontFamily: 'Inter-Bold',
+  },
+  initializingText: {
+    color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
     fontFamily: 'Inter-Regular',
   },
   lockedPlayerLimit: {

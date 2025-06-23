@@ -283,7 +283,7 @@ export default function CharacterViewScreen() {
   const getCampaignName = () => {
     if (character?.campaign_id) {
       // Find the campaign by campaign_id (which should match campaign.id)
-      const campaign = campaigns.find(c => c.uid === character.campaign_id);
+      const campaign = campaigns.find(c => c.id === character.campaign_id);
       return campaign ? campaign.name : 'Unknown Campaign';
     }
     return 'No Campaign Set';
@@ -350,15 +350,9 @@ export default function CharacterViewScreen() {
       return false;
     }
 
-    console.log('Character campaign_id:', character.campaign_id);
-    console.log('Available campaigns:', campaigns.length);
-    console.log('Campaigns:', campaigns.map(c => ({ uid: c.uid, name: c.name, status: c.status })));
-
-    const campaign = campaigns.find(c => c.uid === character.campaign_id);
-    console.log('Found campaign:', campaign);
+    const campaign = campaigns.find(c => c.id === character.campaign_id);
 
     const isStarted = campaign?.status !== 'creation';
-    console.log('Campaign is started:', isStarted);
 
     return isStarted;
   };

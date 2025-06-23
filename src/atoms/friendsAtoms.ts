@@ -520,7 +520,7 @@ export const respondToCampaignInvitationAtom = atom(
             const { error: campaignError } = await supabase
               .from('campaigns')
               .update({ players: updatedPlayers })
-              .eq('uid', invitation.campaign.id);
+              .eq('id', invitation.campaign.id);
             if (campaignError) throw campaignError;
           }
           // Set current campaign in atom (for /invite screen)

@@ -90,7 +90,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
 
   const loadCharacterFeatures = async () => {
     if (!character) return;
-    
+
     try {
       // Load class features based on character's class and level
       const { data: features, error } = await supabase
@@ -110,7 +110,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
 
   const loadCharacterTraits = async () => {
     if (!character) return;
-    
+
     try {
       // Load racial traits based on character's race
       const { data: traits, error } = await supabase
@@ -171,13 +171,13 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
   // Get equipped items from character
   const getEquippedItems = () => {
     if (!character?.equipped_items) return [];
-    
+
     const equipped = character.equipped_items;
     const items = [];
-    
+
     // Add equipped items from all slots
     if (equipped.armor) items.push({ ...equipped.armor, slot: 'Armor' });
-    
+
     // Handle hand slots - check for two-handed weapons
     if (equipped.rightHand && isTwoHandedWeapon(equipped.rightHand)) {
       // Two-handed weapon - show as "Two-Handed Weapon"
@@ -187,7 +187,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
       if (equipped.leftHand) items.push({ ...equipped.leftHand, slot: 'Left Hand' });
       if (equipped.rightHand) items.push({ ...equipped.rightHand, slot: 'Right Hand' });
     }
-    
+
     if (equipped.head) items.push({ ...equipped.head, slot: 'Head' });
     if (equipped.necklace) items.push({ ...equipped.necklace, slot: 'Necklace' });
     if (equipped.boots) items.push({ ...equipped.boots, slot: 'Boots' });
@@ -197,28 +197,28 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
         if (ring) items.push({ ...ring, slot: `Ring ${index + 1}` });
       });
     }
-    
+
     return items;
   };
 
   // Get attack actions from equipped weapons
   const getAttackActions = () => {
     if (!character?.equipped_items) return [];
-    
+
     const attacks = [];
     const equipped = character.equipped_items;
     const strModifier = getAbilityModifier(getFinalAbilityScore('strength'));
     const dexModifier = getAbilityModifier(getFinalAbilityScore('dexterity'));
     const proficiencyBonus = Math.ceil(character.level / 4) + 1;
-    
+
     // Check for two-handed weapon first
     if (equipped.rightHand && equipped.rightHand.weapon_category && isTwoHandedWeapon(equipped.rightHand)) {
       const weapon = equipped.rightHand;
-      const isFinesse = weapon.properties?.some((prop: any) => 
+      const isFinesse = weapon.properties?.some((prop: any) =>
         typeof prop === 'string' ? prop.toLowerCase() === 'finesse' : prop.name?.toLowerCase() === 'finesse'
       );
       const modifier = isFinesse ? Math.max(strModifier, dexModifier) : strModifier;
-      
+
       attacks.push({
         name: weapon.name,
         damage: weapon.damage_dice || '1d4',
@@ -232,11 +232,11 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
       // Check individual hand weapons only if no two-handed weapon
       if (equipped.leftHand && equipped.leftHand.weapon_category) {
         const weapon = equipped.leftHand;
-        const isFinesse = weapon.properties?.some((prop: any) => 
+        const isFinesse = weapon.properties?.some((prop: any) =>
           typeof prop === 'string' ? prop.toLowerCase() === 'finesse' : prop.name?.toLowerCase() === 'finesse'
         );
         const modifier = isFinesse ? Math.max(strModifier, dexModifier) : strModifier;
-        
+
         attacks.push({
           name: weapon.name,
           damage: weapon.damage_dice || '1d4',
@@ -247,14 +247,14 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
           properties: weapon.properties || []
         });
       }
-      
+
       if (equipped.rightHand && equipped.rightHand.weapon_category) {
         const weapon = equipped.rightHand;
-        const isFinesse = weapon.properties?.some((prop: any) => 
+        const isFinesse = weapon.properties?.some((prop: any) =>
           typeof prop === 'string' ? prop.toLowerCase() === 'finesse' : prop.name?.toLowerCase() === 'finesse'
         );
         const modifier = isFinesse ? Math.max(strModifier, dexModifier) : strModifier;
-        
+
         attacks.push({
           name: weapon.name,
           damage: weapon.damage_dice || '1d4',
@@ -266,7 +266,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
         });
       }
     }
-    
+
     return attacks;
   };
 
@@ -285,7 +285,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
     const finalScore = getFinalAbilityScore(ability);
     const modifier = getAbilityModifier(finalScore);
     const proficiencyBonus = Math.ceil(character.level / 4) + 1;
-    
+
     // Check if this is a saving throw proficiency (simplified - would need class data for accuracy)
     const isProficient = false; // This would need to be determined from class data
     const savingThrow = modifier + (isProficient ? proficiencyBonus : 0);
@@ -325,7 +325,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
 
   // Get inventory from character data
   const inventory: InventoryItem[] = [];
-  
+
   // Add purchased equipment to inventory
   const purchasedEquipment = character.equipment || [];
   purchasedEquipment.forEach((item: any) => {
@@ -339,7 +339,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
 
   // Get equipment from character data
   const equipment: Equipment[] = [];
-  
+
   // Add purchased equipment as equipped items
   purchasedEquipment.forEach((item: any) => {
     if (item.equipment_category === 'weapon' || item.equipment_category === 'armor') {
@@ -362,22 +362,22 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
   // Usage tracking handlers
   const handleUseSpellSlot = async (level: number) => {
     if (!character) return;
-    
+
     try {
       const currentUsed = character.spell_slots_used?.[level.toString()] || 0;
       const maxSlots = character.spell_slots_max?.[level.toString()] || 0;
-      
+
       if (currentUsed >= maxSlots) return; // Already at max
-      
+
       const newUsed = { ...character.spell_slots_used, [level.toString()]: currentUsed + 1 };
-      
+
       const { error } = await supabase
         .from('characters')
         .update({ spell_slots_used: newUsed })
         .eq('id', character.id);
-        
+
       if (error) throw error;
-      
+
       // Update local state would need to be handled by parent component
       console.log(`Used level ${level} spell slot`);
     } catch (error) {
@@ -387,21 +387,21 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
 
   const handleRestoreSpellSlot = async (level: number) => {
     if (!character) return;
-    
+
     try {
       const currentUsed = character.spell_slots_used?.[level.toString()] || 0;
-      
+
       if (currentUsed <= 0) return; // Already at min
-      
+
       const newUsed = { ...character.spell_slots_used, [level.toString()]: Math.max(0, currentUsed - 1) };
-      
+
       const { error } = await supabase
         .from('characters')
         .update({ spell_slots_used: newUsed })
         .eq('id', character.id);
-        
+
       if (error) throw error;
-      
+
       console.log(`Restored level ${level} spell slot`);
     } catch (error) {
       console.error('Error restoring spell slot:', error);
@@ -410,26 +410,26 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
 
   const handleUseAbility = async (abilityKey: string, type: 'feature' | 'trait') => {
     if (!character) return;
-    
+
     try {
       const usesField = type === 'feature' ? 'feature_uses' : 'trait_uses';
       const currentUses = character[usesField] || {};
       const abilityUse = currentUses[abilityKey];
-      
+
       if (!abilityUse || abilityUse.used >= abilityUse.max) return;
-      
+
       const newUses = {
         ...currentUses,
         [abilityKey]: { ...abilityUse, used: abilityUse.used + 1 }
       };
-      
+
       const { error } = await supabase
         .from('characters')
         .update({ [usesField]: newUses })
         .eq('id', character.id);
-        
+
       if (error) throw error;
-      
+
       console.log(`Used ${type} ability: ${abilityKey}`);
     } catch (error) {
       console.error('Error using ability:', error);
@@ -438,26 +438,26 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
 
   const handleRestoreAbility = async (abilityKey: string, type: 'feature' | 'trait') => {
     if (!character) return;
-    
+
     try {
       const usesField = type === 'feature' ? 'feature_uses' : 'trait_uses';
       const currentUses = character[usesField] || {};
       const abilityUse = currentUses[abilityKey];
-      
+
       if (!abilityUse || abilityUse.used <= 0) return;
-      
+
       const newUses = {
         ...currentUses,
         [abilityKey]: { ...abilityUse, used: Math.max(0, abilityUse.used - 1) }
       };
-      
+
       const { error } = await supabase
         .from('characters')
         .update({ [usesField]: newUses })
         .eq('id', character.id);
-        
+
       if (error) throw error;
-      
+
       console.log(`Restored ${type} ability: ${abilityKey}`);
     } catch (error) {
       console.error('Error restoring ability:', error);
@@ -611,7 +611,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
           </View>
         ))
       )}
-      
+
       {/* Currency */}
       {(character.gold > 0 || character.silver > 0 || character.copper > 0) && (
         <View style={styles.currencySection}>
@@ -657,7 +657,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
                   <Text style={styles.attackRange}>Range: {attack.range}</Text>
                   {attack.properties.length > 0 && (
                     <Text style={styles.attackProperties}>
-                      Properties: {attack.properties.map(prop => 
+                      Properties: {attack.properties.map(prop =>
                         typeof prop === 'string' ? prop : prop.name || 'Unknown'
                       ).join(', ')}
                     </Text>
@@ -683,7 +683,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
                     <Text style={styles.equippedItemName}>{item.name}</Text>
                     <Text style={styles.equippedItemSlot}>{item.slot}</Text>
                   </View>
-                  
+
                   {/* Show armor details */}
                   {item.armor_class_base && (
                     <View style={styles.itemDetails}>
@@ -701,7 +701,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
                       )}
                     </View>
                   )}
-                  
+
                   {/* Show weapon details */}
                   {item.weapon_category && (
                     <View style={styles.itemDetails}>
@@ -716,14 +716,14 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
                       )}
                       {item.properties && item.properties.length > 0 && (
                         <Text style={styles.itemProperty}>
-                          Properties: {item.properties.map(prop => 
+                          Properties: {item.properties.map(prop =>
                             typeof prop === 'string' ? prop : prop.name || 'Unknown'
                           ).join(', ')}
                         </Text>
                       )}
                     </View>
                   )}
-                  
+
                   {/* Show other item details */}
                   {!item.armor_class_base && !item.weapon_category && (
                     <View style={styles.itemDetails}>
@@ -735,7 +735,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
                       )}
                     </View>
                   )}
-                  
+
                   {item.description && item.description.length > 0 && (
                     <Text style={styles.itemDescription} numberOfLines={2}>
                       {Array.isArray(item.description) ? item.description[0] : item.description}
@@ -755,7 +755,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
     const isHalfCaster = character.class === 'Paladin' || character.class === 'Ranger';
     const isLevel1 = character.level === 1;
     const hasSpellSlots = character.spell_slots_max && Object.values(character.spell_slots_max).some(slots => slots > 0);
-    
+
     // Debug info - remove this after fixing
     console.log('Spells debug:', {
       class: character.class,
@@ -766,7 +766,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
       spell_slots_max: character.spell_slots_max,
       spellsLength: spells.length
     });
-    
+
     return (
       <View style={styles.spellsList}>
         {/* Debug info - remove this after fixing */}
@@ -780,20 +780,20 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
             {'\n'}Spells count: {spells.length}
           </Text>
         </View>
-        
+
         {/* Show informative message for half-casters at level 1 */}
         {isHalfCaster && isLevel1 && !hasSpellSlots && (
           <View style={styles.halfCasterNotice}>
             <Text style={styles.halfCasterTitle}>Spellcasting Unlocks at Level 2</Text>
             <Text style={styles.halfCasterDescription}>
-              {character.class}s are half-casters who begin their magical journey at 2nd level. 
+              {character.class}s are half-casters who begin their magical journey at 2nd level.
               You will gain spell slots and the ability to cast spells when you reach level 2.
             </Text>
             <Text style={styles.halfCasterDetails}>
               At level 2, you will gain:
               {'\n'}• 2 first-level spell slots
               {'\n'}• Access to {character.class.toLowerCase()} spells
-              {character.class === 'Paladin' 
+              {character.class === 'Paladin'
                 ? '\n• Divine magic focused on protection and smiting'
                 : '\n• Nature magic for tracking and survival'
               }
@@ -809,7 +809,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
             onRestoreSpellSlot={handleRestoreSpellSlot}
           />
         )}
-        
+
         {/* Spells List */}
         {spells.length === 0 && !isHalfCaster ? (
           <View style={styles.emptySection}>
@@ -866,22 +866,20 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
     try {
       // Show interstitial ad before leaving campaign
       await showInterstitial('leave_campaign');
-      
+
       console.log('Starting leave campaign process for character:', character.id, 'campaign:', character.campaign_id);
-      
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         console.error('No authenticated user found');
         return;
       }
 
-      console.log('User ID:', user.id);
-
       // First, get the current campaign to access the players array
       const { data: campaign, error: campaignQueryError } = await supabase
         .from('campaigns')
         .select('*')
-        .eq('uid', character.campaign_id)
+        .eq('id', character.campaign_id)
         .single();
 
       if (campaignQueryError) {
@@ -902,7 +900,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
       // Remove character from campaign
       const { error: characterError } = await supabase
         .from('characters')
-        .update({ 
+        .update({
           campaign_id: null,
           updated_at: new Date().toISOString()
         })
@@ -918,22 +916,59 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
       // Remove user from campaign's players array and handle owner leaving
       const currentPlayers = campaign.players || [];
       const updatedPlayers = currentPlayers.filter((player: any) => player.id !== user.id);
-      
+
       console.log('Removing user from players. Before:', currentPlayers.length, 'After:', updatedPlayers.length);
 
       // Prepare campaign update
       const campaignUpdate: any = { players: updatedPlayers };
-      
-      // If the owner is leaving, append "quit" to the owner field
-      if (isOwner) {
-        campaignUpdate.owner = `${campaign.owner}quit`;
-        console.log('Owner leaving - updating owner field to:', campaignUpdate.owner);
+
+      // If the owner is leaving and there are other players, transfer ownership to the first remaining player
+      if (isOwner && updatedPlayers.length > 0) {
+        campaignUpdate.owner = updatedPlayers[0].id;
+        console.log('Owner leaving - transferring ownership to:', updatedPlayers[0].name);
+      } else if (isOwner && updatedPlayers.length === 0) {
+        // If the owner is leaving and no other players remain, delete the campaign
+        console.log('Owner leaving with no remaining players - deleting campaign');
+
+        const { error: deleteError } = await supabase
+          .from('campaigns')
+          .delete()
+          .eq('id', character.campaign_id);
+
+        if (deleteError) {
+          console.error('Error deleting campaign:', deleteError);
+          throw deleteError;
+        }
+
+        console.log('Successfully deleted empty campaign');
+        setShowLeaveCampaignModal(false);
+
+        // Refresh campaigns data
+        console.log('Refreshing campaigns data...');
+        await fetchCampaigns();
+
+        // Call the leave campaign callback to handle navigation
+        if (onLeaveCampaign) {
+          onLeaveCampaign();
+        }
+
+        // Route back to home screen
+        router.replace('/home');
+
+        showAlert(
+          'Left Campaign',
+          'You have left the campaign. Since you were the only member, the campaign has been deleted.',
+          [{ text: 'OK' }],
+          'success'
+        );
+
+        return;
       }
 
       const { error: updatePlayersError } = await supabase
         .from('campaigns')
         .update(campaignUpdate)
-        .eq('uid', character.campaign_id);
+        .eq('id', character.campaign_id);
 
       if (updatePlayersError) {
         console.error('Error updating campaign:', updatePlayersError);
@@ -942,10 +977,12 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
 
       console.log('Successfully updated campaign');
 
+      setShowLeaveCampaignModal(false);
+
       // Refresh campaigns data
       console.log('Refreshing campaigns data...');
       await fetchCampaigns();
-      
+
       // Call the leave campaign callback to handle navigation
       if (onLeaveCampaign) {
         onLeaveCampaign();
@@ -1060,11 +1097,11 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
                 <X size={24} color="#666" />
               </TouchableOpacity>
             </View>
-            
+
             <Text style={styles.confirmationMessage}>
               Are you sure you want to leave this campaign? You will lose access to your character and campaign data.
             </Text>
-            
+
             <View style={styles.confirmationButtons}>
               <TouchableOpacity
                 style={styles.cancelButton}
@@ -1073,7 +1110,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={styles.confirmButton}
                 onPress={confirmLeaveCampaign}
