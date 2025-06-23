@@ -15,6 +15,7 @@ import 'react-native-reanimated';
 import { View, Platform } from 'react-native';
 import { CustomAlertProvider } from '../src/components/CustomAlert';
 import { adManager } from '../src/utils/adManager';
+import UpdateManager from '../src/components/UpdateManager';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -74,34 +75,36 @@ export default function RootLayout() {
   }
 
   return (
-    <CustomAlertProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <BottomSheetModalProvider>
-          <View style={{ flex: 1, backgroundColor: '#121212' }}>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="home" />
-              <Stack.Screen name="login" />
-              <Stack.Screen name="creation" />
-              <Stack.Screen name="profile" />
-              <Stack.Screen name="shop" />
-              <Stack.Screen name="friends" />
-              <Stack.Screen name="invite" />
-              <Stack.Screen name="create" />
-              <Stack.Screen name="characters" />
-              <Stack.Screen name="join" />
-              <Stack.Screen
-                name="story"
-                options={{
-                  presentation: 'fullScreenModal',
-                  animation: 'fade',
-                }}
-              />
-            </Stack>
-            <StatusBar style="auto" />
-          </View>
-        </BottomSheetModalProvider>
-      </GestureHandlerRootView>
-    </CustomAlertProvider>
+    <UpdateManager>
+      <CustomAlertProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <BottomSheetModalProvider>
+            <View style={{ flex: 1, backgroundColor: '#121212' }}>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="home" />
+                <Stack.Screen name="login" />
+                <Stack.Screen name="creation" />
+                <Stack.Screen name="profile" />
+                <Stack.Screen name="shop" />
+                <Stack.Screen name="friends" />
+                <Stack.Screen name="invite" />
+                <Stack.Screen name="create" />
+                <Stack.Screen name="characters" />
+                <Stack.Screen name="join" />
+                <Stack.Screen
+                  name="story"
+                  options={{
+                    presentation: 'fullScreenModal',
+                    animation: 'fade',
+                  }}
+                />
+              </Stack>
+              <StatusBar style="auto" />
+            </View>
+          </BottomSheetModalProvider>
+        </GestureHandlerRootView>
+      </CustomAlertProvider>
+    </UpdateManager>
   );
 }

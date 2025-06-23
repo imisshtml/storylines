@@ -51,8 +51,12 @@ export class AdManager {
     if (this.isInitialized) return;
 
     try {
+      console.log('Initializing Google Mobile Ads SDK...');
+      
       // Initialize the Google Mobile Ads SDK
       await mobileAds().initialize();
+      
+      console.log('Google Mobile Ads SDK initialized successfully');
       
       // Create and load interstitial ad
       await this.createInterstitialAd();
@@ -61,6 +65,8 @@ export class AdManager {
       console.log('AdManager initialized successfully with Google Mobile Ads');
     } catch (error) {
       console.error('Failed to initialize AdManager:', error);
+      // Don't throw the error to prevent app crashes, just log it
+      this.isInitialized = false;
     }
   }
 
