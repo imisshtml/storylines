@@ -32,6 +32,12 @@ export class PurchaseManager {
 
   async initialize(userId: string): Promise<void> {
     if (this.isInitialized) return;
+    
+    // Validate userId to prevent nil object crashes
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      console.error('Invalid userId provided to RevenueCat initialization:', userId);
+      throw new Error('Invalid user ID for RevenueCat initialization');
+    }
 
     try {
       // Configure RevenueCat with your API key
@@ -41,16 +47,20 @@ export class PurchaseManager {
       // 3. Go to API Keys section
       // 4. Copy the "Apple App Store" key for iOS or "Google Play Store" key for Android
       // 5. For cross-platform, you can use the same key or platform-specific keys
+      
+      console.log('Initializing RevenueCat with userId:', userId);
+      
       await Purchases.configure({ 
         apiKey: 'appl_cYcpLzydnEgWmanyfsJYAFySCyk', // Replace with actual key
-        appUserID: userId 
+        appUserID: userId.trim() 
       });
 
       console.log('RevenueCat initialized successfully');
       this.isInitialized = true;
     } catch (error) {
       console.error('Failed to initialize RevenueCat:', error);
-      throw error;
+      // Don't throw the error to prevent app crashes, just log it
+      // throw error;
     }
   }
 

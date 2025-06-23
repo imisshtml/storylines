@@ -52,13 +52,23 @@
           "androidAppId": "ca-app-pub-4846990712111779~8324709931",
           "iosAppId": "ca-app-pub-4846990712111779~3524358138"
         }
+      ],
+      [
+        "expo-updates",
+        {
+          "username": "imisshtml"
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true
     },
-    "web": {
-      "output": "server"
+    "runtimeVersion": "1.0.0",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "86831c86-e42b-4466-8f77-ec933f0d1cef"
+      }
     }
   }
 }

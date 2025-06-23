@@ -54,13 +54,21 @@ export default function ShopScreen() {
       if (user?.id) {
         try {
           await fetchCapabilities();
-          // Initialize RevenueCat
+          
+          // Initialize RevenueCat with validation
+          console.log('ShopScreen: Initializing RevenueCat for user:', user.id);
           await purchaseManager.initialize(user.id);
+          console.log('ShopScreen: RevenueCat initialization completed');
         } catch (error) {
           console.error('Failed to load capabilities or initialize RevenueCat:', error);
+          // Don't crash the app, just show a warning
+          // The shop will still work for viewing items
         } finally {
           setCapabilitiesLoaded(true);
         }
+      } else {
+        console.log('ShopScreen: No user ID available, skipping RevenueCat initialization');
+        setCapabilitiesLoaded(true);
       }
     };
 

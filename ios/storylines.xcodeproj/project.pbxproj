@@ -147,7 +147,7 @@
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
 				F39CA3E6B910E6404D4B9AD3 /* [CP] Embed Pods Frameworks */,
-				CBD105CDA26B0B88621C6012 /* [CP-User] [RNGoogleMobileAds] Configuration */,
+				B240B0E3E4593063D4D8FE8B /* [CP-User] [RNGoogleMobileAds] Configuration */,
 			);
 			buildRules = (
 			);
@@ -295,7 +295,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-storylines/Pods-storylines-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		CBD105CDA26B0B88621C6012 /* [CP-User] [RNGoogleMobileAds] Configuration */ = {
+		B240B0E3E4593063D4D8FE8B /* [CP-User] [RNGoogleMobileAds] Configuration */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
