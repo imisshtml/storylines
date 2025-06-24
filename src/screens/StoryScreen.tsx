@@ -43,6 +43,7 @@ import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
 import BannerAd from '../components/BannerAd';
 import { BannerAdSize } from 'react-native-google-mobile-ads';
+import { purchaseManager } from '../utils/purchaseManager';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask';
 
@@ -64,6 +65,7 @@ export default function StoryScreen() {
   const [showChoices, setShowChoices] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { isLoading, startLoading, stopLoading } = useLoading();
+  const [shouldHideAds, setShouldHideAds] = useState(false);
 
   // Input type selection
   const [selectedInputType, setSelectedInputType] = useState<InputType>('say');
@@ -94,6 +96,23 @@ export default function StoryScreen() {
 
   // Monitor connection health
   useConnectionMonitor();
+
+  // Check if ads should be hidden based on purchases
+  useEffect(() => {
+    const checkAdStatus = async () => {
+      try {
+        const hideAds = await purchaseManager.shouldHideAds();
+        setShouldHideAds(hideAds);
+      } catch (error) {
+        console.error('Error checking ad status:', error);
+        setShouldHideAds(false); // Show ads by default if check fails
+      }
+    };
+
+    if (user) {
+      checkAdStatus();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -634,7 +653,9 @@ export default function StoryScreen() {
     >
       <SafeAreaView style={styles.safeArea}>
         {/* Banner Ad */}
-        <BannerAd size={BannerAdSize.BANNER} style={styles.bannerAd} />
+        {!shouldHideAds && (
+          <BannerAd size={BannerAdSize.BANNER} style={styles.bannerAd} />
+        )}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleHomePress} style={styles.headerButton}>
             <Home size={24} color="#2a2a2a" />

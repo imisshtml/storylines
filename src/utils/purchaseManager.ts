@@ -290,6 +290,36 @@ export class PurchaseManager {
       return [];
     }
   }
+
+  // Helper method to check if ads should be hidden
+  async shouldHideAds(): Promise<boolean> {
+    try {
+      const customerInfo = await this.getCustomerInfo();
+      if (!customerInfo) return false;
+
+      const activeEntitlements = customerInfo.entitlements.active;
+      
+      // Check for remove ads purchase
+      if (activeEntitlements[PRODUCT_IDS.REMOVE_ADS]) {
+        return true;
+      }
+      
+      // Check for Adventurers Pack subscription
+      if (activeEntitlements[PRODUCT_IDS.ADVENTURERS_PACK]) {
+        return true;
+      }
+      
+      // Check for DM/Ultimate Host subscription
+      if (activeEntitlements[PRODUCT_IDS.DM_SUBSCRIPTION]) {
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Failed to check if ads should be hidden:', error);
+      return false; // Show ads if we can't determine purchase status
+    }
+  }
 }
 
 // Export singleton instance
