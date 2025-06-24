@@ -28,25 +28,28 @@ export default function CharactersScreen() {
   const [user] = useAtom(userAtom);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
   const [, fetchCapabilities] = useAtom(fetchUserCapabilitiesAtom);
-  const { isLoading, withLoading } = useLoading();
+  const { isLoading, withLoading, startLoading, stopLoading } = useLoading();
   const { checkCharacterLimit, getCharacterLimitInfo } = useLimitEnforcement();
 
   useEffect(() => {
     const loadData = async () => {
       if (user) {
         try {
-          await withLoading(Promise.all([
+          startLoading('loadData');
+          await Promise.all([
             fetchCharacters(),
             fetchCapabilities()
-          ]), 'loadData')();
+          ]);
         } catch (error) {
           console.error('Error loading data:', error);
+        } finally {
+          stopLoading('loadData');
         }
       }
     };
 
     loadData();
-  }, [user, fetchCharacters, fetchCapabilities, withLoading]);
+  }, [user, fetchCharacters, fetchCapabilities, startLoading, stopLoading]);
 
   const handleBack = () => {
     router.back();
@@ -187,7 +190,7 @@ export default function CharactersScreen() {
       </View>
 
       <ActivityIndicator
-        isLoading={isLoading('fetchCharacters')}
+        isLoading={isLoading('loadData')}
         text="Loading characters..."
         style={styles.content}
       >

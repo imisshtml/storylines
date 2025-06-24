@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator as RNActivityIndicator, ViewStyle } from 'react-native';
+import LottieView from 'lottie-react-native';
 
 interface ActivityIndicatorProps {
   /**
@@ -45,8 +46,8 @@ interface ActivityIndicatorProps {
 
 /**
  * A reusable activity indicator component that can be used in various contexts:
- * - As a full-screen overlay
- * - As an inline component
+ * - As a full-screen overlay (uses Lottie animation)
+ * - As an inline component (uses React Native ActivityIndicator)
  * - As a wrapper around content that shows a loading state
  */
 export default function ActivityIndicator({
@@ -66,7 +67,7 @@ export default function ActivityIndicator({
   if (!isLoading) {
     return null;
   }
-  
+
   return (
     <View 
       style={[
@@ -76,9 +77,19 @@ export default function ActivityIndicator({
         style
       ]}
     >
-      <View style={styles.content}>
-        <RNActivityIndicator size={size} color={color} />
-        {text && <Text style={styles.text}>{text}</Text>}
+      <View style={[styles.content, fullScreen && styles.fullScreenContent]}>
+        {fullScreen ? (
+          <LottieView
+            source={require('../../assets/lottie/campfire.json')}
+            autoPlay
+            loop
+            style={styles.lottieAnimation}
+            resizeMode='contain'
+          />
+        ) : (
+          <RNActivityIndicator size={size} color={color} />
+        )}
+        {text && <Text style={[styles.text, fullScreen && styles.fullScreenText]}>{text}</Text>}
       </View>
     </View>
   );
@@ -97,7 +108,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     zIndex: 1000,
   },
   transparent: {
@@ -112,11 +123,26 @@ const styles = StyleSheet.create({
     minWidth: 120,
     minHeight: 120,
   },
+  fullScreenContent: {
+    backgroundColor: 'transparent',
+    padding: 20,
+  },
   text: {
     marginTop: 12,
     fontSize: 14,
     color: '#fff',
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
-  }
+  },
+  fullScreenText: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    marginTop: 24,
+    color: '#fff',
+    textAlign: 'center',
+  },
+  lottieAnimation: {
+    width: 100,
+    height: 150,
+  },
 });

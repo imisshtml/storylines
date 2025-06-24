@@ -294,6 +294,12 @@ export class PurchaseManager {
   // Helper method to check if ads should be hidden
   async shouldHideAds(): Promise<boolean> {
     try {
+      // Don't check if not initialized
+      if (!this.isInitialized) {
+        console.log('RevenueCat not initialized, showing ads by default');
+        return false;
+      }
+
       const customerInfo = await this.getCustomerInfo();
       if (!customerInfo) return false;
 
