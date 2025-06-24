@@ -42,6 +42,7 @@ import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
 import BannerAd from '../components/BannerAd';
+import PartyMemberViewer from '../components/PartyMemberViewer';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask';
 
@@ -633,7 +634,7 @@ export default function StoryScreen() {
     >
       <SafeAreaView style={styles.safeArea}>
         {/* Banner Ad */}
-       
+        
         <View style={styles.header}>
           <TouchableOpacity onPress={handleHomePress} style={styles.headerButton}>
             <Home size={24} color="#2a2a2a" />
@@ -647,6 +648,13 @@ export default function StoryScreen() {
             <User2 size={24} color="#2a2a2a" />
           </TouchableOpacity>
         </View>
+
+        {/* Party Member Viewer */}
+        <PartyMemberViewer 
+          campaignId={currentCampaign.id}
+          currentUserId={user?.id || ''}
+          currentCharacter={currentCharacter}
+        />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
