@@ -101,6 +101,11 @@ export default function StoryScreen() {
   useEffect(() => {
     const checkAdStatus = async () => {
       try {
+        // Initialize purchase manager if user is available and not already initialized
+        if (user?.id) {
+          await purchaseManager.initialize(user.id);
+        }
+        
         const hideAds = await purchaseManager.shouldHideAds();
         setShouldHideAds(hideAds);
       } catch (error) {
@@ -109,10 +114,10 @@ export default function StoryScreen() {
       }
     };
 
-    if (user) {
+    if (user?.id) {
       checkAdStatus();
     }
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (user) {
