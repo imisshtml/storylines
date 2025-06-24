@@ -500,7 +500,7 @@ export default function StoryScreen() {
     >
       <SafeAreaView style={styles.safeArea}>
         {/* Banner Ad */}
-        <BannerAd size="BANNER" />
+       
         <View style={styles.header}>
           <TouchableOpacity onPress={handleHomePress} style={styles.headerButton}>
             <Home size={24} color="#2a2a2a" />
