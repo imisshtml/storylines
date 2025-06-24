@@ -323,7 +323,7 @@ export default function PartyMemberViewer({
                     style={[
                       styles.characterCard,
                       isNpc && styles.npcCharacterCard,
-                      turnOrder.includes(character.id) && styles.activeTurnCard
+                      turnOrder[0] === character.id && styles.activeTurnCard
                     ]}
                   >
                     <View style={styles.characterAvatarContainer}>
@@ -451,6 +451,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
+    top: 60, // Position it under the title bar
     zIndex: 10,
   },
   handleContainer: {
