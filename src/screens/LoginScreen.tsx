@@ -115,7 +115,7 @@ export default function LoginScreen() {
               onPress={handleTitlePress}
               disabled={!__DEV__}
             >
-              <Image source={require('../../assets/images/sl_logo_small.png')} style={styles.logoImg} resizeMode='contain' />
+              <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
             </TouchableOpacity>
 
             <View style={styles.form}>
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   },
   logoImg: {
     width: 250,
-    height: 150,
+    height: 180,
     marginBottom: 20,
     alignSelf: 'center',
   },

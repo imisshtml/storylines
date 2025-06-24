@@ -312,7 +312,7 @@ export default function HomeScreen() {
                 onPress={handleTitlePress}
                 disabled={!__DEV__}
               >
-                <Image source={require('../../assets/images/sl_logo_small.png')} style={styles.logoImg} resizeMode='contain' />
+                <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
               </TouchableOpacity>
               {user && (
                 <Text style={styles.welcomeText}>
@@ -631,7 +631,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   header: {
     flexDirection: 'row',
@@ -649,7 +649,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 20,
     position: 'absolute',
-    bottom: 40,
+    bottom: 50,
     left: 20,
   },
   titleContainer: {
@@ -1152,7 +1152,7 @@ const styles = StyleSheet.create({
   },
   logoImg: {
     width: 300,
-    height: 50,
+    height: 70,
   },
   roleContainer: {
     flexDirection: 'row',
