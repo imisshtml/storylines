@@ -79,11 +79,6 @@ export default function LoginScreen() {
     setPhone('');
   };
 
-  const handleTitlePress = () => {
-    // Only navigate to dev screen in development mode
-    router.push('/dev');
-  };
-
   const handleBoltPress = async () => {
     try {
       const url = 'https://bolt.new/';
@@ -104,19 +99,14 @@ export default function LoginScreen() {
       style={styles.container}
       imageStyle={styles.backgroundImage}
     >
-      <ActivityIndicator 
-        isLoading={isAuthLoading || isLoading('auth')} 
-        fullScreen 
+      <ActivityIndicator
+        isLoading={isAuthLoading || isLoading('auth')}
+        fullScreen
         text={isSignUp ? "Creating your account..." : "Logging in..."}
       >
         <View style={styles.overlay}>
           <View style={styles.content}>
-            <TouchableOpacity
-              onPress={handleTitlePress}
-              disabled={!__DEV__}
-            >
-              <Image source={require('../../assets/images/sl_logo_small.png')} style={styles.logoImg} resizeMode='contain' />
-            </TouchableOpacity>
+            <Image source={require('../../assets/images/sl_logo_small.png')} style={styles.logoImg} resizeMode='contain' />
 
             <View style={styles.form}>
               {error && (
@@ -260,13 +250,13 @@ export default function LoginScreen() {
         </View>
       </ActivityIndicator>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.boltLogo}
         onPress={handleBoltPress}
         activeOpacity={0.7}
       >
-        <Image 
-          source={require('../../assets/images/logotext_poweredby_360w.png')} 
+        <Image
+          source={require('../../assets/images/logotext_poweredby_360w.png')}
           style={styles.boltLogoImage}
           resizeMode="contain"
         />
@@ -305,10 +295,6 @@ const styles = StyleSheet.create({
     height: 150,
     marginBottom: 20,
     alignSelf: 'center',
-  },
-  devIndicator: {
-    fontSize: 16,
-    color: '#4CAF50',
   },
   form: {
     backgroundColor: 'rgba(26, 26, 26, 0.45)',
