@@ -13,7 +13,7 @@ import {
   StatusBar,
   TextInput,
 } from 'react-native';
-import { ArrowLeft, Camera, LocationEdit as Edit3, Scroll, X, Trash2, ChevronUp, ChevronDown, ShoppingCart, Coins, Package, Dices, Star, Zap, Shield } from 'lucide-react-native';
+import { ArrowLeft, ArrowUp, Camera, LocationEdit as Edit3, Scroll, X, Trash2, ChevronUp, ChevronDown, ShoppingCart, Coins, Package, Dices, Star, Zap, Shield } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAtom } from 'jotai';
 import {
@@ -55,6 +55,7 @@ import { withConnectionHandling } from '../utils/connectionUtils';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 import AvatarSelector from '../components/AvatarSelector';
 import { useCustomAlert } from '../components/CustomAlert';
+import { startLevelUpProcessAtom, charactersToLevelUpAtom } from '../atoms/levelUpAtoms';
 
 export default function CharacterViewScreen() {
   const { characterId } = useLocalSearchParams<{ characterId: string }>();
@@ -87,6 +88,8 @@ export default function CharacterViewScreen() {
   const [characterFeatures, setCharacterFeatures] = useState<any[]>([]);
   const [characterTraits, setCharacterTraits] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'stats' | 'traits' | 'spells' | 'equipment'>('stats');
+  const [charactersToLevelUp] = useAtom(charactersToLevelUpAtom);
+  const [, startLevelUpProcess] = useAtom(startLevelUpProcessAtom);
 
   useEffect(() => {
     if (characters.length > 0 && characterId) {
@@ -123,6 +126,22 @@ export default function CharacterViewScreen() {
       loadAvailableEquipment();
     }
   }, [isEditingEquipment]);
+
+  const handleLevelUp = () => {
+    if (!character) return;
+    const canLevelUp = charactersToLevelUp.some(c => c.id === character.id);
+
+    if (canLevelUp) {
+      startLevelUpProcess(character.id);
+    } else {
+      showAlert(
+        'Level Up Not Available',
+        'This character has not gained enough experience to level up yet.',
+        [{ text: 'OK' }],
+        'info'
+      );
+    }
+  };
 
   const loadAvailableSpells = async () => {
     try {
@@ -283,7 +302,7 @@ export default function CharacterViewScreen() {
   const getCampaignName = () => {
     if (character?.campaign_id) {
       // Find the campaign by campaign_id (which should match campaign.id)
-      const campaign = campaigns.find(c => c.uid === character.campaign_id);
+      const campaign = campaigns.find(c => c.id === character.campaign_id);
       return campaign ? campaign.name : 'Unknown Campaign';
     }
     return 'No Campaign Set';
@@ -350,15 +369,9 @@ export default function CharacterViewScreen() {
       return false;
     }
 
-    console.log('Character campaign_id:', character.campaign_id);
-    console.log('Available campaigns:', campaigns.length);
-    console.log('Campaigns:', campaigns.map(c => ({ uid: c.uid, name: c.name, status: c.status })));
-
-    const campaign = campaigns.find(c => c.uid === character.campaign_id);
-    console.log('Found campaign:', campaign);
+    const campaign = campaigns.find(c => c.id === character.campaign_id);
 
     const isStarted = campaign?.status !== 'creation';
-    console.log('Campaign is started:', isStarted);
 
     return isStarted;
   };
@@ -968,6 +981,12 @@ export default function CharacterViewScreen() {
     return spellcastingInfo;
   };
 
+  const calculateProficiencyBonus = (level: number): number => {
+    return Math.floor((level - 1) / 4) + 2;
+  };
+
+  const canLevelUp = character && charactersToLevelUp.some(c => c.id === character.id);
+
   if (!character) {
     return (
       <SafeAreaView style={styles.container}>
@@ -975,10 +994,10 @@ export default function CharacterViewScreen() {
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <ArrowLeft color="#fff" size={24} />
           </TouchableOpacity>
-          <Text style={styles.title}>Character View</Text>
+          <Text style={styles.title}>Character</Text>
         </View>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>No character found</Text>
+          <Text style={styles.loadingText}>Loading Character...</Text>
         </View>
       </SafeAreaView>
     );
@@ -1024,6 +1043,15 @@ export default function CharacterViewScreen() {
             Level {character.level} {character.race} {character.class}
           </Text>
           <Text style={styles.campaignName}>{getCampaignName()}</Text>
+          {canLevelUp && (
+            <TouchableOpacity 
+              style={styles.levelUpButton}
+              onPress={handleLevelUp}
+            >
+              <ArrowUp size={16} color="#fff" />
+              <Text style={styles.levelUpButtonText}>Level Up Available!</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Tab Navigation */}
@@ -1074,6 +1102,10 @@ export default function CharacterViewScreen() {
                   <View style={styles.combatStatCard}>
                     <Text style={styles.combatStatLabel}>Armor Class</Text>
                     <Text style={styles.combatStatValue}>{character.armor_class}</Text>
+                  </View>
+                  <View style={styles.combatStatCard}>
+                    <Text style={styles.combatStatLabel}>Proficiency</Text>
+                    <Text style={styles.combatStatValue}>{calculateProficiencyBonus(character.level)}</Text>
                   </View>
                 </View>
               </View>
@@ -1957,6 +1989,22 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
+  levelUpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF9800',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    marginTop: 8,
+    alignSelf: 'center',
+    gap: 6,
+  },
+  levelUpButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -2088,6 +2136,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    justifyContent: 'space-between'
   },
   abilityCard: {
     backgroundColor: '#2a2a2a',
