@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/sl_logo.png",
+      "image": "./assets/images/sl_logo.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#000000",
       "imageWidth": 650
@@ -34,13 +34,13 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/sl_logo.png",
-          "resizeMode": "stretch",
+          "image": "./assets/images/sl_logo.jpg",
+          "resizeMode": "contain",
           "backgroundColor": "#000000",
           "imageWidth": 650,
           "dark": {
-            "image": "./assets/images/sl_logo.png",
-            "resizeMode": "stretch",
+            "image": "./assets/images/sl_logo.jpg",
+            "resizeMode": "contain",
             "backgroundColor": "#000000",
             "imageWidth": 650
           }
@@ -63,12 +63,19 @@
         "expo-build-properties",
         {
           "android": {
-            "compileSdkVersion": 34,
+            "compileSdkVersion": 35,
             "targetSdkVersion": 34,
-            "buildToolsVersion": "34.0.0"
+            "buildToolsVersion": "34.0.0",
+            "minSdkVersion": 24,
+            "ndkVersion": "25.1.8937393"
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
           }
         }
-      ]
+      ],
+      "expo-notifications",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

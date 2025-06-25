@@ -89,9 +89,6 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
   const handleJoinCampaign = () => {
     onClose();
     router.push('/join');
-    /*if (onJoinCampaign) {
-      onJoinCampaign();
-    }*/
   };
 
   const handleTestNotification = async () => {
@@ -105,6 +102,25 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
   };
 
   const menuItems = [
+    {
+      icon: <Image source={require('../../assets/images/market.png')} style={styles.img} />,
+      title: "The Goblin's Market",
+      subtitle: 'Enhance your adventure',
+      onPress: () => {
+        onClose();
+        router.push('/shop');
+      },
+    },
+    {
+      icon: <Image source={require('../../assets/images/friends.png')} style={styles.img} />,
+      title: 'Friends',
+      subtitle: 'Every Hero needs a fellowship',
+      onPress: () => {
+        onClose();
+        router.push('/friends');
+      },
+      badge: friendRequestCount > 0 ? friendRequestCount : undefined,
+    },
     {
       icon: <Image source={require('../../assets/images/characters.png')} style={styles.img} />,
       title: 'My Characters',
@@ -125,25 +141,6 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
       title: 'Join a Campaign',
       subtitle: 'Join an existing campaign',
       onPress: handleJoinCampaign,
-    },
-    {
-      icon: <Image source={require('../../assets/images/friends.png')} style={styles.img} />,
-      title: 'Friends',
-      subtitle: 'Every Hero needs a fellowship',
-      onPress: () => {
-        onClose();
-        router.push('/friends');
-      },
-      badge: friendRequestCount > 0 ? friendRequestCount : undefined,
-    },
-    {
-      icon: <Image source={require('../../assets/images/market.png')} style={styles.img} />,
-      title: "The Goblin's Market",
-      subtitle: 'Enhance your adventure',
-      onPress: () => {
-        onClose();
-        router.push('/shop');
-      },
     },
     {
       icon: <Image source={require('../../assets/images/account.png')} style={styles.img} />,
@@ -207,9 +204,6 @@ export default function SidebarMenu({ isVisible, onClose, onJoinCampaign }: Side
           <View style={styles.userInfo}>
             <Text style={styles.userName}>
               {user?.username || user?.email || 'Adventurer'}
-            </Text>
-            <Text style={styles.userEmail}>
-              {user?.email}
             </Text>
           </View>
         </View>
@@ -290,16 +284,16 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   header: {
-    paddingTop: 60,
+    paddingTop: 30,
     paddingHorizontal: 20,
-    paddingBottom: 30,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
   closeButton: {
     alignSelf: 'flex-end',
     padding: 8,
-    marginBottom: 20,
+    marginBottom: 0,
   },
   userInfo: {
     alignItems: 'center',
@@ -374,6 +368,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 20,
+    paddingBottom: 50,
     borderTopWidth: 1,
     borderTopColor: '#333',
   },

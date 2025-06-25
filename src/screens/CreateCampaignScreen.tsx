@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Platform, StatusBar, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView } from 'react-native';
+import { View, Platform, StatusBar, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { CircleAlert as AlertCircle, Save, ArrowLeft, ChevronDown, Trash2, Lock } from 'lucide-react-native';
 import { useAtom } from 'jotai';
 import { campaignsLoadingAtom, campaignsErrorAtom, currentCampaignAtom, upsertCampaignAtom, type Campaign } from '../atoms/campaignAtoms';
@@ -10,6 +10,7 @@ import { supabase } from '../config/supabase';
 import { useCustomAlert } from '../components/CustomAlert';
 import { useLimitEnforcement } from '../hooks/useLimitEnforcement';
 import { fetchUserCapabilitiesAtom } from '../atoms/userCapabilitiesAtoms';
+import ActivityIndicator from '../components/ActivityIndicator';
 
 type Tone = 'serious' | 'humorous' | 'grimdark';
 type ContentLevel = 'kids' | 'teens' | 'adults';
@@ -238,9 +239,11 @@ export default function CreateCampaignScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
+      <ActivityIndicator 
+        isLoading={true} 
+        fullScreen={true}
+        text="Loading campaign..."
+      />
     );
   }
 
@@ -497,7 +500,11 @@ export default function CreateCampaignScreen() {
             disabled={isDeleting}
           >
             {isDeleting ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator 
+                isLoading={true} 
+                size="small" 
+                style={styles.deleteButtonSpinner}
+              />
             ) : (
               <>
                 <Trash2 color="#fff" size={20} />
@@ -834,5 +841,11 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 12,
     fontFamily: 'Inter-Regular',
+  },
+  deleteButtonSpinner: {
+    backgroundColor: 'transparent',
+    padding: 0,
+    minWidth: 0,
+    minHeight: 0,
   },
 });
