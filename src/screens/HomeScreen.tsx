@@ -51,8 +51,8 @@ export default function HomeScreen() {
   const { showAlert } = useCustomAlert();
   const { isLoading, withLoading } = useLoading();
   const { checkCampaignLimit } = useLimitEnforcement();
-  const { 
-    showNotification: showLevelUpNotification, 
+  const {
+    showNotification: showLevelUpNotification,
     dismissNotification: dismissLevelUpNotification,
     charactersToLevelUp
   } = useLevelUpNotification();
@@ -139,13 +139,6 @@ export default function HomeScreen() {
 
   const toggleSidebar = () => {
     setIsSidebarVisible(!isSidebarVisible);
-  };
-
-  const handleTitlePress = () => {
-    // Only navigate to dev screen in development mode
-    if (__DEV__) {
-      router.push('/dev');
-    }
   };
 
   const handleBoltPress = async () => {
@@ -308,12 +301,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
 
             <View style={styles.titleContainer}>
-              <TouchableOpacity
-                onPress={handleTitlePress}
-                disabled={!__DEV__}
-              >
-                <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
-              </TouchableOpacity>
+              <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
               {user && (
                 <Text style={styles.welcomeText}>
                   Welcome back, {user.username || user.email}!
@@ -343,7 +331,7 @@ export default function HomeScreen() {
                         <Text style={styles.buttonText}>Create Character</Text>
                       </TouchableOpacity>
                     </View>
-                    <View style={styles.divider}/>
+                    <View style={styles.divider} />
                   </>
                 )}
                 {characters.length > 0 && (
@@ -370,10 +358,10 @@ export default function HomeScreen() {
                                 {character.level || 1}
                               </Text>
                             </View>
-                            
+
                             {/* Level Up Badge */}
                             {hasLeveledUp(character) && (
-                              <LevelUpBadge 
+                              <LevelUpBadge
                                 visible={true}
                                 size="small"
                                 style={styles.levelUpBadge}
@@ -496,7 +484,7 @@ export default function HomeScreen() {
                                 />
                                 {/* Level Up Badge for campaign character */}
                                 {hasLeveledUp(campaignCharacter) && (
-                                  <LevelUpBadge 
+                                  <LevelUpBadge
                                     visible={true}
                                     size="small"
                                     style={styles.campaignCharacterLevelUpBadge}
@@ -578,7 +566,7 @@ export default function HomeScreen() {
                         style={styles.joinButton}
                         onPress={handleJoinCampaign}
                       >
-                        <Users size={20} color="#fff" style={styles.gap}/>
+                        <Users size={20} color="#fff" style={styles.gap} />
                         <Text style={styles.buttonText}>Join a Campaign</Text>
                       </TouchableOpacity>
                     </View>
@@ -590,13 +578,13 @@ export default function HomeScreen() {
         </View>
       </ActivityIndicator>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.boltLogo}
         onPress={handleBoltPress}
         activeOpacity={0.7}
       >
-        <Image 
-          source={require('../../assets/images/logotext_poweredby_360w.png')} 
+        <Image
+          source={require('../../assets/images/logotext_poweredby_360w.png')}
           style={styles.boltLogoImage}
           resizeMode="contain"
         />

@@ -43,7 +43,7 @@ import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
 import BannerAd from '../components/BannerAd';
 
-type InputType = 'say' | 'rp' | 'whisper' | 'ask';
+type InputType = 'say' | 'rp' | 'whisper' | 'ask' | 'action';
 
 interface InputOption {
   type: InputType;
@@ -292,7 +292,7 @@ export default function StoryScreen() {
     return options.find(opt => opt.type === selectedInputType);
   };
 
-  const sendPlayerAction = async (action: string, playerId: string = 'player1', playerName: string = 'Player') => {
+  const sendPlayerAction = async (action: string, playerId: string = 'player1', playerName: string = 'Player', inputType?: InputType) => {
     if (!currentCampaign || !action.trim()) return;
 
     if (!user?.id) {
@@ -313,7 +313,10 @@ export default function StoryScreen() {
       let formattedMessage = action;
       let messageAuthor = playerName;
 
-      switch (selectedInputType) {
+      // Use provided inputType or fall back to selectedInputType
+      const typeToUse = inputType || selectedInputType;
+
+      switch (typeToUse) {
         case 'say':
           formattedMessage = `${playerName} says, "${action}"`;
           break;
@@ -328,6 +331,9 @@ export default function StoryScreen() {
           break;
         case 'ask':
           formattedMessage = `[Asks GM] ${action}`;
+          break;
+        case 'action':
+          formattedMessage = action;
           break;
       }
 
@@ -347,7 +353,7 @@ export default function StoryScreen() {
       });
 
       // Only send to AI for non-whisper messages or GM questions
-      if (selectedInputType !== 'whisper') {
+      if (typeToUse !== 'whisper') {
         // Prepare context for the AI
         const context = {
           campaign: currentCampaign,
@@ -431,16 +437,20 @@ export default function StoryScreen() {
     if (isLoading('sendAction')) return;
 
     setShowChoices(false);
+
+    // Use character name instead of player name for choices
+    const currentCharacter = getCurrentCharacter();
+    const characterName = currentCharacter?.name || user?.username || user?.email || 'Player';
+
     await sendPlayerAction(
-      `I choose to: ${choice}`,
+      `${characterName} chooses to: ${choice}`,
       user?.id || 'player1',
-      user?.username || user?.email || 'Player'
+      characterName,
+      'action' // Use 'action' input type for choices
     );
 
-    // Show choices again after GM responds (except for whispers)
-    if (selectedInputType !== 'whisper') {
-      setTimeout(() => setShowChoices(true), 1000);
-    }
+    // Show choices again after GM responds
+    setTimeout(() => setShowChoices(true), 1000);
   };
 
   const handleHomePress = () => {
