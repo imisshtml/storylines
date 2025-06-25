@@ -79,11 +79,6 @@ export default function LoginScreen() {
     setPhone('');
   };
 
-  const handleTitlePress = () => {
-    // Only navigate to dev screen in development mode
-    router.push('/dev');
-  };
-
   const handleBoltPress = async () => {
     try {
       const url = 'https://bolt.new/';
@@ -111,13 +106,7 @@ export default function LoginScreen() {
       >
         <View style={styles.overlay}>
           <View style={styles.content}>
-            <TouchableOpacity
-              onPress={handleTitlePress}
-              disabled={!__DEV__}
-            >
-              <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
-            </TouchableOpacity>
-
+            <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
             <View style={styles.form}>
               {error && (
                 <View style={styles.errorContainer}>

@@ -36,41 +36,65 @@ export class PurchaseManager {
   }
 
   async initialize(userId: string): Promise<void> {
-    if (this.isInitialized) return;
+    console.log('🔧 REVENUECAT INITIALIZATION STARTED');
+    console.log('🔧 User ID:', userId);
+    console.log('🔧 Already initialized:', this.isInitialized);
+    console.log('🔧 Billing available:', this.isBillingAvailable);
+    
+    if (this.isInitialized) {
+      console.log('🔧 Already initialized, skipping');
+      return;
+    }
     
     // Validate userId to prevent nil object crashes
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-      console.error('Invalid userId provided to RevenueCat initialization:', userId);
+      console.error('❌ Invalid userId provided to RevenueCat initialization:', userId);
+      console.error('❌ UserId type:', typeof userId);
+      console.error('❌ UserId length:', userId?.length);
       throw new Error('Invalid user ID for RevenueCat initialization');
     }
 
     try {
-      // Configure RevenueCat with your API key
-      // TODO: Replace with your actual RevenueCat API key from:
-      // 1. Go to https://app.revenuecat.com/
-      // 2. Navigate to your app
-      // 3. Go to API Keys section
-      // 4. Copy the "Apple App Store" key for iOS or "Google Play Store" key for Android
-      // 5. For cross-platform, you can use the same key or platform-specific keys
-      
-      console.log('Initializing RevenueCat with userId:', userId);
+      console.log('🔧 Step 1: Configuring RevenueCat...');
+      console.log('🔧 API Key (first 10 chars):', 'appl_cYcpL...');
+      console.log('🔧 Trimmed User ID:', userId.trim());
       
       await Purchases.configure({ 
         apiKey: 'appl_cYcpLzydnEgWmanyfsJYAFySCyk', // Replace with actual key
         appUserID: userId.trim() 
       });
 
-      console.log('RevenueCat initialized successfully');
+      console.log('🔧 Step 2: Testing basic functionality...');
+      
+      // Test basic functionality
+      try {
+        const customerInfo = await Purchases.getCustomerInfo();
+        console.log('🔧 Step 2 SUCCESS: Got customer info:', {
+          originalAppUserId: customerInfo.originalAppUserId,
+          activeEntitlements: Object.keys(customerInfo.entitlements.active).length
+        });
+      } catch (testError) {
+        console.warn('🔧 Step 2 WARNING: Could not get customer info:', testError);
+      }
+
+      console.log('✅ REVENUECAT INITIALIZED SUCCESSFULLY');
       this.isInitialized = true;
     } catch (error) {
-      console.error('Failed to initialize RevenueCat:', error);
+      console.error('❌ REVENUECAT INITIALIZATION FAILED');
+      console.error('❌ Full error:', error);
+      console.error('❌ Error type:', typeof error);
+      console.error('❌ Error constructor:', error?.constructor?.name);
       
       // Handle specific billing unavailable error gracefully
       if (error && typeof error === 'object' && 'code' in error) {
         const purchaseError = error as PurchasesError;
+        console.error('❌ Error code:', purchaseError.code);
+        console.error('❌ Error message:', purchaseError.message);
+        
         if (purchaseError.code === PURCHASES_ERROR_CODE.PURCHASE_NOT_ALLOWED_ERROR ||
             purchaseError.code === PURCHASES_ERROR_CODE.STORE_PROBLEM_ERROR) {
-          console.warn('⚠️  Billing not available on this device (likely emulator or missing Google Play Services). In-app purchases will be disabled.');
+          console.warn('⚠️  BILLING NOT AVAILABLE: Likely emulator or missing Google Play Services');
+          console.warn('⚠️  In-app purchases will be disabled');
           // Set flags to indicate billing is not available
           this.isInitialized = false;
           this.isBillingAvailable = false;
@@ -79,7 +103,8 @@ export class PurchaseManager {
       }
       
       // For other errors, don't throw to prevent app crashes, just log
-      console.warn('🔔 RevenueCat initialization failed, in-app purchases will be disabled');
+      console.warn('🔔 REVENUECAT INITIALIZATION FAILED - In-app purchases will be disabled');
+      console.warn('🔔 This might be normal in development/testing environments');
     }
   }
 
@@ -99,30 +124,45 @@ export class PurchaseManager {
   }
 
   async purchaseProduct(productId: string): Promise<{ success: boolean; customerInfo?: CustomerInfo; error?: string }> {
+    console.log('🛒 PURCHASE ATTEMPT STARTED');
+    console.log('🛒 Product ID:', productId);
+    console.log('🛒 Billing supported:', this.isBillingSupported());
+    console.log('🛒 RevenueCat initialized:', this.isInitialized);
+    console.log('🛒 Timestamp:', new Date().toISOString());
+    
     if (!this.isBillingSupported()) {
+      console.log('❌ PURCHASE FAILED: Billing not supported');
       return { success: false, error: 'In-app purchases are not available on this device' };
     }
 
     try {
+      console.log('🛒 Step 1: Getting offerings...');
       const offerings = await Purchases.getOfferings();
+      console.log('🛒 Step 1 SUCCESS: Got offerings');
       
       // Debug: Log all available offerings and products
-      console.log('=== RevenueCat Debug Info ===');
-      console.log('Current offering:', offerings.current?.identifier);
-      console.log('All offerings:', Object.keys(offerings.all));
+      console.log('=== 🛒 DETAILED PURCHASE DEBUG INFO ===');
+      console.log('🛒 Current offering:', offerings.current?.identifier);
+      console.log('🛒 All offerings count:', Object.keys(offerings.all).length);
+      console.log('🛒 All offering IDs:', Object.keys(offerings.all));
       
-      Object.values(offerings.all).forEach(offering => {
-        console.log(`Offering "${offering.identifier}" packages:`, 
-          offering.availablePackages.map(pkg => ({
+      Object.values(offerings.all).forEach((offering, index) => {
+        console.log(`🛒 Offering ${index + 1}: "${offering.identifier}"`);
+        console.log(`🛒   - Packages count: ${offering.availablePackages.length}`);
+        offering.availablePackages.forEach((pkg, pkgIndex) => {
+          console.log(`🛒   - Package ${pkgIndex + 1}:`, {
             identifier: pkg.identifier,
             productId: pkg.product.identifier,
-            price: pkg.product.priceString
-          }))
-        );
+            price: pkg.product.priceString,
+            title: pkg.product.title,
+            description: pkg.product.description
+          });
+        });
       });
-      console.log('Looking for product:', productId);
-      console.log('============================');
+      console.log('🛒 Looking for product:', productId);
+      console.log('=== 🛒 END DETAILED DEBUG INFO ===');
       
+      console.log('🛒 Step 2: Finding package for product...');
       let packageToPurchase: PurchasesPackage | null = null;
 
       // Find the package for the product ID
@@ -132,31 +172,79 @@ export class PurchaseManager {
         );
         if (foundPackage) {
           packageToPurchase = foundPackage;
-          console.log('Found package:', foundPackage.identifier, 'in offering:', offering.identifier);
+          console.log('🛒 Step 2 SUCCESS: Found package:', foundPackage.identifier, 'in offering:', offering.identifier);
+          console.log('🛒 Package details:', {
+            packageId: foundPackage.identifier,
+            productId: foundPackage.product.identifier,
+            price: foundPackage.product.priceString,
+            title: foundPackage.product.title
+          });
           break;
         }
       }
 
       if (!packageToPurchase) {
+        console.log('❌ PURCHASE FAILED: Product not found in offerings');
+        console.log('❌ Available products:', Object.values(offerings.all).flatMap(o => 
+          o.availablePackages.map(p => p.product.identifier)
+        ));
         throw new Error(`Product ${productId} not found in offerings`);
       }
 
-      const { customerInfo } = await Purchases.purchasePackage(packageToPurchase);
+      console.log('🛒 Step 3: Initiating purchase...');
+      console.log('🛒 About to purchase package:', packageToPurchase.identifier);
       
-      // Update database with purchase
+      const { customerInfo } = await Purchases.purchasePackage(packageToPurchase);
+      console.log('🛒 Step 3 SUCCESS: Purchase completed');
+      console.log('🛒 Customer info received:', {
+        originalAppUserId: customerInfo.originalAppUserId,
+        activeEntitlements: Object.keys(customerInfo.entitlements.active),
+        allPurchaseDates: Object.keys(customerInfo.allPurchaseDates)
+      });
+      
+      console.log('🛒 Step 4: Updating database...');
       await this.updateDatabaseAfterPurchase(productId, customerInfo);
+      console.log('🛒 Step 4 SUCCESS: Database updated');
 
+      console.log('✅ PURCHASE COMPLETED SUCCESSFULLY');
       return { success: true, customerInfo };
     } catch (error) {
-      console.error('Purchase failed:', error);
+      console.log('❌ PURCHASE FAILED WITH EXCEPTION');
+      console.error('❌ Full error object:', error);
+      console.error('❌ Error type:', typeof error);
+      console.error('❌ Error constructor:', error?.constructor?.name);
       
-      if (error && typeof error === 'object' && 'code' in error) {
-        if ((error as any).code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) {
-          return { success: false, error: 'Purchase cancelled by user' };
+      if (error && typeof error === 'object') {
+        const errorObj = error as any;
+        console.error('❌ Error properties:', {
+          code: errorObj.code,
+          message: errorObj.message,
+          domain: errorObj.domain,
+          userInfo: errorObj.userInfo,
+          underlyingErrorMessage: errorObj.underlyingErrorMessage
+        });
+        
+        // Log all enumerable properties
+        console.error('❌ All error properties:', Object.getOwnPropertyNames(errorObj));
+        
+        if ('code' in errorObj) {
+          console.error('❌ Error code details:', {
+            code: errorObj.code,
+            codeType: typeof errorObj.code,
+            isPurchaseCancelled: errorObj.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR,
+            allErrorCodes: Object.values(PURCHASES_ERROR_CODE)
+          });
+          
+          if (errorObj.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) {
+            console.log('ℹ️  Purchase was cancelled by user');
+            return { success: false, error: 'Purchase cancelled by user' };
+          }
+          
+          return { success: false, error: errorObj.message || `Purchase failed with code: ${errorObj.code}` };
         }
-        return { success: false, error: (error as any).message || 'Purchase failed' };
       }
       
+      console.error('❌ Returning generic error');
       return { success: false, error: 'Purchase failed' };
     }
   }

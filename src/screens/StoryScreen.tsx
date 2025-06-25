@@ -45,7 +45,7 @@ import BannerAd from '../components/BannerAd';
 import { BannerAdSize } from 'react-native-google-mobile-ads';
 import { purchaseManager } from '../utils/purchaseManager';
 
-type InputType = 'say' | 'rp' | 'whisper' | 'ask';
+type InputType = 'say' | 'rp' | 'whisper' | 'ask' | 'action' | 'ooc';
 
 interface InputOption {
   type: InputType;
@@ -400,6 +400,12 @@ export default function StoryScreen() {
         placeholder: 'Roleplay your action...'
       },
       {
+        type: 'ooc',
+        label: 'OoC',
+        icon: <MessageSquare size={16} color="#4CAF50" />,
+        placeholder: 'Say something out of character...'
+      },
+      {
         type: 'ask',
         label: 'Ask',
         icon: <HelpCircle size={16} color="#2196F3" />,
@@ -452,7 +458,7 @@ export default function StoryScreen() {
     return options.find(opt => opt.type === selectedInputType);
   };
 
-  const sendPlayerAction = async (action: string, playerId: string = 'player1', playerName: string = 'Player') => {
+  const sendPlayerAction = async (action: string, playerId: string = 'player1', playerName: string = 'Player', inputType?: InputType) => {
     if (!currentCampaign || !action.trim()) return;
 
     console.log('🎭 Player action - User data:', {
@@ -479,7 +485,9 @@ export default function StoryScreen() {
       let formattedMessage = action;
       let messageAuthor = playerName;
 
-      switch (selectedInputType) {
+      const typeToUse = inputType || selectedInputType;
+
+      switch (typeToUse) {
         case 'say':
           formattedMessage = `${playerName} says, "${action}"`;
           break;
@@ -494,6 +502,12 @@ export default function StoryScreen() {
           break;
         case 'ask':
           formattedMessage = `[Asks GM] ${action}`;
+          break;
+        case 'ooc':
+          formattedMessage = `[OOC] ${action}`;
+          break;
+        case 'action':
+          formattedMessage = action;
           break;
       }
 
@@ -512,8 +526,11 @@ export default function StoryScreen() {
         difficulty: 10, // Default difficulty class
       });
 
-      // Only send to AI for non-whisper messages or GM questions
-      if (selectedInputType !== 'whisper') {
+      // Determine if GM should respond and if message should contribute to story
+      const shouldTriggerGM = typeToUse === 'say' || typeToUse === 'rp' || typeToUse === 'action' || typeToUse === 'ask';
+      const shouldContributeToStory = typeToUse === 'say' || typeToUse === 'rp' || typeToUse === 'action';
+      // Only send to AI for messages that should trigger GM response
+      if (shouldTriggerGM) {
         // Prepare context for the AI
         const context = {
           campaign: currentCampaign,
@@ -532,6 +549,8 @@ export default function StoryScreen() {
             message: `Player action: ${action}`,
             context,
             playerAction: action,
+            chatType: typeToUse, // Pass the chat type to the backend
+            shouldContributeToStory, // Indicate whether this should advance the story
           }),
         });
 
@@ -556,8 +575,8 @@ export default function StoryScreen() {
           message_type: 'gm',
         });
 
-        // Use choices from AI response
-        if (currentCampaign) {
+        // Use choices from AI response (only for story-contributing messages)
+        if (currentCampaign && shouldContributeToStory) {
           setAiChoices({ campaignId: currentCampaign.id, choices: data.choices || [] });
         }
       }
@@ -587,8 +606,9 @@ export default function StoryScreen() {
       user?.username || user?.email || 'Player'
     );
 
-    // Show choices again after GM responds (except for whispers)
-    if (selectedInputType !== 'whisper') {
+    // Show choices again after GM responds (only for story-contributing messages)
+    const shouldShowChoices = selectedInputType === 'say' || selectedInputType === 'rp' || selectedInputType === 'action';
+    if (shouldShowChoices) {
       setTimeout(() => setShowChoices(true), 1000);
     }
   };
@@ -597,16 +617,18 @@ export default function StoryScreen() {
     if (isLoading('sendAction')) return;
 
     setShowChoices(false);
+    const currentCharacter = getCurrentCharacter();
+    const characterName = currentCharacter?.name || user?.username || user?.email || 'Player';
+
     await sendPlayerAction(
-      `I choose to: ${choice}`,
+      `${characterName} chooses to: ${choice}`,
       user?.id || 'player1',
-      user?.username || user?.email || 'Player'
+      characterName,
+      'action'
     );
 
     // Show choices again after GM responds (except for whispers)
-    if (selectedInputType !== 'whisper') {
-      setTimeout(() => setShowChoices(true), 1000);
-    }
+    setTimeout(() => setShowChoices(true), 1000);
   };
 
   const handleHomePress = () => {
@@ -733,12 +755,13 @@ export default function StoryScreen() {
               </View>
             )}
 
-            {showChoices && !isLoading('sendAction') && selectedInputType !== 'whisper' && (
-              <EnhancedStoryChoices
-                choices={choicesToShow}
-                onChoiceSelect={handleChoiceSelect}
-                disabled={isLoading('sendAction')}
-              />
+            {showChoices && !isLoading('sendAction') &&
+              (selectedInputType === 'say' || selectedInputType === 'rp' || selectedInputType === 'action') && (
+                <EnhancedStoryChoices
+                  choices={choicesToShow}
+                  onChoiceSelect={handleChoiceSelect}
+                  disabled={isLoading('sendAction')}
+                />
             )}
           </ScrollView>
 

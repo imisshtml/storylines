@@ -3,7 +3,7 @@
 
 export async function POST(request: Request) {
   try {
-    const { campaignId, message, context, playerAction, characterId, playerId } = await request.json();
+    const { campaignId, message, context, playerAction, characterId, playerId, chatType, shouldContributeToStory } = await request.json();
 
     if (!campaignId || !message) {
       return new Response('Missing required fields', {
@@ -25,14 +25,6 @@ export async function POST(request: Request) {
 
     // Use the Node.js middleware service instead of direct OpenAI calls
     const middlewareUrl = process.env.MIDDLEWARE_SERVICE_URL || 'http://localhost:3001';
-    console.log('🔗 Middleware URL:', middlewareUrl);
-
-    console.log('📤 Sending to middleware:', {
-      campaignId,
-      playerId,
-      actionType: inferActionType(message),
-      middlewareUrl
-    });
 
     const middlewareResponse = await fetch(`${middlewareUrl}/api/game/action`, {
       method: 'POST',
@@ -45,6 +37,8 @@ export async function POST(request: Request) {
         characterId: characterId || null,
         action: message,
         actionType: inferActionType(message),
+        chatType: chatType || 'say', // Pass the chat type
+        shouldContributeToStory: shouldContributeToStory !== false, // Default to true for backward compatibility
         metadata: {
           context,
           playerAction,
@@ -56,6 +50,17 @@ export async function POST(request: Request) {
     if (!middlewareResponse.ok) {
       const errorText = await middlewareResponse.text();
       console.error('Middleware error:', errorText);
+
+      // For ask-type messages, provide a helpful response even on error
+      if (chatType === 'ask') {
+        return Response.json({
+          response: "I'm having trouble processing your question right now, but I'd be happy to help clarify anything about the rules or story. Please try asking again or be more specific about what you'd like to know.",
+          choices: [], // No choices for ask-type messages
+          campaignId,
+          timestamp: new Date().toISOString(),
+          error: 'Middleware unavailable'
+        });
+      }
 
       // Fallback to basic response for backward compatibility
       return Response.json({
@@ -84,7 +89,7 @@ export async function POST(request: Request) {
     // Return the enhanced response from middleware
     return Response.json({
       response: response, // This is the narrative text
-      choices: choices || [],
+      choices: shouldContributeToStory ? (choices || []) : [], // Only provide choices for story-contributing messages
       campaignId,
       timestamp: new Date().toISOString(),
       gameState: {

@@ -141,13 +141,6 @@ export default function HomeScreen() {
     setIsSidebarVisible(!isSidebarVisible);
   };
 
-  const handleTitlePress = () => {
-    // Only navigate to dev screen in development mode
-    if (__DEV__) {
-      router.push('/dev');
-    }
-  };
-
   const handleBoltPress = async () => {
     try {
       const url = 'https://bolt.new/';
@@ -308,12 +301,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
 
             <View style={styles.titleContainer}>
-              <TouchableOpacity
-                onPress={handleTitlePress}
-                disabled={!__DEV__}
-              >
-                <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
-              </TouchableOpacity>
+              <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
               {user && (
                 <Text style={styles.welcomeText}>
                   Welcome back, {user.username || user.email}!
