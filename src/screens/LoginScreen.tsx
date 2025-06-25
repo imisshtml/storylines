@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { LogIn, UserPlus, Eye, EyeOff, Phone, Zap } from 'lucide-react-native';
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, Image, Linking } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, Image, Linking, ScrollView } from 'react-native';
 import { useAtom } from 'jotai';
 import { signInAtom, signUpAtom, authLoadingAtom, authErrorAtom } from '../atoms/authAtoms';
 import ActivityIndicator from '../components/ActivityIndicator';
@@ -105,7 +105,12 @@ export default function LoginScreen() {
         text={isSignUp ? "Creating your account..." : "Logging in..."}
       >
         <View style={styles.overlay}>
-          <View style={styles.content}>
+          <ScrollView 
+            style={styles.scrollView}
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
             <View style={styles.form}>
               {error && (
@@ -245,7 +250,7 @@ export default function LoginScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </ActivityIndicator>
 
@@ -274,10 +279,14 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingTop: '20%'
+    paddingTop: '5%'
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
     padding: 20,
+    paddingBottom: 100, // Extra bottom padding for small screens
   },
   logo: {
     fontSize: 32,
@@ -290,9 +299,9 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   logoImg: {
-    width: 250,
-    height: 180,
-    marginBottom: 20,
+    width: 220,
+    height: 160,
+    marginBottom: 10,
     alignSelf: 'center',
   },
   devIndicator: {

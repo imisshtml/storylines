@@ -96,13 +96,22 @@ export default function HomeScreen() {
   }, [user, fetchCampaigns, fetchCharacters, fetchCampaignReadStatus, fetchCampaignInvitations, fetchFriendRequestsReceived, initializeReadStatusRealtime, withLoading]);
 
   const handleCampaignPress = async (campaignId: string) => {
+    console.log('🎯 CAMPAIGN PRESS - Starting navigation');
+    console.log('🎯 Campaign ID:', campaignId);
+    console.log('🎯 Available campaigns:', campaigns.length);
+    
     const campaign = campaigns.find(c => c.id === campaignId);
+    console.log('🎯 Found campaign:', campaign ? campaign.name : 'NOT FOUND');
+    console.log('🎯 Campaign status:', campaign?.status);
+    
     if (campaign) {
+      console.log('🎯 Setting current campaign...');
       setCurrentCampaign(campaign);
 
       // Mark campaign as read when entering it
       if (campaign.latest_message_id) {
         try {
+          console.log('🎯 Updating read status...');
           await updateCampaignReadStatus({
             campaignId: campaign.id,
             messageId: campaign.latest_message_id,
@@ -113,11 +122,14 @@ export default function HomeScreen() {
       }
 
       if (campaign.status === 'creation' || campaign.status === 'open') {
+        console.log('🎯 Navigating to /invite for status:', campaign.status);
         router.push('/invite');
       } else {
-        // Handle other campaign states
+        console.log('🎯 Navigating to /story for status:', campaign.status);
         router.push('/story');
       }
+    } else {
+      console.error('🎯 Campaign not found with ID:', campaignId);
     }
   };
 
@@ -304,7 +316,7 @@ export default function HomeScreen() {
               <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
               {user && (
                 <Text style={styles.welcomeText}>
-                  Welcome back, {user.username || user.email}!
+                  Welcome back!!, {user.username || user.email}!
                 </Text>
               )}
             </View>
@@ -1216,6 +1228,8 @@ const styles = StyleSheet.create({
     height: 90,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1, // Low z-index so other interactive elements can be higher
+    pointerEvents: 'box-none', // Allow touches to pass through to content behind
   },
   boltLogoImage: {
     width: '100%',

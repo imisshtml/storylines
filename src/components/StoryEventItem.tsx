@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     lineHeight: 24,
-    width: 380
+    flex: 1,
   },
   diceContainer: {
     alignItems: 'center',

@@ -6,11 +6,12 @@ import Purchases, {
   PURCHASES_ERROR_CODE
 } from 'react-native-purchases';
 import { supabase } from '../config/supabase';
+import { Platform } from 'react-native';
 
 // RevenueCat Product IDs - Update these with your actual product IDs from RevenueCat
 export const PRODUCT_IDS = {
   REMOVE_ADS: 'prod2355afb536',
-  INCREASE_CHARACTERS: 'proded7232c986',
+  INCREASE_CHARACTERS: 'proded7232c986', // THIS IS THE ONE WE'RE TESTING
   INCREASE_CAMPAIGNS: 'prod99b2b546bd',
   ACCESS_ALL_ADVENTURES: 'prod100afcaa33',
   GROUP_SIZE: 'group_size',
@@ -32,17 +33,48 @@ export class PurchaseManager {
   }
 
   isBillingSupported(): boolean {
+    // Check if we're on an emulator/simulator
+    if (this.isEmulator()) {
+      console.log('🔧 Running on emulator/simulator - billing not supported');
+      return false;
+    }
     return this.isInitialized && this.isBillingAvailable;
+  }
+
+  private isEmulator(): boolean {
+    if (Platform.OS === 'ios') {
+      // iOS Simulator check
+      return Platform.isPad === false && Platform.isTV === false && __DEV__;
+    } else if (Platform.OS === 'android') {
+      // Android Emulator check (basic detection)
+      return __DEV__ && (
+        Platform.constants?.Model?.includes('sdk') ||
+        Platform.constants?.Brand === 'google' ||
+        Platform.constants?.Manufacturer === 'Google'
+      );
+    }
+    return false;
   }
 
   async initialize(userId: string): Promise<void> {
     console.log('🔧 REVENUECAT INITIALIZATION STARTED');
     console.log('🔧 User ID:', userId);
+    console.log('🔧 Platform:', Platform.OS);
+    console.log('🔧 Is Emulator:', this.isEmulator());
     console.log('🔧 Already initialized:', this.isInitialized);
     console.log('🔧 Billing available:', this.isBillingAvailable);
     
     if (this.isInitialized) {
       console.log('🔧 Already initialized, skipping');
+      return;
+    }
+
+    // Skip initialization on emulators
+    if (this.isEmulator()) {
+      console.log('🔧 EMULATOR DETECTED - Skipping RevenueCat initialization');
+      console.log('🔧 In-app purchases will be disabled on emulator/simulator');
+      this.isInitialized = false;
+      this.isBillingAvailable = false;
       return;
     }
     
@@ -78,6 +110,27 @@ export class PurchaseManager {
       }
 
       console.log('✅ REVENUECAT INITIALIZED SUCCESSFULLY');
+      
+      // Test offerings immediately after initialization
+      try {
+        const offerings = await Purchases.getOfferings();
+        console.log('🛒 OFFERINGS CHECK:');
+        console.log('🛒 Current offering exists:', !!offerings.current);
+        console.log('🛒 Total offerings:', Object.keys(offerings.all).length);
+        
+        if (offerings.current) {
+          console.log('🛒 Current offering ID:', offerings.current.identifier);
+          console.log('🛒 Available packages:', offerings.current.availablePackages.length);
+          offerings.current.availablePackages.forEach(pkg => {
+            console.log(`📦 Package: ${pkg.identifier} | Product: ${pkg.product.identifier} | Price: ${pkg.product.priceString}`);
+          });
+        } else {
+          console.log('🚨 NO CURRENT OFFERING FOUND - Check RevenueCat dashboard');
+        }
+      } catch (offeringsError) {
+        console.error('🚨 OFFERINGS LOAD FAILED:', offeringsError);
+      }
+      
       this.isInitialized = true;
     } catch (error) {
       console.error('❌ REVENUECAT INITIALIZATION FAILED');
@@ -116,10 +169,95 @@ export class PurchaseManager {
 
     try {
       const offerings = await Purchases.getOfferings();
+      console.log('::: OFFERINGS', JSON.stringify(offerings, null, 2))
       return Object.values(offerings.all);
     } catch (error) {
       console.error('Failed to get offerings:', error);
       return [];
+    }
+  }
+
+  async purchaseProductDirect(productId: string): Promise<{ success: boolean; customerInfo?: CustomerInfo; error?: string }> {
+    console.log('🛒 DIRECT PURCHASE ATTEMPT STARTED');
+    console.log('🛒 Product ID:', productId);
+    console.log('🛒 Billing supported:', this.isBillingSupported());
+    console.log('🛒 RevenueCat initialized:', this.isInitialized);
+    console.log('🛒 Timestamp:', new Date().toISOString());
+    
+    if (!this.isBillingSupported()) {
+      console.log('❌ DIRECT PURCHASE FAILED: Billing not supported');
+      return { success: false, error: 'In-app purchases are not available on this device' };
+    }
+
+    try {
+      console.log('🛒 Step 1: Getting products directly...');
+      const products = await Purchases.getProducts([productId]);
+      console.log('🛒 Step 1 SUCCESS: Got products:', products.length);
+      
+      if (products.length === 0) {
+        console.log('❌ DIRECT PURCHASE FAILED: Product not found');
+        throw new Error(`Product ${productId} not found`);
+      }
+
+      const product = products[0];
+      console.log('🛒 Product details:', {
+        identifier: product.identifier,
+        price: product.priceString,
+        title: product.title,
+        description: product.description
+      });
+
+      console.error('🛒 Product details:', {
+        identifier: product.identifier,
+        price: product.priceString,
+        title: product.title,
+        description: product.description
+      });
+
+      console.log('🛒 Step 2: Initiating direct purchase...');
+      const { customerInfo } = await Purchases.purchaseStoreProduct(product);
+      console.log('🛒 Step 2 SUCCESS: Direct purchase completed');
+      
+      console.log('🛒 Customer info received:', {
+        originalAppUserId: customerInfo.originalAppUserId,
+        activeEntitlements: Object.keys(customerInfo.entitlements.active),
+        allPurchaseDates: Object.keys(customerInfo.allPurchaseDates)
+      });
+      
+      console.log('🛒 Step 3: Updating database...');
+      await this.updateDatabaseAfterPurchase(productId, customerInfo);
+      console.log('🛒 Step 3 SUCCESS: Database updated');
+
+      console.log('✅ DIRECT PURCHASE COMPLETED SUCCESSFULLY');
+      return { success: true, customerInfo };
+    } catch (error) {
+      console.log('❌ DIRECT PURCHASE FAILED WITH EXCEPTION');
+      console.error('❌ Full error object:', error);
+      console.error('❌ Error type:', typeof error);
+      console.error('❌ Error constructor:', error?.constructor?.name);
+      
+      if (error && typeof error === 'object') {
+        const errorObj = error as any;
+        console.error('❌ Error properties:', {
+          code: errorObj.code,
+          message: errorObj.message,
+          domain: errorObj.domain,
+          userInfo: errorObj.userInfo,
+          underlyingErrorMessage: errorObj.underlyingErrorMessage
+        });
+        
+        if ('code' in errorObj) {
+          if (errorObj.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) {
+            console.log('ℹ️  Direct purchase was cancelled by user');
+            return { success: false, error: 'Purchase cancelled by user' };
+          }
+          
+          return { success: false, error: errorObj.message || `Purchase failed with code: ${errorObj.code}` };
+        }
+      }
+      
+      console.error('❌ Returning generic error');
+      return { success: false, error: 'Purchase failed' };
     }
   }
 
