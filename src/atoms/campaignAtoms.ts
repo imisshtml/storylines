@@ -203,6 +203,7 @@ export const upsertCampaignAtom = atom(
         owner: campaign.owner,
         content_level: campaign.content_level,
         rp_focus: campaign.rp_focus,
+        limit: campaign.limit,
       };
 
       // Remove undefined values

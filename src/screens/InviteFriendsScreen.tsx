@@ -575,7 +575,7 @@ export default function InviteFriendsScreen() {
               const { error: charactersError } = await supabase
                 .from('characters')
                 .update({ campaign_id: null })
-                .eq('campaign_id', currentCampaign.uid);
+                .eq('campaign_id', currentCampaign.id);
 
               if (charactersError) {
                 console.error('Error removing characters from campaign:', charactersError);
@@ -587,7 +587,7 @@ export default function InviteFriendsScreen() {
               const { error: invitationsError } = await supabase
                 .from('campaign_invitations')
                 .delete()
-                .eq('campaign_id', currentCampaign.uid);
+                .eq('campaign_id', currentCampaign.id);
 
               if (invitationsError) {
                 console.error('Error deleting campaign invitations:', invitationsError);
@@ -643,7 +643,7 @@ export default function InviteFriendsScreen() {
               const { error: characterError } = await supabase
                 .from('characters')
                 .update({ campaign_id: null })
-                .eq('campaign_id', currentCampaign.uid)
+                .eq('campaign_id', currentCampaign.id)
                 .eq('user_id', user.id);
 
               if (characterError) {

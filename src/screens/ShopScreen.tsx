@@ -180,29 +180,87 @@ export default function ShopScreen() {
   };
 
   const handlePurchase = async (productId: string) => {
+    console.log('🛍️ SHOP PURCHASE INITIATED');
+    console.log('🛍️ Product ID:', productId);
+    console.log('🛍️ User ID:', user?.id);
+    console.log('🛍️ User email:', user?.email);
+    console.log('🛍️ Timestamp:', new Date().toISOString());
+    
     if (!user?.id) {
+      console.error('❌ SHOP PURCHASE FAILED: No user ID');
       showAlert('Authentication Error', 'Please log in to make purchases.', [{ text: 'OK' }], 'error');
       return;
     }
 
     setLoadingItemId(productId);
+    console.log('🛍️ Loading state set for product:', productId);
 
     try {
+      console.log('🛍️ Calling purchaseManager.purchaseProduct...');
       const result = await purchaseManager.purchaseProduct(productId);
+      console.log('🛍️ Purchase result received:', {
+        success: result.success,
+        error: result.error,
+        hasCustomerInfo: !!result.customerInfo
+      });
       
       if (result.success) {
+        console.log('✅ SHOP PURCHASE SUCCESS');
+        console.log('✅ Customer info:', result.customerInfo ? {
+          originalAppUserId: result.customerInfo.originalAppUserId,
+          activeEntitlements: Object.keys(result.customerInfo.entitlements.active)
+        } : 'No customer info');
+        
         showAlert('Purchase Successful!', 'Your purchase has been completed.', [{ text: 'OK' }], 'success');
-        // Refresh capabilities to reflect new purchase
+        
+        console.log('🛍️ Refreshing capabilities...');
         await fetchCapabilities();
+        console.log('🛍️ Capabilities refreshed');
       } else {
+        console.log('❌ SHOP PURCHASE FAILED');
+        console.log('❌ Error message:', result.error);
+        
         if (result.error !== 'Purchase cancelled by user') {
-          showAlert('Purchase Failed', result.error || 'Something went wrong. Please try again.', [{ text: 'OK' }], 'error');
+          showAlert('Purchase Failed', result.error || 'Something went wrong. Please try again.', [
+            { text: 'OK' },
+            ...((__DEV__ && result.error) ? [{
+              text: 'Copy Error',
+              onPress: () => {
+                // In development, allow copying the error for debugging
+                console.log('📋 Error copied to console for debugging:', result.error);
+              }
+            }] : [])
+          ], 'error');
+        } else {
+          console.log('ℹ️ Purchase was cancelled by user');
         }
       }
     } catch (error) {
-      console.error('Purchase error:', error);
-      showAlert('Purchase Failed', 'Something went wrong. Please try again.', [{ text: 'OK' }], 'error');
+      console.error('❌ SHOP PURCHASE EXCEPTION');
+      console.error('❌ Exception details:', error);
+      console.error('❌ Exception type:', typeof error);
+      console.error('❌ Exception constructor:', error?.constructor?.name);
+      
+      if (error && typeof error === 'object') {
+        console.error('❌ Exception properties:', Object.getOwnPropertyNames(error));
+      }
+      
+      showAlert('Purchase Failed', 'Something went wrong. Please try again.', [
+        { text: 'OK' },
+        ...(__DEV__ ? [{
+          text: 'Show Debug Info',
+          onPress: () => {
+            console.log('🐛 DEBUG INFO FOR PURCHASE FAILURE:');
+            console.log('🐛 Product ID:', productId);
+            console.log('🐛 User:', { id: user?.id, email: user?.email });
+            console.log('🐛 Error:', error);
+            console.log('🐛 PurchaseManager initialized:', purchaseManager.isBillingSupported());
+            console.log('🐛 Timestamp:', new Date().toISOString());
+          }
+        }] : [])
+      ], 'error');
     } finally {
+      console.log('🛍️ Clearing loading state');
       setLoadingItemId(null);
     }
   };
@@ -236,28 +294,104 @@ export default function ShopScreen() {
   const handleTestOfferings = async () => {
     try {
       const offerings = await purchaseManager.getOfferings();
-      console.log('=== OFFERINGS TEST ===');
-      console.log('Found offerings:', offerings.length);
-      offerings.forEach(offering => {
-        console.log(`Offering: ${offering.identifier}`);
-        console.log('Packages:', offering.availablePackages.map(pkg => ({
-          id: pkg.identifier,
-          productId: pkg.product.identifier,
-          price: pkg.product.priceString
-        })));
+      console.log('=== 🔍 COMPLETE OFFERINGS ANALYSIS ===');
+      console.log('🔍 Found offerings:', offerings.length);
+      
+      // Log all available products
+      const allAvailableProducts: string[] = [];
+      offerings.forEach((offering, index) => {
+        console.log(`🔍 Offering ${index + 1}: "${offering.identifier}"`);
+        console.log(`🔍   Packages: ${offering.availablePackages.length}`);
+        offering.availablePackages.forEach((pkg, pkgIndex) => {
+          const productId = pkg.product.identifier;
+          allAvailableProducts.push(productId);
+          console.log(`🔍   Package ${pkgIndex + 1}:`, {
+            packageId: pkg.identifier,
+            productId: productId,
+            price: pkg.product.priceString,
+            title: pkg.product.title
+          });
+        });
       });
-      console.log('=====================');
+      
+      console.log('🔍 ALL AVAILABLE PRODUCT IDS:', allAvailableProducts);
+      
+      // Compare with expected product IDs
+      console.log('🔍 EXPECTED PRODUCT IDS:');
+      Object.entries(PRODUCT_IDS).forEach(([key, value]) => {
+        const isAvailable = allAvailableProducts.includes(value);
+        console.log(`🔍   ${key}: ${value} - ${isAvailable ? '✅ AVAILABLE' : '❌ MISSING'}`);
+      });
+      
+      console.log('🔍 SHOP ITEMS MAPPING:');
+      shopItems.forEach(item => {
+        const revenueCatId = item.revenueCatId || item.id;
+        const isAvailable = allAvailableProducts.includes(revenueCatId);
+        console.log(`🔍   ${item.title}: ${revenueCatId} - ${isAvailable ? '✅ AVAILABLE' : '❌ MISSING'}`);
+      });
+      
+      console.log('=== 🔍 END OFFERINGS ANALYSIS ===');
+      
+      // Create detailed alert message
+      const missingProducts = Object.entries(PRODUCT_IDS).filter(([, value]) => 
+        !allAvailableProducts.includes(value)
+      );
+      
+      const alertMessage = `Found ${offerings.length} offerings with ${allAvailableProducts.length} products.\n\n` +
+        `Missing products: ${missingProducts.length}\n` +
+        (missingProducts.length > 0 ? 
+          missingProducts.map(([key, value]) => `• ${key}: ${value}`).join('\n') : 
+          'All products available!'
+        );
       
       showAlert(
-        'Offerings Test', 
-        `Found ${offerings.length} offerings. Check console for details.`,
+        'Offerings Analysis', 
+        alertMessage,
         [{ text: 'OK' }],
-        'info'
+        missingProducts.length > 0 ? 'warning' : 'success'
       );
     } catch (error) {
       console.error('Offerings test error:', error);
       showAlert('Offerings Test Failed', 'Could not load offerings. Check console.', [{ text: 'OK' }], 'error');
     }
+  };
+
+  const handleSystemDebug = async () => {
+    console.log('🔍 SYSTEM DEBUG INFO');
+    console.log('🔍 Platform:', Platform.OS);
+    console.log('🔍 User:', { id: user?.id, email: user?.email });
+    console.log('🔍 PurchaseManager billing supported:', purchaseManager.isBillingSupported());
+    
+    try {
+      const customerInfo = await purchaseManager.getCustomerInfo();
+      console.log('🔍 Customer Info:', customerInfo ? {
+        originalAppUserId: customerInfo.originalAppUserId,
+        activeEntitlements: Object.keys(customerInfo.entitlements.active),
+        allPurchaseDates: Object.keys(customerInfo.allPurchaseDates)
+      } : 'null');
+    } catch (error) {
+      console.log('🔍 Customer Info Error:', error);
+    }
+    
+    try {
+      const offerings = await purchaseManager.getOfferings();
+      console.log('🔍 Offerings count:', offerings.length);
+      console.log('🔍 Available products:', offerings.flatMap(o => 
+        o.availablePackages.map(p => p.product.identifier)
+      ));
+    } catch (error) {
+      console.log('🔍 Offerings Error:', error);
+    }
+    
+    console.log('🔍 User Capabilities:', userCapabilities);
+    console.log('🔍 Timestamp:', new Date().toISOString());
+    
+    showAlert(
+      'Debug Info Logged',
+      'System debug information has been logged to console. Check your development tools.',
+      [{ text: 'OK' }],
+      'info'
+    );
   };
 
   const handleScrollModalSuccess = () => {
@@ -375,8 +509,8 @@ export default function ShopScreen() {
                     loadingItemId === item.id && styles.shopItemLoading,
                     isPurchased && styles.shopItemPurchased
                   ]}
-                  onPress={() => handlePurchase(item.id)}
-                  disabled={loadingItemId === item.id || isPurchased}
+                  onPress={() => handlePurchase(item.revenueCatId || item.id)}
+                                      disabled={loadingItemId === (item.revenueCatId || item.id) || isPurchased}
                   activeOpacity={isPurchased ? 1 : 0.8}
                 >
                   {/* Content */}
@@ -400,7 +534,7 @@ export default function ShopScreen() {
                     </View>
                     
                     <View style={styles.itemRight}>
-                      {loadingItemId === item.id ? (
+                      {loadingItemId === (item.revenueCatId || item.id) ? (
                         <View style={styles.itemLoadingContainer}>
                           <ActivityIndicator size="small" color="#4CAF50" />
                         </View>
@@ -443,13 +577,22 @@ export default function ShopScreen() {
           </Text>
           
           {__DEV__ && (
-            <TouchableOpacity
-              style={[styles.restoreButton, { backgroundColor: '#2196F3', marginTop: 10 }]}
-              onPress={handleTestOfferings}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.restoreButtonText}>Test Offerings (Dev)</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={[styles.restoreButton, { backgroundColor: '#2196F3', marginTop: 10 }]}
+                onPress={handleTestOfferings}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.restoreButtonText}>Test Offerings (Dev)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.restoreButton, { backgroundColor: '#FF9800', marginTop: 10 }]}
+                onPress={handleSystemDebug}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.restoreButtonText}>System Debug (Dev)</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
 
