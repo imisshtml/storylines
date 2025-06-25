@@ -15,6 +15,8 @@ import 'react-native-reanimated';
 import { View, Platform } from 'react-native';
 import { CustomAlertProvider } from '../src/components/CustomAlert';
 import { adManager } from '../src/utils/adManager';
+import LevelUpModal from '../src/components/LevelUpModal';
+import { initializeCharacterLevelRealtimeAtom } from '../src/atoms/levelUpAtoms';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -30,6 +32,7 @@ export default function RootLayout() {
   const [, initializeRealtime] = useAtom(initializeRealtimeAtom);
   const [, initializeReadStatusRealtime] = useAtom(initializeCampaignReadStatusRealtimeAtom);
   const [, initializeFriendshipsRealtime] = useAtom(initializeFriendshipsRealtimeAtom);
+  const [, initializeCharacterLevelRealtime] = useAtom(initializeCharacterLevelRealtimeAtom);
 
   // Global connection monitoring - runs once and persists across all navigation
   useConnectionMonitor({
@@ -51,6 +54,7 @@ export default function RootLayout() {
         await initializeReadStatusRealtime();
         await new Promise(resolve => setTimeout(resolve, 1000));
         await initializeFriendshipsRealtime();
+        await initializeCharacterLevelRealtime();
         
         // Initialize AdManager
         await adManager.initialize();
@@ -61,7 +65,7 @@ export default function RootLayout() {
     };
 
     initialize();
-  }, [initializeAuth, initializeRealtime, initializeReadStatusRealtime, initializeFriendshipsRealtime]);
+  }, [initializeAuth, initializeRealtime, initializeReadStatusRealtime, initializeFriendshipsRealtime, initializeCharacterLevelRealtime]);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
@@ -99,6 +103,7 @@ export default function RootLayout() {
               />
             </Stack>
             <StatusBar style="auto" />
+            <LevelUpModal />
           </View>
         </BottomSheetModalProvider>
       </GestureHandlerRootView>

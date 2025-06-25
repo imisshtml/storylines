@@ -106,7 +106,7 @@ export default function LoginScreen() {
       >
         <View style={styles.overlay}>
           <View style={styles.content}>
-            <Image source={require('../../assets/images/sl_logo_small.png')} style={styles.logoImg} resizeMode='contain' />
+            <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
 
             <View style={styles.form}>
               {error && (
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
   },
   logoImg: {
     width: 250,
-    height: 150,
+    height: 180,
     marginBottom: 20,
     alignSelf: 'center',
   },

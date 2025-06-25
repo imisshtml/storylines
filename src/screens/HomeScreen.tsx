@@ -26,6 +26,9 @@ import { initializeNotificationListeners, requestNotificationPermissions } from 
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
 import { useLimitEnforcement } from '../hooks/useLimitEnforcement';
+import { useLevelUpNotification } from '../hooks/useLevelUpNotification';
+import CharacterLevelUpNotification from '../components/CharacterLevelUpNotification';
+import LevelUpBadge from '../components/LevelUpBadge';
 
 export default function HomeScreen() {
   const [campaigns] = useAtom(campaignsAtom);
@@ -48,6 +51,11 @@ export default function HomeScreen() {
   const { showAlert } = useCustomAlert();
   const { isLoading, withLoading } = useLoading();
   const { checkCampaignLimit } = useLimitEnforcement();
+  const {
+    showNotification: showLevelUpNotification,
+    dismissNotification: dismissLevelUpNotification,
+    charactersToLevelUp
+  } = useLevelUpNotification();
 
   // Fetch characters and read status when component mounts or user changes
   useEffect(() => {
@@ -133,10 +141,6 @@ export default function HomeScreen() {
     setIsSidebarVisible(!isSidebarVisible);
   };
 
-  const handleJoinCampaign = () => {
-    router.push('/join')
-  };
-
   const handleBoltPress = async () => {
     try {
       const url = 'https://bolt.new/';
@@ -149,6 +153,10 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Error opening URL:', error);
     }
+  };
+
+  const handleJoinCampaign = () => {
+    router.push('/join')
   };
 
   const handleAcceptCampaignInvitation = async (invitationId: string) => {
@@ -270,6 +278,11 @@ export default function HomeScreen() {
     );
   };
 
+  // Check if a character has leveled up
+  const hasLeveledUp = (character: Character) => {
+    return charactersToLevelUp.some(c => c.id === character.id);
+  };
+
   return (
     <ImageBackground
       source={require('../../assets/images/storylines_splash.jpg')}
@@ -288,7 +301,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
 
             <View style={styles.titleContainer}>
-              <Image source={require('../../assets/images/sl_logo_small.png')} style={styles.logoImg} resizeMode='contain' />
+              <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
               {user && (
                 <Text style={styles.welcomeText}>
                   Welcome back, {user.username || user.email}!
@@ -345,6 +358,15 @@ export default function HomeScreen() {
                                 {character.level || 1}
                               </Text>
                             </View>
+
+                            {/* Level Up Badge */}
+                            {hasLeveledUp(character) && (
+                              <LevelUpBadge
+                                visible={true}
+                                size="small"
+                                style={styles.levelUpBadge}
+                              />
+                            )}
                           </View>
                           <View style={styles.characterInfo}>
                             <Text style={styles.characterName} numberOfLines={1}>
@@ -455,10 +477,20 @@ export default function HomeScreen() {
                           {(() => {
                             const campaignCharacter = getCharacterForCampaign(campaign.id);
                             return campaignCharacter ? (
-                              <Image
-                                source={getCharacterAvatar(campaignCharacter)}
-                                style={styles.campaignHeaderAvatar}
-                              />
+                              <View style={styles.characterAvatarWrapper}>
+                                <Image
+                                  source={getCharacterAvatar(campaignCharacter)}
+                                  style={styles.campaignHeaderAvatar}
+                                />
+                                {/* Level Up Badge for campaign character */}
+                                {hasLeveledUp(campaignCharacter) && (
+                                  <LevelUpBadge
+                                    visible={true}
+                                    size="small"
+                                    style={styles.campaignCharacterLevelUpBadge}
+                                  />
+                                )}
+                              </View>
                             ) : null;
                           })()}
                         </View>
@@ -568,6 +600,12 @@ export default function HomeScreen() {
         isVisible={isJoinModalVisible}
         onClose={() => setIsJoinModalVisible(false)}
       />
+
+      {/* Level Up Notification */}
+      <CharacterLevelUpNotification
+        isVisible={showLevelUpNotification}
+        onClose={dismissLevelUpNotification}
+      />
     </ImageBackground>
   );
 }
@@ -581,7 +619,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   header: {
     flexDirection: 'row',
@@ -599,7 +637,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 20,
     position: 'absolute',
-    bottom: 40,
+    bottom: 50,
     left: 20,
   },
   titleContainer: {
@@ -844,12 +882,20 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
     paddingRight: 24, // Add padding to prevent overlap with notification dot
   },
+  characterAvatarWrapper: {
+    position: 'relative',
+  },
   campaignHeaderAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
     borderWidth: 2,
     borderColor: '#4CAF50',
+  },
+  campaignCharacterLevelUpBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
   },
   settingsButton: {
     padding: 4,
@@ -976,6 +1022,11 @@ const styles = StyleSheet.create({
     minWidth: 28,
     justifyContent: 'center',
   },
+  levelUpBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+  },
   characterLevel: {
     color: '#fff',
     fontSize: 10,
@@ -1089,7 +1140,7 @@ const styles = StyleSheet.create({
   },
   logoImg: {
     width: 300,
-    height: 50,
+    height: 70,
   },
   roleContainer: {
     flexDirection: 'row',
