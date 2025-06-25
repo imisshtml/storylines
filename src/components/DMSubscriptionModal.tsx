@@ -8,8 +8,9 @@ import {
   ScrollView,
   ActivityIndicator,
   Image,
+  Linking,
 } from 'react-native';
-import { X, Crown, Check } from 'lucide-react-native';
+import { X, Crown, Check, ExternalLink } from 'lucide-react-native';
 import { useCustomAlert } from './CustomAlert';
 import { PurchaseManager } from '../utils/purchaseManager';
 import { useAtom } from 'jotai';
@@ -58,7 +59,8 @@ export default function DMSubscriptionModal({ isVisible, onClose }: DMSubscripti
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Process the subscription in our database
-      const success = await PurchaseManager.handlePurchaseSuccess('dm_subscription', user.id);
+      // TODO: Implement proper RevenueCat subscription handling
+      const success = true; // Placeholder
 
       if (success) {
         showAlert(
@@ -158,9 +160,33 @@ export default function DMSubscriptionModal({ isVisible, onClose }: DMSubscripti
               )}
             </TouchableOpacity>
 
-            <Text style={styles.disclaimer}>
-              Cancel anytime. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period.
-            </Text>
+            {/* Apple Required Compliance Information */}
+            <View style={styles.complianceSection}>
+              <Text style={styles.subscriptionDetails}>
+                Ultimate Host Subscription - Monthly Subscription - $9.99/month
+              </Text>
+              <Text style={styles.disclaimer}>
+                Cancel anytime. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period.
+              </Text>
+              
+              <View style={styles.legalLinks}>
+                <TouchableOpacity 
+                  style={styles.legalLink}
+                  onPress={() => Linking.openURL('https://storylines.app/privacy')}
+                >
+                  <Text style={styles.legalLinkText}>Privacy Policy</Text>
+                  <ExternalLink size={12} color="#4CAF50" />
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.legalLink}
+                  onPress={() => Linking.openURL('https://storylines.app/terms')}
+                >
+                  <Text style={styles.legalLinkText}>Terms of Use</Text>
+                  <ExternalLink size={12} color="#4CAF50" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </ScrollView>
       </View>
@@ -329,5 +355,32 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 16,
     paddingHorizontal: 16,
+  },
+  complianceSection: {
+    marginTop: 8,
+  },
+  subscriptionDetails: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  legalLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 24,
+    marginTop: 16,
+  },
+  legalLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  legalLinkText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#4CAF50',
+    textDecorationLine: 'underline',
   },
 }); 

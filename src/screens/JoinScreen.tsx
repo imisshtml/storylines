@@ -482,7 +482,7 @@ export default function JoinScreen() {
               ]}
               value={inviteCode}
               onChangeText={handleCodeChange}
-              placeholder="Enter 6-character code"
+              placeholder="Enter code"
               placeholderTextColor="#666"
               maxLength={6}
               autoCapitalize="characters"

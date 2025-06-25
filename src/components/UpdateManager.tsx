@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import * as Updates from 'expo-updates';
 import { Download, RefreshCw, AlertCircle } from 'lucide-react-native';
+import LottieView from 'lottie-react-native';
 
 interface UpdateManagerProps {
   children: React.ReactNode;
@@ -13,8 +14,10 @@ interface UpdateState {
   isUpdateAvailable: boolean;
   isUpdatePending: boolean;
   showUpdateModal: boolean;
+  showAutoUpdate: boolean;
   error: string | null;
   progress: number;
+  autoUpdateEnabled: boolean;
 }
 
 export default function UpdateManager({ children }: UpdateManagerProps) {
@@ -24,8 +27,10 @@ export default function UpdateManager({ children }: UpdateManagerProps) {
     isUpdateAvailable: false,
     isUpdatePending: false,
     showUpdateModal: false,
+    showAutoUpdate: false,
     error: null,
     progress: 0,
+    autoUpdateEnabled: true, // Enable automatic updates by default - can be made configurable
   });
 
   useEffect(() => {
@@ -45,13 +50,32 @@ export default function UpdateManager({ children }: UpdateManagerProps) {
       const update = await Updates.checkForUpdateAsync();
       
       if (update.isAvailable) {
-        console.log('Update available, showing modal');
-        setUpdateState(prev => ({
-          ...prev,
-          isChecking: false,
-          isUpdateAvailable: true,
-          showUpdateModal: true,
-        }));
+        console.log('Update available');
+        
+        if (updateState.autoUpdateEnabled) {
+          // Automatically download and install the update
+          console.log('Auto-updating enabled, starting automatic download');
+          setUpdateState(prev => ({
+            ...prev,
+            isChecking: false,
+            isUpdateAvailable: true,
+            showAutoUpdate: true,
+          }));
+          
+          // Start automatic download after showing the update UI
+          setTimeout(() => {
+            downloadAndInstallUpdate(true);
+          }, 500);
+        } else {
+          // Show manual update modal
+          console.log('Auto-updating disabled, showing manual update modal');
+          setUpdateState(prev => ({
+            ...prev,
+            isChecking: false,
+            isUpdateAvailable: true,
+            showUpdateModal: true,
+          }));
+        }
       } else {
         console.log('No updates available');
         setUpdateState(prev => ({ ...prev, isChecking: false }));
@@ -66,18 +90,32 @@ export default function UpdateManager({ children }: UpdateManagerProps) {
     }
   };
 
-  const downloadAndInstallUpdate = async () => {
+  const downloadAndInstallUpdate = async (isAutomatic: boolean = false) => {
     try {
       setUpdateState(prev => ({
         ...prev,
         isDownloading: true,
-        showUpdateModal: true,
+        showUpdateModal: !isAutomatic,
+        showAutoUpdate: isAutomatic,
         error: null,
         progress: 0,
       }));
 
+      // Simulate progress for better UX (since fetchUpdateAsync doesn't provide real progress)
+      const progressInterval = setInterval(() => {
+        setUpdateState(prev => {
+          if (prev.progress < 90) {
+            return { ...prev, progress: prev.progress + Math.random() * 15 };
+          }
+          return prev;
+        });
+      }, 200);
+
       // Download the update
       const downloadResult = await Updates.fetchUpdateAsync();
+      
+      // Clear progress interval
+      clearInterval(progressInterval);
       
       if (downloadResult.isNew) {
         console.log('Update downloaded successfully, reloading app');
@@ -91,13 +129,14 @@ export default function UpdateManager({ children }: UpdateManagerProps) {
         // Wait a moment to show completion, then reload
         setTimeout(() => {
           Updates.reloadAsync();
-        }, 1000);
+        }, isAutomatic ? 1500 : 1000);
       } else {
         console.log('No new update to download');
         setUpdateState(prev => ({
           ...prev,
           isDownloading: false,
           showUpdateModal: false,
+          showAutoUpdate: false,
         }));
       }
     } catch (error) {
@@ -105,6 +144,7 @@ export default function UpdateManager({ children }: UpdateManagerProps) {
       setUpdateState(prev => ({
         ...prev,
         isDownloading: false,
+        showAutoUpdate: false,
         error: 'Failed to download update',
       }));
     }
@@ -129,6 +169,35 @@ export default function UpdateManager({ children }: UpdateManagerProps) {
   return (
     <>
       {children}
+      
+      {/* Automatic Update Overlay */}
+      {updateState.showAutoUpdate && (
+        <View style={styles.autoUpdateOverlay}>
+          <View style={styles.autoUpdateContent}>
+            <LottieView
+              source={require('../../assets/lottie/campfire.json')}
+              autoPlay
+              loop
+              style={styles.updateLottieAnimation}
+              resizeMode='contain'
+            />
+            <Text style={styles.updateText}>New stories being told...</Text>
+          </View>
+          <View style={styles.progressSection}>
+            <View style={styles.progressBar}>
+              <Animated.View 
+                style={[
+                  styles.progressFill, 
+                  { width: `${updateState.progress}%` }
+                ]} 
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {updateState.progress > 0 ? `${Math.round(updateState.progress)}%` : 'Preparing...'}
+            </Text>
+          </View>
+        </View>
+      )}
       
       {/* Update Modal */}
       <Modal
@@ -203,7 +272,7 @@ export default function UpdateManager({ children }: UpdateManagerProps) {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.button, styles.primaryButton]}
-                    onPress={downloadAndInstallUpdate}
+                    onPress={() => downloadAndInstallUpdate(false)}
                   >
                     <Download size={16} color="#fff" />
                     <Text style={styles.primaryButtonText}>Update Now</Text>
@@ -289,11 +358,61 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   progressText: {
-    color: '#2196F3',
+    color: '#fff',
     fontSize: 14,
+    fontFamily: 'Inter-Regular',
     fontWeight: '500',
+    textAlign: 'center',
   },
   loader: {
     marginTop: 16,
+  },
+  autoUpdateOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    zIndex: 1000,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  autoUpdateContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressSection: {
+    position: 'absolute',
+    bottom: 120,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  progressBar: {
+    width: '100%',
+    maxWidth: 280,
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    borderRadius: 4,
+  },
+  updateLottieAnimation: {
+    width: 120,
+    height: 180,
+  },
+  updateText: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    marginTop: 24,
+    color: '#fff',
+    textAlign: 'center',
   },
 }); 

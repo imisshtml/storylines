@@ -1645,7 +1645,12 @@ export default function CreationScreen() {
 
       {renderStepIndicator()}
 
-      <ScrollView ref={currStepRef} style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        ref={currStepRef} 
+        style={styles.content} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {renderCurrentStep()}
       </ScrollView>
 
@@ -1983,6 +1988,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100, // Extra bottom padding for small screens
   },
   stepContent: {
     padding: 20,

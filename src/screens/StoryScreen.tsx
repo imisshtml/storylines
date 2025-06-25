@@ -126,10 +126,17 @@ export default function StoryScreen() {
   }, [user, fetchCharacters]);
 
   useEffect(() => {
+    console.log('📖 STORY SCREEN - useEffect triggered');
+    console.log('📖 Current campaign:', currentCampaign ? currentCampaign.name : 'NONE');
+    console.log('📖 Campaign status:', currentCampaign?.status);
+    
     if (!currentCampaign) {
+      console.log('📖 No current campaign, redirecting to home');
       router.replace('/home');
       return;
     }
+    
+    console.log('📖 Campaign found, initializing story screen');
 
     // Clear previous campaign history when switching campaigns
     clearCampaignHistory();
@@ -308,8 +315,15 @@ export default function StoryScreen() {
           playerAction: 'INITIAL_STORY_GENERATION'
         });
 
+        // Use production endpoint for API calls
+        const middlewareUrl = process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL || 'http://localhost:3001';
+        const fullUrl = `${middlewareUrl}/api/game/action`;
+        
+        console.log('📡 Middleware URL from env:', process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL);
+        console.log('📡 Initial story API endpoint:', fullUrl);
+
         // Send request to generate initial story
-        const response = await fetch('/api/story', {
+        const response = await fetch(fullUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -317,9 +331,16 @@ export default function StoryScreen() {
           body: JSON.stringify({
             campaignId: currentCampaign.id,
             playerId: user.id,
-            message: 'Generate initial story introduction',
-            context,
-            playerAction: 'INITIAL_STORY_GENERATION',
+            characterId: null,
+            action: 'INITIAL_STORY_GENERATION',
+            actionType: 'initial_story',
+            chatType: 'action',
+            shouldContributeToStory: true,
+            metadata: {
+              context,
+              playerAction: 'INITIAL_STORY_GENERATION',
+              timestamp: new Date().toISOString()
+            }
           }),
         });
 
@@ -458,20 +479,68 @@ export default function StoryScreen() {
     return options.find(opt => opt.type === selectedInputType);
   };
 
-  const sendPlayerAction = async (action: string, playerId: string = 'player1', playerName: string = 'Player', inputType?: InputType) => {
-    if (!currentCampaign || !action.trim()) return;
+  // Helper function to infer action type from message content
+  const inferActionType = (message: string): string => {
+    const lowerMessage = message.toLowerCase();
 
-    console.log('🎭 Player action - User data:', {
+    // Handle initial story generation
+    if (message === 'INITIAL_STORY_GENERATION' || lowerMessage.includes('initial story') || lowerMessage.includes('generate initial')) {
+      return 'initial_story';
+    }
+
+    if (lowerMessage.includes('attack') || lowerMessage.includes('strike') || lowerMessage.includes('hit')) {
+      return 'attack';
+    }
+    if (lowerMessage.includes('cast') || lowerMessage.includes('spell') || lowerMessage.includes('magic')) {
+      return 'spell';
+    }
+    if (lowerMessage.includes('persuade') || lowerMessage.includes('convince') || lowerMessage.includes('talk') || lowerMessage.includes('negotiate')) {
+      return 'social';
+    }
+    if (lowerMessage.includes('move') || lowerMessage.includes('go') || lowerMessage.includes('walk') || lowerMessage.includes('run')) {
+      return 'movement';
+    }
+    if (lowerMessage.includes('search') || lowerMessage.includes('look') || lowerMessage.includes('examine') || lowerMessage.includes('investigate')) {
+      return 'exploration';
+    }
+    if (lowerMessage.includes('use') || lowerMessage.includes('drink') || lowerMessage.includes('eat') || lowerMessage.includes('activate')) {
+      return 'item';
+    }
+    if (lowerMessage.includes('rest') || lowerMessage.includes('sleep') || lowerMessage.includes('recover')) {
+      return 'rest';
+    }
+    if (lowerMessage.includes('hide') || lowerMessage.includes('sneak') || lowerMessage.includes('stealth')) {
+      return 'stealth';
+    }
+
+    return 'other';
+  };
+
+  const sendPlayerAction = async (action: string, playerId: string = 'player1', playerName: string = 'Player', inputType?: InputType) => {
+    console.log('🎭 STORYTELLER REQUEST STARTING');
+    console.log('🎭 Campaign:', currentCampaign?.id, currentCampaign?.name);
+    console.log('🎭 Action:', action);
+    console.log('🎭 Input Type:', inputType || selectedInputType);
+    
+    if (!currentCampaign || !action.trim()) {
+      console.log('❌ Early return - no campaign or empty action');
+      return;
+    }
+
+    console.log('🎭 User data:', {
       userId: user?.id,
       userEmail: user?.email,
-      username: user?.username
+      username: user?.username,
+      hasUser: !!user
     });
 
     if (!user?.id) {
+      console.log('❌ No user ID - authentication error');
       setError('You need to be logged in to play. Please sign in again.');
       return;
     }
 
+    console.log('🎭 Starting loading state');
     startLoading('sendAction');
     setError(null);
     // Clear choices while loading
@@ -531,42 +600,88 @@ export default function StoryScreen() {
       const shouldContributeToStory = typeToUse === 'say' || typeToUse === 'rp' || typeToUse === 'action';
       // Only send to AI for messages that should trigger GM response
       if (shouldTriggerGM) {
+        console.log('🎭 Preparing to send to AI storyteller');
+        console.log('🎭 Should contribute to story:', shouldContributeToStory);
+        
         // Prepare context for the AI
         const context = {
           campaign: currentCampaign,
           storyHistory: campaignHistory.slice(-5), // Get last 5 messages for context
         };
 
+        console.log('🎭 Context prepared:', {
+          campaignId: currentCampaign.id,
+          historyLength: campaignHistory.length,
+          lastMessages: context.storyHistory.length
+        });
+
+        const requestBody = {
+          campaignId: currentCampaign.id,
+          playerId: user.id,
+          characterId: currentCharacter?.id || null,
+          action: action,
+          actionType: inferActionType(action),
+          chatType: typeToUse,
+          shouldContributeToStory,
+          metadata: {
+            context,
+            playerAction: action,
+            timestamp: new Date().toISOString()
+          }
+        };
+
+        // Use production endpoint for API calls
+        const middlewareUrl = process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL || 'http://localhost:3001';
+        const fullUrl = `${middlewareUrl}/api/game/action`;
+        
+        console.log('🎭 Middleware URL from env:', process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL);
+        console.log('🎭 Full URL for request:', fullUrl);
+        console.log('🎭 Request body keys:', Object.keys(requestBody));
+        console.log('🎭 Request body size:', JSON.stringify(requestBody).length, 'characters');
+
         // Send request to our API route with user ID in the body
-        const response = await fetch('/api/story', {
+        const response = await fetch(fullUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            campaignId: currentCampaign.id, // Use UID for database consistency
-            playerId: user.id, // Pass the user ID directly
-            message: `Player action: ${action}`,
-            context,
-            playerAction: action,
-            chatType: typeToUse, // Pass the chat type to the backend
-            shouldContributeToStory, // Indicate whether this should advance the story
-          }),
+          body: JSON.stringify(requestBody),
         });
 
+        console.log('🎭 Fetch response received');
+        console.log('🎭 Response status:', response.status);
+        console.log('🎭 Response ok:', response.ok);
+        console.log('🎭 Response headers:', Object.fromEntries(response.headers.entries()));
+
         if (!response.ok) {
+          console.log('❌ Response not OK - status:', response.status);
+          const errorText = await response.text().catch(() => 'Unable to read error response');
+          console.log('❌ Error response body:', errorText);
+          
           if (response.status === 401) {
             throw new Error('Authentication failed. Please sign in again.');
           }
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
         }
 
+        console.log('🎭 Parsing JSON response');
         const data = await response.json();
+        
+        console.log('🎭 Response data received:', {
+          success: data.success,
+          hasResponse: !!data.response,
+          responseLength: data.response?.length || 0,
+          hasChoices: !!data.choices,
+          choicesCount: data.choices?.length || 0,
+          error: data.error
+        });
 
         if (!data.success) {
+          console.log('❌ API returned success=false, error:', data.error);
           throw new Error(data.error || 'Failed to get GM response');
         }
 
+        console.log('🎭 Adding GM response to campaign history');
         // Add GM response to campaign history
         await addCampaignMessage({
           campaign_id: currentCampaign.id,
@@ -577,18 +692,41 @@ export default function StoryScreen() {
 
         // Use choices from AI response (only for story-contributing messages)
         if (currentCampaign && shouldContributeToStory) {
+          console.log('🎭 Setting AI choices:', data.choices?.length || 0, 'choices');
           setAiChoices({ campaignId: currentCampaign.id, choices: data.choices || [] });
         }
+        
+        console.log('✅ Storyteller request completed successfully');
+      } else {
+        console.log('🎭 Skipping AI request - shouldTriggerGM is false for input type:', typeToUse);
       }
 
     } catch (error) {
-      console.error('Error sending player action:', error);
-      setError(error instanceof Error ? error.message : 'Failed to get GM response');
+      console.error('❌ STORYTELLER ERROR - Full error object:', error);
+      console.error('❌ Error type:', typeof error);
+      console.error('❌ Error constructor:', error?.constructor?.name);
+      console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      
+      // Log additional context
+      console.error('❌ Error context:', {
+        campaignId: currentCampaign?.id,
+        userId: user?.id,
+        action: action,
+        inputType: inputType || selectedInputType,
+        timestamp: new Date().toISOString()
+      });
+      
+      const errorMessage = error instanceof Error ? error.message : 'Failed to connect to Storyteller';
+      console.error('❌ Setting error message:', errorMessage);
+      setError(errorMessage);
+      
       // Clear choices on error
       if (currentCampaign) {
         clearAiChoices(currentCampaign.id);
       }
     } finally {
+      console.log('🎭 Stopping loading state');
       stopLoading('sendAction');
     }
   };
@@ -632,7 +770,7 @@ export default function StoryScreen() {
   };
 
   const handleHomePress = () => {
-    router.back();
+    router.replace('/home'); // Replace instead of push to avoid stack buildup
   };
 
   const handleCharacterPress = () => {

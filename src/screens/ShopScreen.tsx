@@ -17,6 +17,7 @@ import { useCustomAlert } from '../components/CustomAlert';
 import DMSubscriptionModal from '../components/DMSubscriptionModal';
 import AdventurerPackModal from '../components/AdventurerPackModal';
 import { PurchaseManager, purchaseManager, PRODUCT_IDS } from '../utils/purchaseManager';
+import Purchases from 'react-native-purchases';
 import { useAtom } from 'jotai';
 import { userAtom } from '../atoms/authAtoms';
 import { fetchUserCapabilitiesAtom, userCapabilitiesAtom } from '../atoms/userCapabilitiesAtoms';
@@ -42,6 +43,7 @@ export default function ShopScreen() {
   const [showAdventurerModal, setShowAdventurerModal] = useState(false);
   const [showScrollModal, setShowScrollModal] = useState(false);
   const [capabilitiesLoaded, setCapabilitiesLoaded] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const { showAlert } = useCustomAlert();
   const [user] = useAtom(userAtom);
   const [, fetchCapabilities] = useAtom(fetchUserCapabilitiesAtom);
@@ -51,29 +53,70 @@ export default function ShopScreen() {
   // Load capabilities when component mounts
   useEffect(() => {
     const loadCapabilities = async () => {
+      console.log('🛍️ ShopScreen: Starting loadCapabilities');
+      
       if (user?.id) {
         try {
+          console.log('🛍️ ShopScreen: Fetching user capabilities...');
           await fetchCapabilities();
+          console.log('🛍️ ShopScreen: Capabilities fetched successfully');
           
           // Initialize RevenueCat with validation
-          console.log('ShopScreen: Initializing RevenueCat for user:', user.id);
+          console.log('🛍️ ShopScreen: Initializing RevenueCat for user:', user.id);
           await purchaseManager.initialize(user.id);
-          console.log('ShopScreen: RevenueCat initialization completed');
+          console.log('🛍️ ShopScreen: RevenueCat initialization completed');
+          
+          // Reset retry counter on successful connection
+          setRetryCount(0);
         } catch (error) {
-          console.error('Failed to load capabilities or initialize RevenueCat:', error);
-          // Don't crash the app, just show a warning
-          // The shop will still work for viewing items
+          console.error('❌ ShopScreen: Failed to load capabilities or initialize RevenueCat:', error);
+          console.error('❌ ShopScreen: Error type:', typeof error);
+          console.error('❌ ShopScreen: Error message:', error instanceof Error ? error.message : String(error));
+          
+          // Auto-retry connection on failure (max 3 attempts)
+          if (retryCount < 3) {
+            const nextRetry = retryCount + 1;
+            console.log(`🔄 Connection failed, auto-retrying in 2 seconds... (attempt ${nextRetry}/3)`);
+            setRetryCount(nextRetry);
+            
+            setTimeout(() => {
+              console.log(`🔄 Starting auto-retry attempt ${nextRetry}`);
+              setCapabilitiesLoaded(false);
+              loadWithTimeout();
+            }, 2000);
+          } else {
+            console.log('❌ Max retry attempts reached, giving up');
+            showAlert(
+              'Connection Failed', 
+              'Could not connect to purchase services after multiple attempts. Some features may not work properly.',
+              [{ text: 'OK' }],
+              'error'
+            );
+          }
         } finally {
+          console.log('🛍️ ShopScreen: Setting capabilities loaded to true');
           setCapabilitiesLoaded(true);
         }
       } else {
-        console.log('ShopScreen: No user ID available, skipping RevenueCat initialization');
+        console.log('🛍️ ShopScreen: No user ID available, skipping RevenueCat initialization');
         setCapabilitiesLoaded(true);
       }
     };
 
-    loadCapabilities();
-  }, [user?.id, fetchCapabilities]);
+    // Add timeout to prevent infinite loading
+    const loadWithTimeout = () => {
+      const timeoutId = setTimeout(() => {
+        console.warn('⚠️ ShopScreen: Loading timeout - forcing capabilities loaded');
+        setCapabilitiesLoaded(true);
+      }, 15000); // 15 second timeout
+
+      loadCapabilities().finally(() => {
+        clearTimeout(timeoutId);
+      });
+    };
+
+    loadWithTimeout();
+  }, [user?.id, fetchCapabilities, showAlert]);
 
   // Debug: Log capabilities changes
   useEffect(() => {
@@ -196,8 +239,8 @@ export default function ShopScreen() {
     console.log('🛍️ Loading state set for product:', productId);
 
     try {
-      console.log('🛍️ Calling purchaseManager.purchaseProduct...');
-      const result = await purchaseManager.purchaseProduct(productId);
+      console.log('🛍️ Calling purchaseManager.purchaseProductDirect...');
+      const result = await purchaseManager.purchaseProductDirect(productId);
       console.log('🛍️ Purchase result received:', {
         success: result.success,
         error: result.error,
@@ -382,6 +425,24 @@ export default function ShopScreen() {
     } catch (error) {
       console.log('🔍 Offerings Error:', error);
     }
+
+    // Test individual product IDs
+    console.log('🔍 TESTING INDIVIDUAL PRODUCT IDS:');
+    const productIds = Object.values(PRODUCT_IDS);
+    
+    for (const productId of productIds) {
+      try {
+        console.log(`🔍 Testing product: ${productId}`);
+        const products = await Purchases.getProducts([productId]);
+        if (products.length > 0) {
+          console.log(`✅ ${productId}: FOUND - Price: ${products[0].priceString}`);
+        } else {
+          console.log(`❌ ${productId}: NOT FOUND`);
+        }
+      } catch (error) {
+        console.log(`❌ ${productId}: ERROR -`, error);
+      }
+    }
     
     console.log('🔍 User Capabilities:', userCapabilities);
     console.log('🔍 Timestamp:', new Date().toISOString());
@@ -421,7 +482,7 @@ export default function ShopScreen() {
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ArrowLeft color="#fff" size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>The Goblin's Market</Text>
+        <Text style={styles.headerTitle}>The Goblin&apos;s Market</Text>
         <View style={styles.headerRight}>
         </View>
       </View>
@@ -496,6 +557,7 @@ export default function ShopScreen() {
         {/* Shop Items */}
         <View style={styles.itemsSection}>
           <View style={styles.divider} />
+          
           <View style={styles.itemsGrid}>
             {shopItems.map((item) => {
               const isPurchased = isItemPurchased(item.id);
@@ -575,6 +637,35 @@ export default function ShopScreen() {
           <Text style={styles.restoreNote}>
             Already purchased? Tap here to restore your previous purchases.
           </Text>
+          
+          <TouchableOpacity
+            style={[styles.restoreButton, { backgroundColor: '#4CAF50', marginTop: 10 }]}
+            onPress={async () => {
+              console.log('🔄 Manual connection refresh triggered');
+              setCapabilitiesLoaded(false);
+              
+              // Recreate the loadWithTimeout logic
+              const timeoutId = setTimeout(() => {
+                console.warn('⚠️ ShopScreen: Manual refresh timeout - forcing capabilities loaded');
+                setCapabilitiesLoaded(true);
+              }, 15000);
+
+              try {
+                if (user?.id) {
+                  await fetchCapabilities();
+                  await purchaseManager.initialize(user.id);
+                }
+              } catch (error) {
+                console.error('❌ Manual refresh failed:', error);
+              } finally {
+                clearTimeout(timeoutId);
+                setCapabilitiesLoaded(true);
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.restoreButtonText}>Refresh Connection</Text>
+          </TouchableOpacity>
           
           {__DEV__ && (
             <>
