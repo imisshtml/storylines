@@ -303,9 +303,16 @@ export default function CharacterViewScreen() {
     if (character?.campaign_id) {
       // Find the campaign by campaign_id (which should match campaign.id)
       const campaign = campaigns.find(c => c.id === character.campaign_id);
-      return campaign ? campaign.name : 'Unknown Campaign';
+      if (campaign) {
+        // If character is retired or campaign is completed/failed, show "Available for Campaign"
+        /*if (character.retired || campaign.status === 'completed' || campaign.status === 'failed') {
+          return 'Available for Campaign';
+        }*/
+        return campaign.name;
+      }
+      return 'Unknown Campaign';
     }
-    return 'No Campaign Set';
+    return 'Available for Campaign';
   };
 
   const hasSpellcasting = () => {
@@ -316,8 +323,8 @@ export default function CharacterViewScreen() {
 
   const no1stLvlSpells = (character?.class === 'Paladin' || character?.class === 'Ranger') && character?.level === 1;
 
-  const getAvailableTabs = () => {
-    const tabs = [
+  const getAvailableTabs = (): { id: 'stats' | 'traits' | 'spells' | 'equipment', label: string, icon: any }[] => {
+    const tabs: { id: 'stats' | 'traits' | 'spells' | 'equipment', label: string, icon: any }[] = [
       { id: 'stats' as const, label: 'Stats', icon: Dices },
       { id: 'traits' as const, label: 'Traits', icon: Star },
       { id: 'equipment' as const, label: 'Equipment', icon: Package },
@@ -1018,40 +1025,50 @@ export default function CharacterViewScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Character Portrait Section */}
         <View style={styles.portraitSection}>
-          <View style={styles.avatarContainer}>
-            <Image
-              source={getCharacterAvatarUrl(character)}
-              style={styles.avatar}
-            />
-            <TouchableOpacity
-              style={styles.editAvatarButton}
-              onPress={() => setIsEditingAvatar(true)}
-            >
-              <Camera size={16} color="#fff" />
-            </TouchableOpacity>
-            {isLoading && (
-              <View style={styles.uploadingOverlay}>
-                <ActivityIndicator size="small" color="#4CAF50" />
-              </View>
-            )}
+          <View style={styles.characterHeader}>
+            <View style={styles.avatarContainer}>
+              <Image
+                source={getCharacterAvatarUrl(character)}
+                style={[
+                  styles.avatar,
+                  character.retired && styles.retiredAvatar
+                ]}
+              />
+              {!character.retired && (
+                <TouchableOpacity
+                  style={styles.editAvatarButton}
+                  onPress={() => setIsEditingAvatar(true)}
+                >
+                  <Camera size={16} color="#fff" />
+                </TouchableOpacity>
+              )}
+              {isLoading && (
+                <View style={styles.uploadingOverlay}>
+                  <ActivityIndicator size="small" color="#4CAF50" />
+                </View>
+              )}
+            </View>
+            
+            <View style={styles.characterInfo}>
+              <Text style={styles.characterName}>{character.name}</Text>
+              <Text style={styles.characterClass}>
+                Level {character.level} {character.race} {character.class}
+              </Text>
+              <Text style={styles.campaignName}>{getCampaignName()}</Text>
+              {canLevelUp && (
+                <TouchableOpacity 
+                  style={styles.levelUpButton}
+                  onPress={handleLevelUp}
+                >
+                  <ArrowUp size={16} color="#fff" />
+                  <Text style={styles.levelUpButtonText}>Level Up Available!</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-          <Text style={styles.characterName}>{character.name}</Text>
-          <Text style={styles.characterClass}>
-            Level {character.level} {character.race} {character.class}
-          </Text>
-          <Text style={styles.campaignName}>{getCampaignName()}</Text>
-          {canLevelUp && (
-            <TouchableOpacity 
-              style={styles.levelUpButton}
-              onPress={handleLevelUp}
-            >
-              <ArrowUp size={16} color="#fff" />
-              <Text style={styles.levelUpButtonText}>Level Up Available!</Text>
-            </TouchableOpacity>
-          )}
         </View>
 
         {/* Tab Navigation */}
@@ -1987,7 +2004,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
     padding: 20,
+    paddingBottom: 80, // Add extra padding to account for Android navigation bar
   },
   levelUpButton: {
     flexDirection: 'row',
@@ -1997,7 +2017,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 16,
     marginTop: 8,
-    alignSelf: 'center',
+    alignSelf: 'flex-start',
     gap: 6,
   },
   levelUpButtonText: {
@@ -2016,12 +2036,19 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
   },
   portraitSection: {
-    alignItems: 'center',
     marginBottom: 30,
+  },
+  characterHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
+  },
+  characterInfo: {
+    flex: 1,
+    justifyContent: 'center',
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 16,
   },
   avatar: {
     width: 120,
@@ -2029,6 +2056,10 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     borderWidth: 3,
     borderColor: '#4CAF50',
+  },
+  retiredAvatar: {
+    opacity: 0.5,
+    borderColor: '#666',
   },
   editAvatarButton: {
     position: 'absolute',
@@ -2271,6 +2302,7 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     padding: 20,
+    paddingBottom: 50,
     height: 500,
   },
   modalSubtitle: {
@@ -2598,6 +2630,7 @@ const styles = StyleSheet.create({
   },
   equipmentScrollView: {
     height: 300,
+    paddingBottom: 50
   },
   equipmentShopItem: {
     flexDirection: 'row',

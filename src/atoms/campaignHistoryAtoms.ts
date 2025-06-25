@@ -93,10 +93,26 @@ export const addCampaignMessageAtom = atom(
   }
 );
 
+// Track active campaign history subscriptions by campaign ID
+let activeCampaignHistorySubscriptions: Record<string, any> = {};
+
 // Initialize real-time subscription for campaign history
 export const initializeCampaignHistoryRealtimeAtom = atom(
   null,
   async (get, set, campaignId: string) => {
+    // If we already have an active subscription for this campaign, return the existing cleanup
+    if (activeCampaignHistorySubscriptions[campaignId]) {
+      console.log(`📡 Reusing existing subscription for campaign: ${campaignId}`);
+      return () => {
+        if (activeCampaignHistorySubscriptions[campaignId]) {
+          activeCampaignHistorySubscriptions[campaignId].unsubscribe();
+          delete activeCampaignHistorySubscriptions[campaignId];
+        }
+      };
+    }
+
+    console.log(`📡 Creating new subscription for campaign: ${campaignId}`);
+    
     const subscription = supabase
       .channel(`campaign_history:${campaignId}`)
       .on(
@@ -125,8 +141,15 @@ export const initializeCampaignHistoryRealtimeAtom = atom(
       )
       .subscribe();
 
+    // Store the subscription
+    activeCampaignHistorySubscriptions[campaignId] = subscription;
+
     return () => {
-      subscription.unsubscribe();
+      if (activeCampaignHistorySubscriptions[campaignId]) {
+        console.log(`📡 Cleaning up subscription for campaign: ${campaignId}`);
+        activeCampaignHistorySubscriptions[campaignId].unsubscribe();
+        delete activeCampaignHistorySubscriptions[campaignId];
+      }
     };
   }
 );
