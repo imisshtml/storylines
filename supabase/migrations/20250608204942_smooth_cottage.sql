@@ -15,6 +15,7 @@
       - `owner` (uuid, foreign key to profiles)
       - `content_level` (text) - 'kids', 'teens', or 'adults'
       - `rp_focus` (text) - balance between roleplay and combat
+      - `limit` (integer) - player limit for each campaign
       - `created_at` (timestamp)
       - `updated_at` (timestamp)
 
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
   owner uuid REFERENCES auth.users(id) NOT NULL,
   content_level text NOT NULL CHECK (content_level IN ('kids', 'teens', 'adults')) DEFAULT 'adults',
   rp_focus text NOT NULL CHECK (rp_focus IN ('heavy_rp', 'rp_focused', 'balanced', 'combat_focused', 'heavy_combat')) DEFAULT 'balanced',
+  "limit" integer DEFAULT 3,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now()
 );
@@ -66,6 +68,14 @@ BEGIN
   ) THEN
     ALTER TABLE campaigns 
       ADD COLUMN updated_at timestamp with time zone DEFAULT now();
+  END IF;
+  
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'campaigns' AND column_name = 'limit'
+  ) THEN
+    ALTER TABLE campaigns 
+      ADD COLUMN "limit" integer DEFAULT 3;
   END IF;
 END $$;
 
