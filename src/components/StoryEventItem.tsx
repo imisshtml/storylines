@@ -15,6 +15,17 @@ export default function StoryEventItem({ message }: StoryEventItemProps) {
   const getTestDiceRoll = () => {
     if (message.dice_roll) return message.dice_roll;
     if (message.message_type === 'player') {
+      // Check if this is a message type that should NOT have dice rolls
+      const messageContent = message.message.toLowerCase();
+      const isOOC = messageContent.startsWith('[ooc]');
+      const isAsk = messageContent.startsWith('[asks gm]');
+      const isWhisper = messageContent.startsWith('[whispers to');
+
+      // Don't generate dice rolls for OOC, Ask, or Whisper messages
+      if (isOOC || isAsk || isWhisper) {
+        return null;
+      }
+
       // Use message ID as seed for consistent random number
       const seed = message.id;
       return ((seed * 9301 + 49297) % 233280) % 20 + 1;
