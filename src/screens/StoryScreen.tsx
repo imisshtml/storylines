@@ -124,15 +124,25 @@ export default function StoryScreen() {
 
     initializeSubscription();
 
-    // Mark campaign as read when entering
-    if (currentCampaign.latest_message_id) {
-      updateCampaignReadStatus({
-        campaignId: currentCampaign.id,
-        messageId: currentCampaign.latest_message_id,
-      }).catch(error => {
-        console.error('Error marking campaign as read on entry:', error);
-      });
-    }
+    // Mark campaign as read when entering - only if there are actual messages
+    // Wait for campaign history to load first to avoid foreign key errors
+    const markAsReadWhenReady = () => {
+      if (currentCampaign.latest_message_id && campaignHistory.length > 0) {
+        // Find the actual latest message in the loaded history
+        const latestMessage = campaignHistory[campaignHistory.length - 1];
+        if (latestMessage) {
+          updateCampaignReadStatus({
+            campaignId: currentCampaign.id,
+            messageId: latestMessage.id,
+          }).catch(error => {
+            console.error('Error marking campaign as read on entry:', error);
+          });
+        }
+      }
+    };
+
+    // Delay the read status update to ensure campaign history is loaded
+    setTimeout(markAsReadWhenReady, 500);
 
     // Cleanup function
     return () => {
