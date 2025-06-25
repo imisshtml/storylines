@@ -43,7 +43,7 @@ import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
 import BannerAd from '../components/BannerAd';
 
-type InputType = 'say' | 'rp' | 'whisper' | 'ask' | 'action';
+type InputType = 'say' | 'rp' | 'whisper' | 'ask' | 'action' | "ooc";
 
 interface InputOption {
   type: InputType;
@@ -240,6 +240,12 @@ export default function StoryScreen() {
         placeholder: 'Roleplay your action...'
       },
       {
+        type: 'ooc',
+        label: 'OoC',
+        icon: <MessageSquare size={16} color="#4CAF50" />,
+        placeholder: 'Say something out of character...'
+      },
+      {
         type: 'ask',
         label: 'Ask',
         icon: <HelpCircle size={16} color="#2196F3" />,
@@ -332,6 +338,9 @@ export default function StoryScreen() {
         case 'ask':
           formattedMessage = `[Asks GM] ${action}`;
           break;
+        case 'ooc':
+          formattedMessage = `[OOC] ${action}`;
+          break;
         case 'action':
           formattedMessage = action;
           break;
@@ -352,8 +361,12 @@ export default function StoryScreen() {
         difficulty: 10, // Default difficulty class
       });
 
-      // Only send to AI for non-whisper messages or GM questions
-      if (typeToUse !== 'whisper') {
+      // Determine if GM should respond and if message should contribute to story
+      const shouldTriggerGM = typeToUse === 'say' || typeToUse === 'rp' || typeToUse === 'action' || typeToUse === 'ask';
+      const shouldContributeToStory = typeToUse === 'say' || typeToUse === 'rp' || typeToUse === 'action';
+
+      // Only send to AI for messages that should trigger GM response
+      if (shouldTriggerGM) {
         // Prepare context for the AI
         const context = {
           campaign: currentCampaign,
@@ -372,6 +385,8 @@ export default function StoryScreen() {
             message: `Player action: ${action}`,
             context,
             playerAction: action,
+            chatType: typeToUse, // Pass the chat type to the backend
+            shouldContributeToStory, // Indicate whether this should advance the story
           }),
         });
 
@@ -396,8 +411,8 @@ export default function StoryScreen() {
           message_type: 'gm',
         });
 
-        // Use choices from AI response
-        if (currentCampaign) {
+        // Use choices from AI response (only for story-contributing messages)
+        if (currentCampaign && shouldContributeToStory) {
           setAiChoices({ campaignId: currentCampaign.id, choices: data.choices || [] });
         }
       }
@@ -427,8 +442,9 @@ export default function StoryScreen() {
       user?.username || user?.email || 'Player'
     );
 
-    // Show choices again after GM responds (except for whispers)
-    if (selectedInputType !== 'whisper') {
+    // Show choices again after GM responds (only for story-contributing messages)
+    const shouldShowChoices = selectedInputType === 'say' || selectedInputType === 'rp' || selectedInputType === 'action';
+    if (shouldShowChoices) {
       setTimeout(() => setShowChoices(true), 1000);
     }
   };
@@ -510,7 +526,7 @@ export default function StoryScreen() {
     >
       <SafeAreaView style={styles.safeArea}>
         {/* Banner Ad */}
-       
+
         <View style={styles.header}>
           <TouchableOpacity onPress={handleHomePress} style={styles.headerButton}>
             <Home size={24} color="#2a2a2a" />
@@ -575,13 +591,14 @@ export default function StoryScreen() {
               </View>
             )}
 
-            {showChoices && !isLoading('sendAction') && selectedInputType !== 'whisper' && (
-              <EnhancedStoryChoices
-                choices={choicesToShow}
-                onChoiceSelect={handleChoiceSelect}
-                disabled={isLoading('sendAction')}
-              />
-            )}
+            {showChoices && !isLoading('sendAction') &&
+              (selectedInputType === 'say' || selectedInputType === 'rp' || selectedInputType === 'action') && (
+                <EnhancedStoryChoices
+                  choices={choicesToShow}
+                  onChoiceSelect={handleChoiceSelect}
+                  disabled={isLoading('sendAction')}
+                />
+              )}
           </ScrollView>
 
           <View style={styles.inputContainer}>

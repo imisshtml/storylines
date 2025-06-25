@@ -7,31 +7,45 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Switch,
-  Alert,
   ActivityIndicator,
   StatusBar,
   Platform,
 } from 'react-native';
-import { ArrowLeft, User, Mail, Calendar, Crown, Users, UserX, Bell, BellOff, Volume2, VolumeX, Trash2, Shield } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  User,
+  Mail,
+  Calendar,
+  Crown,
+  UserCheck,
+  Bell,
+  BellOff,
+  Volume2,
+  VolumeX,
+  Trash2,
+  Shield,
+} from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { userAtom, signOutAtom } from '../atoms/authAtoms';
 import { campaignsAtom } from '../atoms/campaignAtoms';
 import { supabase } from '../config/supabase';
 import { useCustomAlert } from '../components/CustomAlert';
+import { friendsAtom } from '../atoms/friendsAtoms';
 
 export default function ProfileScreen() {
   const [user] = useAtom(userAtom);
   const [campaigns] = useAtom(campaignsAtom);
   const [, signOut] = useAtom(signOutAtom);
+  const [friends] = useAtom(friendsAtom);
   const { showAlert, hideAlert } = useCustomAlert();
-  
+
   // Settings state
   const [pushNotifications, setPushNotifications] = useState(true);
   const [turnNotifications, setTurnNotifications] = useState(true);
   const [receiveEmails, setReceiveEmails] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   // Profile data state
   const [profileData, setProfileData] = useState({
     createdAt: '',
@@ -63,10 +77,10 @@ export default function ProfileScreen() {
       }
 
       // Count completed campaigns (campaigns where user was a participant and status is completed)
-      const completedCampaigns = campaigns.filter(campaign => 
-        campaign.status === 'completed' && 
-        (campaign.owner === user.id || 
-         campaign.players.some((player: any) => player.id === user.id))
+      const completedCampaigns = campaigns.filter(campaign =>
+        campaign.status === 'completed' &&
+        (campaign.owner === user.id ||
+          campaign.players.some((player: any) => player.id === user.id))
       ).length;
 
       setProfileData({
@@ -127,7 +141,7 @@ export default function ProfileScreen() {
       // Sign out and redirect to login
       await signOut();
       router.replace('/login');
-      
+
       showAlert(
         'Account Deleted',
         'Your account has been successfully deleted.',
@@ -171,7 +185,7 @@ export default function ProfileScreen() {
         {/* Profile Information Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Profile Information</Text>
-          
+
           <View style={styles.infoItem}>
             <View style={styles.infoIcon}>
               <User size={20} color="#4CAF50" />
@@ -206,7 +220,7 @@ export default function ProfileScreen() {
         {/* Statistics Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Statistics</Text>
-          
+
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
               <Crown size={24} color="#FFD700" />
@@ -221,9 +235,9 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.statItem}>
-              <UserX size={24} color="#ff4444" />
-              <Text style={styles.statValue}>{profileData.ignoredUsers}</Text>
-              <Text style={styles.statLabel}>Ignored Users</Text>
+              <UserCheck size={24} color="#4CAF50" />
+              <Text style={styles.statValue}>{friends.length}</Text>
+              <Text style={styles.statLabel}>Friends</Text>
             </View>
           </View>
         </View>
@@ -231,7 +245,7 @@ export default function ProfileScreen() {
         {/* Notification Settings Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Notification Settings</Text>
-          
+
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
               <View style={styles.settingIcon}>
@@ -268,7 +282,7 @@ export default function ProfileScreen() {
               <View style={styles.settingContent}>
                 <Text style={styles.settingLabel}>Turn Notifications</Text>
                 <Text style={styles.settingDescription}>
-                  Get notified when it's your turn in a campaign
+                  {"Get notified when it's your turn in a campaign"}
                 </Text>
               </View>
             </View>
@@ -304,7 +318,7 @@ export default function ProfileScreen() {
         {/* Danger Zone Section */}
         <View style={styles.section}>
           <Text style={styles.dangerSectionTitle}>Danger Zone</Text>
-          
+
           <TouchableOpacity
             style={styles.deleteButton}
             onPress={handleDeleteAccount}
@@ -319,7 +333,7 @@ export default function ProfileScreen() {
               </>
             )}
           </TouchableOpacity>
-          
+
           <Text style={styles.deleteWarning}>
             This action is permanent and cannot be undone. All your data will be lost.
           </Text>
