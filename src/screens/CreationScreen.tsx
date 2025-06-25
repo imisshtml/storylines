@@ -165,7 +165,8 @@ export default function CreationScreen() {
   useEffect(() => {
     const checkLimit = async () => {
       if (user && characters.length > 0) {
-        const canCreate = await checkUserLimit('character', characters.length);
+        const activeCharacters = characters.filter(character => !character.retired);
+        const canCreate = await checkUserLimit('character', activeCharacters.length);
         if (!canCreate) {
           showAlert(
             'Character Limit Reached',
@@ -575,7 +576,8 @@ export default function CreationScreen() {
     }
 
     // Final check before saving
-    const canCreate = await checkUserLimit('character', characters.length);
+    const activeCharacters = characters.filter(character => !character.retired);
+    const canCreate = await checkUserLimit('character', activeCharacters.length);
     if (!canCreate) {
       showAlert(
         'Character Limit Reached',

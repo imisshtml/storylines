@@ -243,6 +243,14 @@ export default function StoryScreen() {
 
   // Add new useEffect to generate initial story when campaign has no history
   useEffect(() => {
+    // Early exit if campaign is not eligible for initial story generation
+    if (!currentCampaign || 
+        (currentCampaign.status !== 'creation' && 
+         currentCampaign.status !== 'waiting' && 
+         currentCampaign.status !== 'in_progress')) {
+      return;
+    }
+
     const generateInitialStory = async () => {
       console.log('🔍 generateInitialStory called with:', {
         currentCampaign: currentCampaign?.name,

@@ -324,7 +324,11 @@ export default function HomeScreen() {
 
           <View style={styles.contentContainer}>
             <View style={styles.campaignsContainer}>
-              <ScrollView style={styles.campaignsScrollView} showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                style={styles.campaignsScrollView} 
+                contentContainerStyle={styles.campaignsScrollContent}
+                showsVerticalScrollIndicator={false}
+              >
                 {/* Characters Section */}
                 {characters.length === 0 && (
                   <>
@@ -362,17 +366,23 @@ export default function HomeScreen() {
                           <View style={styles.characterAvatarContainer}>
                             <Image
                               source={getCharacterAvatar(character)}
-                              style={styles.characterAvatar}
+                              style={[
+                                styles.characterAvatar,
+                                character.retired && styles.retiredCharacterAvatar
+                              ]}
                             />
-                            <View style={styles.characterLevelBadge}>
+                            <View style={[
+                              styles.characterLevelBadge,
+                              character.retired && styles.retiredCharacterLevelBadge
+                            ]}>
                               <Star size={8} color="#fff" fill="#fff" />
                               <Text style={styles.characterLevel}>
                                 {character.level || 1}
                               </Text>
                             </View>
                             
-                            {/* Level Up Badge */}
-                            {hasLeveledUp(character) && (
+                            {/* Level Up Badge - don't show for retired characters */}
+                            {hasLeveledUp(character) && !character.retired && (
                               <LevelUpBadge 
                                 visible={true}
                                 size="small"
@@ -472,6 +482,15 @@ export default function HomeScreen() {
                     isOwner(campaign) ||
                     (campaign.players && campaign.players.some((player: any) => player.id === user?.id))
                   )
+                  .sort((a, b) => {
+                    // Sort so completed/failed campaigns appear at the bottom
+                    const aIsCompleted = a.status === 'completed' || a.status === 'failed';
+                    const bIsCompleted = b.status === 'completed' || b.status === 'failed';
+                    
+                    if (aIsCompleted && !bIsCompleted) return 1;
+                    if (!aIsCompleted && bIsCompleted) return -1;
+                    return 0; // Keep original order for campaigns of same completion status
+                  })
                   .map(campaign => (
                     <View key={campaign.id} style={styles.campaignCard}>
                       {/* Notification dot positioned absolutely in top-right corner */}
@@ -492,10 +511,13 @@ export default function HomeScreen() {
                               <View style={styles.characterAvatarWrapper}>
                                 <Image
                                   source={getCharacterAvatar(campaignCharacter)}
-                                  style={styles.campaignHeaderAvatar}
+                                  style={[
+                                    styles.campaignHeaderAvatar,
+                                    campaignCharacter.retired && styles.retiredCampaignHeaderAvatar
+                                  ]}
                                 />
-                                {/* Level Up Badge for campaign character */}
-                                {hasLeveledUp(campaignCharacter) && (
+                                {/* Level Up Badge for campaign character - don't show for retired characters */}
+                                {hasLeveledUp(campaignCharacter) && !campaignCharacter.retired && (
                                   <LevelUpBadge 
                                     visible={true}
                                     size="small"
@@ -513,46 +535,68 @@ export default function HomeScreen() {
                             <Crown size={14} color="#FFD700" />
                           </View>
                         )}
-                        {(campaign.status === 'creation' || campaign.status === 'open')
-                          ? `Players: ${campaign.players.length}/${campaign.limit} • Waiting to Start`
-                          : `Players: ${campaign.players.length} • ${campaign.status === 'waiting' ? 'Waiting' : 'In Progress'}`
-                        }
+                        {(() => {
+                          if (campaign.status === 'creation' || campaign.status === 'open') {
+                            return `Players: ${campaign.players.length}/${campaign.limit} • Waiting to Start`;
+                          } else if (campaign.status === 'completed') {
+                            return `Players: ${campaign.players.length} • Completed`;
+                          } else if (campaign.status === 'failed') {
+                            return `Players: ${campaign.players.length} • Failed`;
+                          } else if (campaign.status === 'waiting') {
+                            return `Players: ${campaign.players.length} • Waiting`;
+                          } else {
+                            return `Players: ${campaign.players.length} • In Progress`;
+                          }
+                        })()}
                       </Text>
-                      {(campaign.status === 'creation' || campaign.status === 'open') && isOwner(campaign) ? (
-                        <View style={styles.creationButtonsContainer}>
+                      {(() => {
+                        // Don't show buttons for completed or failed campaigns
+                        if (campaign.status === 'completed' || campaign.status === 'failed') {
+                          return null;
+                        }
+                        
+                        // Show creation buttons for campaigns in creation/open status and user is owner
+                        if ((campaign.status === 'creation' || campaign.status === 'open') && isOwner(campaign)) {
+                          return (
+                            <View style={styles.creationButtonsContainer}>
+                              <TouchableOpacity
+                                style={styles.campaignButton}
+                                onPress={() => handleSettingsPress(campaign.id)}
+                              >
+                                <Settings size={18} color="#fff" />
+                                <Text style={styles.buttonText}>Campaign</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.inviteButton}
+                                onPress={() => handleCampaignPress(campaign.id)}
+                              >
+                                <Users size={18} color="#fff" />
+                                <Text style={styles.buttonText}>Invite</Text>
+                              </TouchableOpacity>
+                            </View>
+                          );
+                        }
+                        
+                        // Show continue button for other statuses
+                        return (
                           <TouchableOpacity
-                            style={styles.campaignButton}
-                            onPress={() => handleSettingsPress(campaign.id)}
-                          >
-                            <Settings size={18} color="#fff" />
-                            <Text style={styles.buttonText}>Campaign</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.inviteButton}
+                            style={styles.continueButton}
                             onPress={() => handleCampaignPress(campaign.id)}
                           >
-                            <Users size={18} color="#fff" />
-                            <Text style={styles.buttonText}>Invite</Text>
+                            {(campaign.status === 'creation' || campaign.status === 'open') ? (
+                              <>
+                                <Users size={20} color="#fff" />
+                                <Text style={styles.buttonText}>Waiting for Start</Text>
+                              </>
+                            ) : (
+                              <>
+                                <Play size={20} color="#fff" />
+                                <Text style={styles.buttonText}>Continue Story</Text>
+                              </>
+                            )}
                           </TouchableOpacity>
-                        </View>
-                      ) : (
-                        <TouchableOpacity
-                          style={styles.continueButton}
-                          onPress={() => handleCampaignPress(campaign.id)}
-                        >
-                          {(campaign.status === 'creation' || campaign.status === 'open') ? (
-                            <>
-                              <Users size={20} color="#fff" />
-                              <Text style={styles.buttonText}>Waiting for Start</Text>
-                            </>
-                          ) : (
-                            <>
-                              <Play size={20} color="#fff" />
-                              <Text style={styles.buttonText}>Continue Story</Text>
-                            </>
-                          )}
-                        </TouchableOpacity>
-                      )}
+                        );
+                      })()}
                     </View>
                   ))}
 
@@ -900,6 +944,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#4CAF50',
   },
+  retiredCampaignHeaderAvatar: {
+    borderColor: '#666',
+    opacity: 0.7,
+  },
   campaignCharacterLevelUpBadge: {
     position: 'absolute',
     top: -5,
@@ -1007,6 +1055,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#4CAF50',
   },
+  retiredCharacterAvatar: {
+    borderColor: '#666',
+    opacity: 0.7,
+  },
   characterLevelBadge: {
     position: 'absolute',
     bottom: -4,
@@ -1022,6 +1074,9 @@ const styles = StyleSheet.create({
     borderColor: '#2a2a2a',
     minWidth: 28,
     justifyContent: 'center',
+  },
+  retiredCharacterLevelBadge: {
+    backgroundColor: '#666',
   },
   levelUpBadge: {
     position: 'absolute',
@@ -1132,6 +1187,9 @@ const styles = StyleSheet.create({
   },
   campaignsScrollView: {
     flex: 1,
+  },
+  campaignsScrollContent: {
+    paddingBottom: 50,
   },
   charactersScrollView: {
     flex: 1,

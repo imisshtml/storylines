@@ -14,7 +14,7 @@ import { ArrowLeft, Plus, Star, Crown, Users, Sword, Shield, UserPlus } from 'lu
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
-import { campaignsAtom } from '../atoms/campaignAtoms';
+import { campaignsAtom, type Campaign } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 import ActivityIndicator from '../components/ActivityIndicator';
@@ -79,9 +79,20 @@ export default function CharactersScreen() {
   };
 
   const getCharacterCampaignStatus = (character: Character) => {
+    // If character is retired, always show as available for campaign
+    if (character.retired) {
+      //return null;
+    }
+    console.log('::: >>> ', character.campaign_id)
     if (character.campaign_id) {
-      const campaign = campaigns.find(c => c.uid === character.campaign_id);
+      const campaign = campaigns.find(c => c.id === character.campaign_id);
+    
       if (campaign) {
+        // If campaign is completed or failed, show as available for campaign
+        if (campaign.status === 'completed' || campaign.status === 'failed') {
+          //return null;
+        }
+        
         return {
           name: campaign.name,
           status: campaign.status,
@@ -106,9 +117,15 @@ export default function CharactersScreen() {
         <View style={styles.avatarContainer}>
           <Image
             source={getCharacterAvatarUrl(character)}
-            style={styles.characterAvatar}
+            style={[
+              styles.characterAvatar,
+              character.retired && styles.retiredCharacterAvatar
+            ]}
           />
-          <View style={styles.levelBadge}>
+          <View style={[
+            styles.levelBadge,
+            character.retired && styles.retiredLevelBadge
+          ]}>
             <Star size={12} color="#fff" />
             <Text style={styles.levelText}>{character.level}</Text>
           </View>
@@ -148,7 +165,9 @@ export default function CharactersScreen() {
                 ]}>
                   <Text style={styles.statusText}>
                     {campaignInfo.status === 'creation' ? 'Setup' :
-                      campaignInfo.status === 'waiting' ? 'Waiting' : 'Active'}
+                      campaignInfo.status === 'waiting' ? 'Waiting' :
+                      campaignInfo.status === 'completed' ? 'Completed' :
+                      campaignInfo.status === 'failed' ? 'Failed' : 'Active'}
                   </Text>
                 </View>
               </View>
@@ -334,6 +353,10 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: '#4CAF50',
   },
+  retiredCharacterAvatar: {
+    opacity: 0.5,
+    borderColor: '#666',
+  },
   levelBadge: {
     position: 'absolute',
     bottom: -4,
@@ -349,6 +372,9 @@ const styles = StyleSheet.create({
     borderColor: '#2a2a2a',
     minWidth: 32,
     justifyContent: 'center',
+  },
+  retiredLevelBadge: {
+    backgroundColor: '#666',
   },
   levelText: {
     color: '#fff',

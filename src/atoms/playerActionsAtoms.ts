@@ -133,10 +133,28 @@ export const executePlayerActionAtom = atom(
   }
 );
 
+// Track active player action subscriptions by campaign and user ID
+let activePlayerActionSubscriptions: Record<string, any> = {};
+
 // Initialize real-time subscription for player actions
 export const initializePlayerActionsRealtimeAtom = atom(
   null,
   async (get, set, { campaignId, userId }: { campaignId: string; userId: string }) => {
+    const subscriptionKey = `${campaignId}:${userId}`;
+    
+    // If we already have an active subscription for this campaign/user, return the existing cleanup
+    if (activePlayerActionSubscriptions[subscriptionKey]) {
+      console.log(`🎬 Reusing existing player actions subscription for: ${subscriptionKey}`);
+      return () => {
+        if (activePlayerActionSubscriptions[subscriptionKey]) {
+          activePlayerActionSubscriptions[subscriptionKey].unsubscribe();
+          delete activePlayerActionSubscriptions[subscriptionKey];
+        }
+      };
+    }
+
+    console.log(`🎬 Creating new player actions subscription for: ${subscriptionKey}`);
+    
     const subscription = supabase
       .channel(`player_actions:${campaignId}:${userId}`)
       .on(
@@ -173,8 +191,15 @@ export const initializePlayerActionsRealtimeAtom = atom(
       )
       .subscribe();
 
+    // Store the subscription
+    activePlayerActionSubscriptions[subscriptionKey] = subscription;
+
     return () => {
-      subscription.unsubscribe();
+      if (activePlayerActionSubscriptions[subscriptionKey]) {
+        console.log(`🎬 Cleaning up player actions subscription for: ${subscriptionKey}`);
+        activePlayerActionSubscriptions[subscriptionKey].unsubscribe();
+        delete activePlayerActionSubscriptions[subscriptionKey];
+      }
     };
   }
 );

@@ -135,6 +135,7 @@ export type Character = {
   long_rest_recharge?: AbilityUses;
   last_short_rest?: string;
   last_long_rest?: string;
+  retired?: boolean;
   created_at?: string;
   updated_at?: string;
 };

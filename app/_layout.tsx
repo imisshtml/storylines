@@ -47,15 +47,28 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
+    // Store cleanup functions
+    let cleanupFunctions: (() => void)[] = [];
+
     // Initialize authentication, real-time subscriptions, and ads
     const initialize = async () => {
       try {
         await initializeAuth();
-        await initializeRealtime();
-        await initializeReadStatusRealtime();
+        
+        // Initialize realtime subscriptions and store cleanup functions
+        const campaignCleanup = await initializeRealtime();
+        if (campaignCleanup) cleanupFunctions.push(campaignCleanup);
+        
+        const readStatusCleanup = await initializeReadStatusRealtime();
+        if (readStatusCleanup) cleanupFunctions.push(readStatusCleanup);
+        
         await new Promise(resolve => setTimeout(resolve, 1000));
-        await initializeFriendshipsRealtime();
-        await initializeCharacterLevelRealtime();
+        
+        const friendshipsCleanup = await initializeFriendshipsRealtime();
+        if (friendshipsCleanup) cleanupFunctions.push(friendshipsCleanup);
+        
+        const characterLevelCleanup = await initializeCharacterLevelRealtime();
+        if (characterLevelCleanup) cleanupFunctions.push(characterLevelCleanup);
         
         // Initialize AdManager
         await adManager.initialize();
@@ -66,6 +79,17 @@ export default function RootLayout() {
     };
 
     initialize();
+
+    // Cleanup function to run when component unmounts or dependencies change
+    return () => {
+      cleanupFunctions.forEach(cleanup => {
+        try {
+          cleanup();
+        } catch (error) {
+          console.error('Error during subscription cleanup:', error);
+        }
+      });
+    };
   }, [initializeAuth, initializeRealtime, initializeReadStatusRealtime, initializeFriendshipsRealtime, initializeCharacterLevelRealtime]);
 
   useEffect(() => {

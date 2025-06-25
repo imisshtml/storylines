@@ -8,13 +8,15 @@ export type Campaign = {
   level: number;
   tone: 'serious' | 'humorous' | 'grimdark';
   exclude: string[];
-  status: 'creation' | 'waiting' | 'in_progress' | 'open';
+  status: 'creation' | 'waiting' | 'in_progress' | 'open' | 'completed' | 'failed';
   players: Player[];
   invite_code: string;
   owner: string;
   content_level: 'kids' | 'teens' | 'adults';
   rp_focus: 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heavy_combat';
   limit?: number; // Player limit for the campaign
+  campaign_length?: 'tale' | 'journey' | 'saga' | 'chronicle' | 'epic';
+  max_level?: number;
   created_at?: string;
   uid: string;
   // Add fields for notification tracking

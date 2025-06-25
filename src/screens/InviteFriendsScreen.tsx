@@ -855,7 +855,7 @@ export default function InviteFriendsScreen() {
         </View>
       )}
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Players Section */}
         <View style={styles.playersContainer}>
           <View style={styles.playersHeader}>
@@ -1258,6 +1258,9 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  scrollContent: {
+    paddingBottom: 10,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1612,6 +1615,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     margin: 20,
     padding: 16,
+    marginBottom: 50,
     borderRadius: 8,
     alignItems: 'center',
   },

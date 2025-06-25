@@ -22,12 +22,17 @@ export const PRODUCT_IDS = {
 export class PurchaseManager {
   private static instance: PurchaseManager;
   private isInitialized = false;
+  private isBillingAvailable = true;
 
   static getInstance(): PurchaseManager {
     if (!PurchaseManager.instance) {
       PurchaseManager.instance = new PurchaseManager();
     }
     return PurchaseManager.instance;
+  }
+
+  isBillingSupported(): boolean {
+    return this.isInitialized && this.isBillingAvailable;
   }
 
   async initialize(userId: string): Promise<void> {
@@ -59,12 +64,31 @@ export class PurchaseManager {
       this.isInitialized = true;
     } catch (error) {
       console.error('Failed to initialize RevenueCat:', error);
-      // Don't throw the error to prevent app crashes, just log it
-      // throw error;
+      
+      // Handle specific billing unavailable error gracefully
+      if (error && typeof error === 'object' && 'code' in error) {
+        const purchaseError = error as PurchasesError;
+        if (purchaseError.code === PURCHASES_ERROR_CODE.PURCHASE_NOT_ALLOWED_ERROR ||
+            purchaseError.code === PURCHASES_ERROR_CODE.STORE_PROBLEM_ERROR) {
+          console.warn('⚠️  Billing not available on this device (likely emulator or missing Google Play Services). In-app purchases will be disabled.');
+          // Set flags to indicate billing is not available
+          this.isInitialized = false;
+          this.isBillingAvailable = false;
+          return; // Don't throw error, just gracefully handle
+        }
+      }
+      
+      // For other errors, don't throw to prevent app crashes, just log
+      console.warn('🔔 RevenueCat initialization failed, in-app purchases will be disabled');
     }
   }
 
   async getOfferings(): Promise<PurchasesOffering[]> {
+    if (!this.isBillingSupported()) {
+      console.log('Billing not supported, returning empty offerings');
+      return [];
+    }
+
     try {
       const offerings = await Purchases.getOfferings();
       return Object.values(offerings.all);
@@ -75,6 +99,10 @@ export class PurchaseManager {
   }
 
   async purchaseProduct(productId: string): Promise<{ success: boolean; customerInfo?: CustomerInfo; error?: string }> {
+    if (!this.isBillingSupported()) {
+      return { success: false, error: 'In-app purchases are not available on this device' };
+    }
+
     try {
       const offerings = await Purchases.getOfferings();
       

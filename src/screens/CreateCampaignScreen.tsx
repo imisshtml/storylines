@@ -15,6 +15,7 @@ import ActivityIndicator from '../components/ActivityIndicator';
 type Tone = 'serious' | 'humorous' | 'grimdark';
 type ContentLevel = 'kids' | 'teens' | 'adults';
 type RPFocus = 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heavy_combat';
+type CampaignLength = 'tale' | 'journey' | 'saga' | 'chronicle' | 'epic';
 
 const contentTags = [
   'Gore',
@@ -38,6 +39,22 @@ const rpFocusLabels: Record<RPFocus, string> = {
   'heavy_combat': 'Heavy Combat',
 };
 
+const campaignLengthLabels: Record<CampaignLength, string> = {
+  'tale': 'Tale',
+  'journey': 'Journey',
+  'saga': 'Saga',
+  'chronicle': 'Chronicle',
+  'epic': 'Epic',
+};
+
+const campaignLengthDescriptions: Record<CampaignLength, string> = {
+  'tale': 'A compact tale to enjoy in one sitting.',
+  'journey': 'A narrative journey full of twists and turns.',
+  'saga': 'A classic saga that unfolds over time.',
+  'chronicle': 'A winding chronicle for those seeking rich storytelling.',
+  'epic': 'An epic experience that defines legends.',
+};
+
 const contentLevelDescriptions: Record<ContentLevel, string> = {
   'kids': 'Suitable for children. No mature themes or violence.',
   'teens': 'Mild themes and fantasy violence. Similar to YA content.',
@@ -57,7 +74,7 @@ export default function CreateCampaignScreen() {
   const [campaignName, setCampaignName] = useState('');
   const [selectedAdventure, setSelectedAdventure] = useState<Adventure | null>(null);
   const [startingLevel, setStartingLevel] = useState('1');
-  const [selectedTone, setSelectedTone] = useState<Tone | null>(null);
+  const [selectedTone, setSelectedTone] = useState<Tone | null>('humorous');
   const [excludedTags, setExcludedTags] = useState<string[]>([]);
   const [contentLevel, setContentLevel] = useState<ContentLevel>('adults');
   const [rpFocusValue, setRpFocusValue] = useState(2); // 0-4 scale, 2 = balanced
@@ -65,6 +82,10 @@ export default function CreateCampaignScreen() {
   const [isAdventureSheetVisible, setIsAdventureSheetVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [capabilitiesLoaded, setCapabilitiesLoaded] = useState(false);
+  const [isOpenCampaign, setIsOpenCampaign] = useState(false);
+  const [campaignLengthValue, setCampaignLengthValue] = useState(2); // 0-4 scale, 2 = saga (default)
+  const [maxLevel, setMaxLevel] = useState(20);
+  const [isMaxLevelDropdownVisible, setIsMaxLevelDropdownVisible] = useState(false);
 
   const isEditing = currentCampaign !== null;
   const maxGroupSize = getGroupSizeLimit();
@@ -99,6 +120,9 @@ export default function CreateCampaignScreen() {
       setContentLevel(currentCampaign.content_level);
       setRpFocusValue(getValueFromRpFocus(currentCampaign.rp_focus));
       setPlayerLimit(Math.min(currentCampaign.limit || 3, maxGroupSize));
+      setIsOpenCampaign(currentCampaign.status === 'open');
+      setCampaignLengthValue(getValueFromCampaignLength(currentCampaign.campaign_length || 'saga'));
+      setMaxLevel(currentCampaign.max_level || 20);
       // Set the selected adventure from the campaign's adventure ID
       const adventure = ADVENTURES.find((a: Adventure) => a.id === currentCampaign.adventure);
       if (adventure) {
@@ -108,12 +132,15 @@ export default function CreateCampaignScreen() {
       // Reset form for new campaign
       setCampaignName('');
       setStartingLevel('1');
-      setSelectedTone(null);
+      setSelectedTone('humorous');
       setExcludedTags([]);
       setContentLevel('adults');
       setRpFocusValue(2); // balanced
       setPlayerLimit(Math.min(3, maxGroupSize));
       setSelectedAdventure(null);
+      setIsOpenCampaign(false);
+      setCampaignLengthValue(2); // saga (default)
+      setMaxLevel(20);
     }
   }, [currentCampaign, isEditing, maxGroupSize, capabilitiesLoaded]);
 
@@ -126,6 +153,17 @@ export default function CreateCampaignScreen() {
   
   const getValueFromRpFocus = (focus: RPFocus): number => {
     return rpFocusOptions.indexOf(focus);
+  };
+
+  // Helper functions to convert between slider value and CampaignLength enum
+  const campaignLengthOptions: CampaignLength[] = ['tale', 'journey', 'saga', 'chronicle', 'epic'];
+  
+  const getCampaignLengthFromValue = (value: number): CampaignLength => {
+    return campaignLengthOptions[Math.round(value)] || 'saga';
+  };
+  
+  const getValueFromCampaignLength = (length: CampaignLength): number => {
+    return campaignLengthOptions.indexOf(length);
   };
 
   const handleBack = () => {
@@ -159,7 +197,7 @@ export default function CreateCampaignScreen() {
         level: parseInt(startingLevel, 10),
         tone: selectedTone,
         exclude: excludedTags,
-        status: 'creation',
+        status: isOpenCampaign ? 'open' : 'creation',
         players: [{
           id: user.id,
           name: user.username || '',
@@ -170,6 +208,8 @@ export default function CreateCampaignScreen() {
         content_level: contentLevel,
         rp_focus: getRpFocusFromValue(rpFocusValue),
         limit: playerLimit,
+        campaign_length: getCampaignLengthFromValue(campaignLengthValue),
+        max_level: maxLevel,
       };
 
       // If editing, include the ID
@@ -264,7 +304,7 @@ export default function CreateCampaignScreen() {
         </View>
       )}
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
         <View style={styles.section}>
           <Text style={styles.label}>Campaign Name</Text>
           <TextInput
@@ -350,7 +390,7 @@ export default function CreateCampaignScreen() {
             Maximum number of players (including yourself) that can join this campaign.
             {maxGroupSize < 7 && (
               <Text style={styles.upgradeHint}>
-                {' '}Purchase &quot;Group Size +2&quot; in the shop to increase your limit to {Math.min(maxGroupSize + 2, 7)} players.
+                {' '}Ultimate Host subscriptions can have up to 7 players.
               </Text>
             )}
           </Text>
@@ -392,32 +432,6 @@ export default function CreateCampaignScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>Content Level</Text>
-          <View style={styles.contentLevelContainer}>
-            {(['kids', 'teens', 'adults'] as ContentLevel[]).map(level => (
-              <TouchableOpacity
-                key={level}
-                style={[
-                  styles.contentLevelButton,
-                  contentLevel === level && styles.selectedContentLevel
-                ]}
-                onPress={() => setContentLevel(level)}
-              >
-                <Text style={[
-                  styles.contentLevelText,
-                  contentLevel === level && styles.selectedContentLevelText
-                ]}>
-                  {level.charAt(0).toUpperCase() + level.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <Text style={styles.contentLevelDescription}>
-            {contentLevelDescriptions[contentLevel]}
-          </Text>
-        </View>
-
-        <View style={styles.section}>
           <Text style={styles.label}>Roleplay vs Combat Focus</Text>
           <View style={styles.sliderContainer}>
             <View style={styles.sliderLabels}>
@@ -451,6 +465,84 @@ export default function CreateCampaignScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.label}>Campaign Length</Text>
+          <View style={styles.sliderContainer}>
+            <View style={styles.sliderLabels}>
+              <Text style={styles.sliderLabelText}>Tale</Text>
+              <Text style={styles.sliderLabelText}>Epic</Text>
+            </View>
+            <View style={styles.customSlider}>
+              <View style={styles.sliderTrack}>
+                <View 
+                  style={[
+                    styles.sliderThumb, 
+                    { left: `${(campaignLengthValue / 4) * 100}%` }
+                  ]} 
+                />
+                {[0, 1, 2, 3, 4].map((value) => (
+                  <TouchableOpacity
+                    key={value}
+                    style={[
+                      styles.sliderStep,
+                      { left: `${(value / 4) * 100}%` }
+                    ]}
+                    onPress={() => setCampaignLengthValue(value)}
+                  />
+                ))}
+              </View>
+            </View>
+            <Text style={styles.currentFocusLabel}>
+              {campaignLengthLabels[getCampaignLengthFromValue(campaignLengthValue)]}
+            </Text>
+            <Text style={styles.contentLevelDescription}>
+              {campaignLengthDescriptions[getCampaignLengthFromValue(campaignLengthValue)]}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Milestones</Text>
+          <TouchableOpacity
+            style={styles.adventureSelector}
+            onPress={() => setIsMaxLevelDropdownVisible(true)}
+          >
+            <Text style={styles.adventureSelectorText}>
+              Max Level: {maxLevel}
+            </Text>
+            <ChevronDown color="#fff" size={20} />
+          </TouchableOpacity>
+          <Text style={styles.contentLevelDescription}>
+            The maximum character level for this campaign
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Content Level</Text>
+          <View style={styles.contentLevelContainer}>
+            {(['adults', 'teens', 'kids' ] as ContentLevel[]).map(level => (
+              <TouchableOpacity
+                key={level}
+                style={[
+                  styles.contentLevelButton,
+                  contentLevel === level && styles.selectedContentLevel
+                ]}
+                onPress={() => setContentLevel(level)}
+              >
+                <Text style={[
+                  styles.contentLevelText,
+                  contentLevel === level && styles.selectedContentLevelText
+                ]}>
+                  {level.charAt(0).toUpperCase() + level.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.contentLevelDescription}>
+            {contentLevelDescriptions[contentLevel]}
+          </Text>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.label}>Content to Exclude</Text>
           <Text style={styles.contentLevelDescription}>
             Dark Realms content—such as sexual themes, religious extremism, or real-world hate—are banished from our adventures.
@@ -477,6 +569,30 @@ export default function CreateCampaignScreen() {
               </TouchableOpacity>
             ))}
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Campaign Visibility</Text>
+          <TouchableOpacity
+            style={styles.openCampaignToggle}
+            onPress={() => setIsOpenCampaign(!isOpenCampaign)}
+          >
+            <View style={styles.toggleInfo}>
+              <Text style={styles.toggleTitle}>Open Campaign</Text>
+              <Text style={styles.toggleDescription}>
+                Allow players to discover and join this campaign from the Join Campaigns screen
+              </Text>
+            </View>
+            <View style={[
+              styles.toggleSwitch,
+              isOpenCampaign && styles.toggleSwitchActive
+            ]}>
+              <View style={[
+                styles.toggleIndicator,
+                isOpenCampaign && styles.toggleIndicatorActive
+              ]} />
+            </View>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -521,6 +637,43 @@ export default function CreateCampaignScreen() {
         onSelect={handleAdventureSelect}
         selectedId={selectedAdventure?.id}
       />
+
+      {/* Max Level Dropdown Modal */}
+      {isMaxLevelDropdownVisible && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Max Level</Text>
+            <ScrollView style={styles.levelList}>
+              {Array.from({ length: 20 }, (_, i) => i + 1).map((level) => (
+                <TouchableOpacity
+                  key={level}
+                  style={[
+                    styles.levelOption,
+                    maxLevel === level && styles.selectedLevelOption
+                  ]}
+                  onPress={() => {
+                    setMaxLevel(level);
+                    setIsMaxLevelDropdownVisible(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.levelOptionText,
+                    maxLevel === level && styles.selectedLevelOptionText
+                  ]}>
+                    Level {level}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setIsMaxLevelDropdownVisible(false)}
+            >
+              <Text style={styles.modalCloseButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -566,6 +719,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 50,
   },
   section: {
     padding: 16,
@@ -746,7 +902,7 @@ const styles = StyleSheet.create({
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   sliderLabelText: {
     fontSize: 12,
@@ -754,7 +910,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
   },
   customSlider: {
-    height: 40,
+    height: 30,
     justifyContent: 'center',
     marginBottom: 16,
   },
@@ -847,5 +1003,113 @@ const styles = StyleSheet.create({
     padding: 0,
     minWidth: 0,
     minHeight: 0,
+  },
+  openCampaignToggle: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  toggleInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  toggleTitle: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 4,
+  },
+  toggleDescription: {
+    fontSize: 14,
+    color: '#888',
+    fontFamily: 'Inter-Regular',
+    lineHeight: 20,
+  },
+  toggleSwitch: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#666',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleSwitchActive: {
+    backgroundColor: '#4CAF50',
+  },
+  toggleIndicator: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  toggleIndicatorActive: {
+    transform: [{ translateX: 20 }],
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modalContent: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 16,
+    padding: 24,
+    margin: 20,
+    maxHeight: '70%',
+    width: '80%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  levelList: {
+    maxHeight: 300,
+  },
+  levelOption: {
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: '#1a1a1a',
+  },
+  selectedLevelOption: {
+    backgroundColor: '#4CAF50',
+  },
+  levelOptionText: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+  },
+  selectedLevelOptionText: {
+    fontFamily: 'Inter-Bold',
+  },
+  modalCloseButton: {
+    backgroundColor: '#666',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 16,
+  },
+  modalCloseButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    textAlign: 'center',
   },
 });

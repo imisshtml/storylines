@@ -18,12 +18,14 @@ export const useLimitEnforcement = () => {
   const { showAlert } = useCustomAlert();
 
   const checkCharacterLimit = async (): Promise<boolean> => {
-    const canCreate = await checkUserLimit('character', characters.length);
+    // Only count non-retired characters
+    const activeCharacters = characters.filter(character => !character.retired);
+    const canCreate = await checkUserLimit('character', activeCharacters.length);
     
     if (!canCreate) {
       showAlert(
         'Character Limit Reached',
-        `You can only create ${userCapabilities.characterLimit} characters. Purchase character limit upgrades in the shop to create more characters.`,
+        `You can only create ${userCapabilities.characterLimit} active characters. Purchase character limit upgrades in the shop to create more characters.`,
         [
           {
             text: 'Go to Shop',
@@ -47,9 +49,10 @@ export const useLimitEnforcement = () => {
   const checkCampaignLimit = async (): Promise<boolean> => {
     if (!user?.id) return false;
     
-    // Count campaigns where user is either owner or player
+    // Count campaigns where user is either owner or player, excluding completed/failed campaigns
     const userCampaigns = campaigns.filter(campaign => 
-      campaign.owner === user.id || campaign.players?.some(player => player.id === user.id)
+      (campaign.owner === user.id || campaign.players?.some(player => player.id === user.id)) &&
+      campaign.status !== 'completed' && campaign.status !== 'failed'
     );
     
     const canCreate = await checkUserLimit('campaign', userCampaigns.length);
@@ -57,7 +60,7 @@ export const useLimitEnforcement = () => {
     if (!canCreate) {
       showAlert(
         'Campaign Limit Reached',
-        `You can only create/join ${userCapabilities.campaignLimit} campaigns. Purchase campaign limit upgrades in the shop to join more campaigns.`,
+        `You can only create/join ${userCapabilities.campaignLimit} active campaigns. Purchase campaign limit upgrades in the shop to join more campaigns.`,
         [
           {
             text: 'Go to Shop',
@@ -78,17 +81,21 @@ export const useLimitEnforcement = () => {
     return true;
   };
 
-  const getCharacterLimitInfo = () => ({
-    current: characters.length,
-    max: userCapabilities.characterLimit,
-    canCreate: characters.length < userCapabilities.characterLimit,
-  });
+  const getCharacterLimitInfo = () => {
+    const activeCharacters = characters.filter(character => !character.retired);
+    return {
+      current: activeCharacters.length,
+      max: userCapabilities.characterLimit,
+      canCreate: activeCharacters.length < userCapabilities.characterLimit,
+    };
+  };
 
   const getCampaignLimitInfo = () => {
     if (!user?.id) return { current: 0, max: userCapabilities.campaignLimit, canJoin: true };
     
     const userCampaigns = campaigns.filter(campaign => 
-      campaign.owner === user.id || campaign.players?.some(player => player.id === user.id)
+      (campaign.owner === user.id || campaign.players?.some(player => player.id === user.id)) &&
+      campaign.status !== 'completed' && campaign.status !== 'failed'
     );
     
     return {
