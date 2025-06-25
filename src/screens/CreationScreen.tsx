@@ -2574,6 +2574,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 20,
+    paddingBottom: 50,
     borderTopWidth: 1,
     borderTopColor: '#2a2a2a',
   },
