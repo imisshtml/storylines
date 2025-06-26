@@ -160,15 +160,6 @@ export default function ShopScreen() {
       type: 'one_time',
       revenueCatId: PRODUCT_IDS.ACCESS_ALL_ADVENTURES,
     },
-    {
-      id: 'scroll_rebirth',
-      title: 'Scroll of Rebirth',
-      description: 'Instantly revive a fallen character with full health',
-      price: '$0.99',
-      image: require('../../assets/images/scrollRevive.png'),
-      type: 'one_time',
-      revenueCatId: PRODUCT_IDS.SCROLL_OF_REBIRTH,
-    },
   ];
   /*
   DM prod340862bac9
@@ -181,6 +172,15 @@ export default function ShopScreen() {
       image: require('../../assets/images/increaseGroup.png'),
       type: 'one_time',
       revenueCatId: 'group_size_2',
+    },
+    {
+      id: 'scroll_rebirth',
+      title: 'Scroll of Rebirth',
+      description: 'Instantly revive a fallen character with full health',
+      price: '$0.99',
+      image: require('../../assets/images/scrollRevive.png'),
+      type: 'one_time',
+      revenueCatId: PRODUCT_IDS.SCROLL_OF_REBIRTH,
     },
   */
 
@@ -460,6 +460,9 @@ export default function ShopScreen() {
     fetchCapabilities();
   };
 
+  const displayAdventurersPack = false;
+  const displayScroll = false;
+
   // Show loading while capabilities are being fetched
   if (!capabilitiesLoaded) {
     return (
@@ -523,35 +526,37 @@ export default function ShopScreen() {
           </TouchableOpacity>
 
           {/* Adventurers Pack Subscription */}
-          <TouchableOpacity
-            style={styles.premiumCard}
-            onPress={() => setShowAdventurerModal(true)}
-            activeOpacity={0.8}
-          >
-            <View style={styles.premiumContent}>
-              <View style={styles.premiumLeft}>
-                <View style={styles.premiumImageContainer}>
-                  <Image
-                    source={require('../../assets/images/adventurersPack.png')}
-                    style={styles.premiumImage}
-                    resizeMode="contain"
-                  />
-                </View>
-                <View style={styles.premiumInfo}>
-                  <View style={styles.premiumHeader}>
-                    <Text style={styles.premiumTitle}>Adventurers Pack</Text>
+          {displayAdventurersPack && (
+            <TouchableOpacity
+              style={styles.premiumCard}
+              onPress={() => setShowAdventurerModal(true)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.premiumContent}>
+                <View style={styles.premiumLeft}>
+                  <View style={styles.premiumImageContainer}>
+                    <Image
+                      source={require('../../assets/images/adventurersPack.png')}
+                      style={styles.premiumImage}
+                      resizeMode="contain"
+                    />
                   </View>
-                  <Text style={styles.premiumDescription}>
-                    Enhanced player features, bonus content, and priority support
-                  </Text>
+                  <View style={styles.premiumInfo}>
+                    <View style={styles.premiumHeader}>
+                      <Text style={styles.premiumTitle}>Adventurers Pack</Text>
+                    </View>
+                    <Text style={styles.premiumDescription}>
+                      Enhanced player features, bonus content, and priority support
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.premiumPriceContainer}>
+                  <Text style={styles.premiumPrice}>$4.99</Text>
+                  <Text style={styles.premiumPeriod}>/ month</Text>
                 </View>
               </View>
-              <View style={styles.premiumPriceContainer}>
-                <Text style={styles.premiumPrice}>$4.99</Text>
-                <Text style={styles.premiumPeriod}>/ month</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Shop Items */}
@@ -638,36 +643,38 @@ export default function ShopScreen() {
             Already purchased? Tap here to restore your previous purchases.
           </Text>
           
-          <TouchableOpacity
-            style={[styles.restoreButton, { backgroundColor: '#4CAF50', marginTop: 10 }]}
-            onPress={async () => {
-              console.log('🔄 Manual connection refresh triggered');
-              setCapabilitiesLoaded(false);
-              
-              // Recreate the loadWithTimeout logic
-              const timeoutId = setTimeout(() => {
-                console.warn('⚠️ ShopScreen: Manual refresh timeout - forcing capabilities loaded');
-                setCapabilitiesLoaded(true);
-              }, 15000);
+          {false && (
+            <TouchableOpacity
+              style={[styles.restoreButton, { backgroundColor: '#4CAF50', marginTop: 10 }]}
+              onPress={async () => {
+                console.log('🔄 Manual connection refresh triggered');
+                setCapabilitiesLoaded(false);
+                
+                // Recreate the loadWithTimeout logic
+                const timeoutId = setTimeout(() => {
+                  console.warn('⚠️ ShopScreen: Manual refresh timeout - forcing capabilities loaded');
+                  setCapabilitiesLoaded(true);
+                }, 15000);
 
-              try {
-                if (user?.id) {
-                  await fetchCapabilities();
-                  await purchaseManager.initialize(user.id);
+                try {
+                  if (user?.id) {
+                    await fetchCapabilities();
+                    await purchaseManager.initialize(user.id);
+                  }
+                } catch (error) {
+                  console.error('❌ Manual refresh failed:', error);
+                } finally {
+                  clearTimeout(timeoutId);
+                  setCapabilitiesLoaded(true);
                 }
-              } catch (error) {
-                console.error('❌ Manual refresh failed:', error);
-              } finally {
-                clearTimeout(timeoutId);
-                setCapabilitiesLoaded(true);
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.restoreButtonText}>Refresh Connection</Text>
-          </TouchableOpacity>
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.restoreButtonText}>Refresh Connection</Text>
+            </TouchableOpacity>
+          )}
           
-          {__DEV__ && (
+          {__DEV__ && false && (
             <>
               <TouchableOpacity
                 style={[styles.restoreButton, { backgroundColor: '#2196F3', marginTop: 10 }]}
@@ -861,11 +868,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
     transform: [{ scale: 1 }],
   },
   shopItemLoading: {
@@ -936,11 +938,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
   },
   itemPrice: {
     fontSize: 18,
