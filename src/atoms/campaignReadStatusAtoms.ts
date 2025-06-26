@@ -56,7 +56,20 @@ export const updateCampaignReadStatusAtom = atom(
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // First, check if a record already exists
+      // First, verify that the message actually exists in the database
+      const { data: messageExists, error: messageCheckError } = await supabase
+        .from('campaign_history')
+        .select('id')
+        .eq('id', messageId)
+        .eq('campaign_id', campaignId)
+        .single();
+
+      if (messageCheckError || !messageExists) {
+        console.warn(`Message ID ${messageId} does not exist in campaign ${campaignId}, skipping read status update`);
+        return;
+      }
+
+      // Check if a record already exists
       const { data: existingRecord } = await supabase
         .from('campaign_read_status')
         .select('id')
