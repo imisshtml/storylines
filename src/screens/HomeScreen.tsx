@@ -356,8 +356,11 @@ export default function HomeScreen() {
                       horizontal
                       showsHorizontalScrollIndicator={false}
                       contentContainerStyle={styles.charactersScrollContent}
+                      removeClippedSubviews={true}
                     >
-                      {characters.map(character => (
+                      {characters
+                        .slice(0, 20)
+                        .map(character => (
                         <TouchableOpacity
                           key={character.id}
                           style={styles.characterCard}
@@ -370,6 +373,11 @@ export default function HomeScreen() {
                                 styles.characterAvatar,
                                 character.retired && styles.retiredCharacterAvatar
                               ]}
+                              onError={() => {
+                                console.warn('Character avatar load failed:', character.id);
+                              }}
+                              resizeMode="cover"
+                              fadeDuration={100}
                             />
                             <View style={[
                               styles.characterLevelBadge,

@@ -1,39 +1,16 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { User, Crown, Info } from 'lucide-react-native';
 import { CampaignMessage } from '../atoms/campaignHistoryAtoms';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
-import DiceRoll from './DiceRoll';
 
 interface StoryEventItemProps {
   message: CampaignMessage;
 }
 
-export default function StoryEventItem({ message }: StoryEventItemProps) {
+const StoryEventItem = memo(({ message }: StoryEventItemProps) => {
 
-  // Generate consistent dice roll based on message ID (for testing)
-  const getTestDiceRoll = () => {
-    if (message.dice_roll) return message.dice_roll;
-    if (message.message_type === 'player') {
-      // Check if this is a message type that should NOT have dice rolls
-      const messageContent = message.message.toLowerCase();
-      const isOOC = messageContent.startsWith('[ooc]');
-      const isAsk = messageContent.startsWith('[asks gm]');
-      const isWhisper = messageContent.startsWith('[whispers to');
-
-      // Don't generate dice rolls for OOC, Ask, or Whisper messages
-      if (isOOC || isAsk || isWhisper) {
-        return null;
-      }
-      
-      // Use message ID as seed for consistent random number
-      const seed = message.id;
-      return ((seed * 9301 + 49297) % 233280) % 20 + 1;
-    }
-    return null;
-  };
-
-  const testDiceRoll = getTestDiceRoll();
+  // Dice roll logic temporarily disabled to prevent ExoPlayer crashes on Android
 
   const getEventIcon = () => {
     switch (message.message_type) {
@@ -55,13 +32,12 @@ export default function StoryEventItem({ message }: StoryEventItemProps) {
               <Image
                 source={avatarSource}
                 style={styles.characterAvatar}
-                onError={(error) => {
-                  console.error('Avatar load error:', error);
-                  console.log('Failed avatar URL:', message.character_avatar);
+                onError={() => {
+                  // Simplified error handling to reduce log spam
+                  console.warn('Avatar load failed for message:', message.id);
                 }}
-                onLoad={() => console.log('✅ Avatar loaded successfully')}
-                onLoadStart={() => console.log('🔄 Avatar loading started')}
                 resizeMode="cover"
+                // Remove excessive logging that can cause performance issues
               />
             </View>
           );
@@ -125,20 +101,16 @@ export default function StoryEventItem({ message }: StoryEventItemProps) {
         <Text style={[styles.content, eventStyles.text]}>
           {message.message}
         </Text>
-        {testDiceRoll && (
-          <View style={styles.diceContainer}>
-            <DiceRoll
-              rollResult={testDiceRoll}
-              size={100}
-              isRolling={false} // For now, always show result immediately for testing
-              difficulty={message.difficulty || 10}
-            />
-          </View>
-        )}
+        {/* DiceRoll component temporarily disabled to prevent ExoPlayer crashes on Android */}
       </View>
     </View>
   );
-}
+});
+
+// Add display name for debugging
+StoryEventItem.displayName = 'StoryEventItem';
+
+export default StoryEventItem;
 
 const styles = StyleSheet.create({
   container: {

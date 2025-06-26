@@ -95,19 +95,31 @@ export const addCampaignMessageAtom = atom(
 
 // Track active campaign history subscriptions by campaign ID
 let activeCampaignHistorySubscriptions: Record<string, any> = {};
+let subscriptionCleanupTimeouts: Record<string, ReturnType<typeof setTimeout>> = {};
 
 // Initialize real-time subscription for campaign history
 export const initializeCampaignHistoryRealtimeAtom = atom(
   null,
   async (get, set, campaignId: string) => {
+    // Clean up any pending cleanup timeouts for this campaign
+    if (subscriptionCleanupTimeouts[campaignId]) {
+      clearTimeout(subscriptionCleanupTimeouts[campaignId]);
+      delete subscriptionCleanupTimeouts[campaignId];
+    }
+
     // If we already have an active subscription for this campaign, return the existing cleanup
     if (activeCampaignHistorySubscriptions[campaignId]) {
       console.log(`📡 Reusing existing subscription for campaign: ${campaignId}`);
       return () => {
-        if (activeCampaignHistorySubscriptions[campaignId]) {
-          activeCampaignHistorySubscriptions[campaignId].unsubscribe();
-          delete activeCampaignHistorySubscriptions[campaignId];
-        }
+        // Don't immediately clean up, use delayed cleanup to prevent rapid subscribe/unsubscribe cycles
+        subscriptionCleanupTimeouts[campaignId] = setTimeout(() => {
+          if (activeCampaignHistorySubscriptions[campaignId]) {
+            console.log(`📡 Delayed cleanup of subscription for campaign: ${campaignId}`);
+            activeCampaignHistorySubscriptions[campaignId].unsubscribe();
+            delete activeCampaignHistorySubscriptions[campaignId];
+          }
+          delete subscriptionCleanupTimeouts[campaignId];
+        }, 5000); // 5 second delay before cleanup
       };
     }
 
@@ -130,11 +142,18 @@ export const initializeCampaignHistoryRealtimeAtom = atom(
           // Check if message already exists to avoid duplicates
           const messageExists = currentHistory.some(msg => msg.id === newMessage.id);
           if (!messageExists) {
-            // Insert in correct chronological order
-            const updatedHistory = [...currentHistory, newMessage].sort((a, b) => {
+            // Limit history size to prevent memory overflow on Android
+            const maxHistorySize = 50;
+            let updatedHistory = [...currentHistory, newMessage].sort((a, b) => {
               const timeCompare = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
               return timeCompare !== 0 ? timeCompare : a.id - b.id;
             });
+            
+            // Keep only the most recent messages if we exceed the limit
+            if (updatedHistory.length > maxHistorySize) {
+              updatedHistory = updatedHistory.slice(-maxHistorySize);
+            }
+            
             set(campaignHistoryAtom, updatedHistory);
           }
         }
@@ -145,11 +164,15 @@ export const initializeCampaignHistoryRealtimeAtom = atom(
     activeCampaignHistorySubscriptions[campaignId] = subscription;
 
     return () => {
-      if (activeCampaignHistorySubscriptions[campaignId]) {
-        console.log(`📡 Cleaning up subscription for campaign: ${campaignId}`);
-        activeCampaignHistorySubscriptions[campaignId].unsubscribe();
-        delete activeCampaignHistorySubscriptions[campaignId];
-      }
+      // Use delayed cleanup to prevent rapid subscribe/unsubscribe cycles
+      subscriptionCleanupTimeouts[campaignId] = setTimeout(() => {
+        if (activeCampaignHistorySubscriptions[campaignId]) {
+          console.log(`📡 Delayed cleanup of subscription for campaign: ${campaignId}`);
+          activeCampaignHistorySubscriptions[campaignId].unsubscribe();
+          delete activeCampaignHistorySubscriptions[campaignId];
+        }
+        delete subscriptionCleanupTimeouts[campaignId];
+      }, 5000); // 5 second delay before cleanup
     };
   }
 );

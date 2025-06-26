@@ -64,7 +64,7 @@ export default function StoryScreen() {
   const [isCharacterSheetVisible, setIsCharacterSheetVisible] = useState(false);
   const [showChoices, setShowChoices] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { isLoading, startLoading, stopLoading } = useLoading();
+  const { isLoading, startLoading, stopLoading, withLoading } = useLoading();
   const [shouldHideAds, setShouldHideAds] = useState(false);
 
   // Input type selection
@@ -94,8 +94,20 @@ export default function StoryScreen() {
   const realtimeUnsubscribeRef = useRef<(() => void) | null>(null);
   const playerActionsUnsubscribeRef = useRef<(() => void) | null>(null);
 
+  // Add performance tracking refs
+  const lastScrollTime = useRef(0);
+  const scrollDebounceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const renderCount = useRef(0);
+  const lastHistoryLength = useRef(0);
+
   // Monitor connection health
   useConnectionMonitor();
+
+  // Track render performance
+  renderCount.current++;
+  if (renderCount.current % 10 === 0) {
+    console.log(`📊 StoryScreen render count: ${renderCount.current}`);
+  }
 
   // Check if ads should be hidden based on purchases
   useEffect(() => {
@@ -227,26 +239,54 @@ export default function StoryScreen() {
   }, [currentCampaign?.id, user?.id, fetchPlayerActions, initializePlayerActionsRealtime, getAiChoices]);
 
   useEffect(() => {
-    // Auto-scroll to bottom when new messages are added
+    // Debounced auto-scroll to prevent excessive scrolling operations
     if (scrollViewRef.current && campaignHistory.length > 0) {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      const now = Date.now();
+      
+      // Only scroll if enough time has passed since last scroll
+      if (now - lastScrollTime.current > 300) {
+        if (scrollDebounceTimeout.current) {
+          clearTimeout(scrollDebounceTimeout.current);
+        }
+        
+        scrollDebounceTimeout.current = setTimeout(() => {
+          try {
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+            lastScrollTime.current = Date.now();
+          } catch (error) {
+            console.error('Error scrolling to end:', error);
+          }
+        }, 150);
+      }
     }
-  }, [campaignHistory]);
+    
+    return () => {
+      if (scrollDebounceTimeout.current) {
+        clearTimeout(scrollDebounceTimeout.current);
+      }
+    };
+  }, [campaignHistory.length]); // Only depend on length, not full array
 
   useEffect(() => {
-    // Update read status when new messages arrive
-    if (currentCampaign && campaignHistory.length > 0) {
+    // Debounced read status update to prevent excessive API calls
+    if (currentCampaign && campaignHistory.length > lastHistoryLength.current) {
       const latestMessage = campaignHistory[campaignHistory.length - 1];
-      updateCampaignReadStatus({
-        campaignId: currentCampaign.id,
-        messageId: latestMessage.id,
-      }).catch(error => {
-        console.error('Error updating read status:', error);
-      });
+      
+      // Debounce the read status update
+      const updateTimeout = setTimeout(() => {
+        updateCampaignReadStatus({
+          campaignId: currentCampaign.id,
+          messageId: latestMessage.id,
+        }).catch(error => {
+          console.error('Error updating read status:', error);
+        });
+      }, 1000); // 1 second debounce
+      
+      lastHistoryLength.current = campaignHistory.length;
+      
+      return () => clearTimeout(updateTimeout);
     }
-  }, [campaignHistory, currentCampaign, updateCampaignReadStatus]);
+  }, [campaignHistory.length, currentCampaign?.id]);
 
   // Add new useEffect to generate initial story when campaign has no history
   useEffect(() => {
@@ -853,19 +893,20 @@ export default function StoryScreen() {
             style={styles.storyContainer}
             showsVerticalScrollIndicator={false}
           >
+            {/* Campaign History */}
             {campaignHistory.length === 0 ? (
               <View style={styles.welcomeContainer}>
                 <Text style={styles.welcomeText}>
-                  Welcome to {currentCampaign.name}! Your adventure is about to begin...
-                </Text>
-                <Text style={styles.instructionText}>
-                  Choose an action below or write your own to start the story.
+                  Welcome to your adventure! The storyteller is preparing your tale...
                 </Text>
               </View>
             ) : (
-              campaignHistory.map((message) => (
-                <StoryEventItem key={message.id} message={message} />
-              ))
+              // Limit rendered messages to prevent memory issues on Android
+              campaignHistory
+                .slice(-30) // Only show last 30 messages to prevent memory overflow
+                .map((message, index) => (
+                  <StoryEventItem key={`${message.id}-${index}`} message={message} />
+                ))
             )}
 
             {isLoading('initialStory') && (

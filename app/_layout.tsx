@@ -49,32 +49,50 @@ export default function RootLayout() {
   useEffect(() => {
     // Store cleanup functions
     let cleanupFunctions: (() => void)[] = [];
+    let isInitialized = false;
 
     // Initialize authentication, real-time subscriptions, and ads
     const initialize = async () => {
+      if (isInitialized) {
+        console.log('🚫 Skipping duplicate initialization');
+        return;
+      }
+      
       try {
+        console.log('🚀 Starting app initialization...');
+        isInitialized = true;
+        
         await initializeAuth();
         
-        // Initialize realtime subscriptions and store cleanup functions
+        // Initialize realtime subscriptions with staggered timing to prevent overload
+        console.log('📡 Initializing realtime subscriptions...');
+        
         const campaignCleanup = await initializeRealtime();
         if (campaignCleanup) cleanupFunctions.push(campaignCleanup);
+        
+        // Small delay between subscriptions to prevent Android memory pressure
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         const readStatusCleanup = await initializeReadStatusRealtime();
         if (readStatusCleanup) cleanupFunctions.push(readStatusCleanup);
         
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         const friendshipsCleanup = await initializeFriendshipsRealtime();
         if (friendshipsCleanup) cleanupFunctions.push(friendshipsCleanup);
         
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         const characterLevelCleanup = await initializeCharacterLevelRealtime();
         if (characterLevelCleanup) cleanupFunctions.push(characterLevelCleanup);
         
-        // Initialize AdManager
+        // Initialize AdManager with delay
+        await new Promise(resolve => setTimeout(resolve, 500));
         await adManager.initialize();
-        console.log('AdManager initialized in app layout');
+        console.log('✅ App initialization completed successfully');
       } catch (error) {
-        console.error(`[${Platform.OS}] [App Layout] Initialization error:`, error);
+        console.error(`❌ [${Platform.OS}] [App Layout] Initialization error:`, error);
+        isInitialized = false; // Allow retry
       }
     };
 
@@ -82,15 +100,19 @@ export default function RootLayout() {
 
     // Cleanup function to run when component unmounts or dependencies change
     return () => {
-      cleanupFunctions.forEach(cleanup => {
+      console.log('🧹 Cleaning up app subscriptions...');
+      cleanupFunctions.forEach((cleanup, index) => {
         try {
           cleanup();
+          console.log(`✅ Cleaned up subscription ${index + 1}`);
         } catch (error) {
-          console.error('Error during subscription cleanup:', error);
+          console.error(`❌ Error during subscription cleanup ${index + 1}:`, error);
         }
       });
+      cleanupFunctions = [];
+      isInitialized = false;
     };
-  }, [initializeAuth, initializeRealtime, initializeReadStatusRealtime, initializeFriendshipsRealtime, initializeCharacterLevelRealtime]);
+  }, []); // Remove dependency array to prevent re-initialization
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
