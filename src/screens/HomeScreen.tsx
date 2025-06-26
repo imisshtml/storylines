@@ -9,7 +9,6 @@ import { userAtom } from '../atoms/authAtoms';
 import {
   fetchCampaignReadStatusAtom,
   updateCampaignReadStatusAtom,
-  initializeCampaignReadStatusRealtimeAtom
 } from '../atoms/campaignReadStatusAtoms';
 import {
   campaignInvitationsAtom,
@@ -31,16 +30,14 @@ import CharacterLevelUpNotification from '../components/CharacterLevelUpNotifica
 import LevelUpBadge from '../components/LevelUpBadge';
 
 export default function HomeScreen() {
-  const [campaigns] = useAtom(campaignsAtom);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
   const [characters] = useAtom(charactersAtom);
   const [campaignInvitations] = useAtom(campaignInvitationsAtom);
   const [friendRequestsReceived] = useAtom(friendRequestsReceivedAtom);
   const [, setCurrentCampaign] = useAtom(currentCampaignAtom);
-  const [, fetchCampaigns] = useAtom(fetchCampaignsAtom);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
   const [, fetchCampaignReadStatus] = useAtom(fetchCampaignReadStatusAtom);
   const [, updateCampaignReadStatus] = useAtom(updateCampaignReadStatusAtom);
-  const [, initializeReadStatusRealtime] = useAtom(initializeCampaignReadStatusRealtimeAtom);
   const [, fetchCampaignInvitations] = useAtom(fetchCampaignInvitationsAtom);
   const [, respondToCampaignInvitation] = useAtom(respondToCampaignInvitationAtom);
   const [, fetchFriendRequestsReceived] = useAtom(fetchFriendRequestsReceivedAtom);
@@ -59,25 +56,66 @@ export default function HomeScreen() {
 
   // Fetch characters and read status when component mounts or user changes
   useEffect(() => {
+    console.log('🏠 HomeScreen useEffect - User:', user?.id || 'NO USER');
     if (user) {
-      const loadInitialData = async () => {
-        try {
-          await Promise.all([
-            fetchCampaigns(),
-            fetchCharacters(),
-            fetchCampaignReadStatus(),
-            fetchCampaignInvitations(),
-            fetchFriendRequestsReceived(),
-          ]);
+            console.log('🏠 User exists, starting initial data load...');
+        
+        const loadInitialData = async () => {
+          try {
+            console.log('🏠 DIRECT SUPABASE CALL - Fuck the atoms!');
+            
+            // Direct Supabase call to get campaigns WITH TIMEOUT
+            const { supabase } = await import('../config/supabase');
+            
+            // First try the EXACT query that worked with fresh client
+            console.log('🏠 Testing the exact query that worked before...');
+            const countQuery = Promise.race([
+              supabase.from('campaigns').select('count', { count: 'exact', head: true }),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Count query timeout')), 5000)
+              )
+            ]);
+            
+            const countResult = await countQuery;
+            console.log('🏠 Count query result:', countResult);
+            
+            // Now try the actual campaigns query
+            console.log('🏠 Making campaigns query with 5s timeout...');
+            const campaignQuery = Promise.race([
+              supabase.from('campaigns').select('*').eq('owner', user.id),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Campaigns query timeout')), 5000)
+              )
+            ]);
+            
+            const result = await campaignQuery;
+            const { data: campaignData, error } = result as any;
+            
+            console.log('🏠 Direct campaigns result:', { data: campaignData, error, count: campaignData?.length });
+            
+            if (campaignData) {
+              setCampaigns(campaignData);
+              console.log('🏠 ✅ Set campaigns directly:', campaignData.length);
+            }
+            
+            // Still fetch other data with atoms
+            await Promise.all([
+              fetchCharacters(),
+              fetchCampaignReadStatus(),
+              fetchCampaignInvitations(),
+              fetchFriendRequestsReceived(),
+            ]);
+            
+            console.log('🏠 All initial data load completed');
         } catch (error) {
-          console.error('Error loading initial data:', error);
+          console.error('🏠 Error loading initial data:', error);
         }
       };
 
       withLoading(loadInitialData, 'initialLoad')();
 
-      // Initialize real-time subscription for read status
-      initializeReadStatusRealtime();
+      // Note: Read status subscription is handled globally in app/_layout.tsx
+      // Removed duplicate initializeReadStatusRealtime() call to prevent "subscribe multiple times" error
 
       // Initialize notification listeners
       const cleanupNotifications = initializeNotificationListeners();
@@ -93,7 +131,7 @@ export default function HomeScreen() {
         }
       };
     }
-  }, [user, fetchCampaigns, fetchCharacters, fetchCampaignReadStatus, fetchCampaignInvitations, fetchFriendRequestsReceived, initializeReadStatusRealtime, withLoading]);
+  }, [user, fetchCharacters, fetchCampaignReadStatus, fetchCampaignInvitations, fetchFriendRequestsReceived, withLoading]);
 
   const handleCampaignPress = async (campaignId: string) => {
     console.log('🎯 CAMPAIGN PRESS - Starting navigation');

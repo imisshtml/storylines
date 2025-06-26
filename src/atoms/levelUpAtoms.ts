@@ -2,6 +2,7 @@ import { atom } from 'jotai';
 import { supabase } from '../config/supabase';
 import { Character, fetchCharactersAtom } from './characterAtoms';
 import { userAtom } from './authAtoms';
+import { createRealtimeSubscription } from '../utils/connectionUtils';
 
 // Types
 export interface LevelUpCharacter {
@@ -153,36 +154,6 @@ export const prevLevelUpStepAtom = atom(
   }
 );
 
-// Initialize real-time subscription for character level changes
-export const initializeCharacterLevelRealtimeAtom = atom(
-  null,
-  async (get, set) => {
-    const user = get(userAtom);
-    if (!user) return;
-
-    const subscription = supabase
-      .channel('character-level-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'characters',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          // Check if level has changed
-          if (payload.new.level !== payload.old.level) {
-            console.log('Character level changed:', payload.new.name, payload.old.level, '->', payload.new.level);
-            // Trigger check for level up characters
-            set(checkForLevelUpCharactersAtom);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }
-);
+// NOTE: Character level change subscriptions are now handled by the unified subscription system
+// in app/_layout.tsx. The onCharacterUpdate handler triggers checkForLevelUpCharactersAtom
+// when a character's level changes.

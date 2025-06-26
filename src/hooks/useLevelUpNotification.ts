@@ -4,27 +4,19 @@ import {
   charactersToLevelUpAtom, 
   checkForLevelUpCharactersAtom,
   hasCharactersToLevelUpAtom,
-  initializeCharacterLevelRealtimeAtom
 } from '../atoms/levelUpAtoms';
 
 export const useLevelUpNotification = () => {
   const [charactersToLevelUp] = useAtom(charactersToLevelUpAtom);
   const [hasCharactersToLevelUp] = useAtom(hasCharactersToLevelUpAtom);
   const [, checkForLevelUpCharacters] = useAtom(checkForLevelUpCharactersAtom);
-  const [, initializeRealtime] = useAtom(initializeCharacterLevelRealtimeAtom);
+  //const [, initializeRealtime] = useAtom(initializeCharacterLevelRealtimeAtom);
   const [showNotification, setShowNotification] = useState(false);
 
   // Initialize realtime subscription and check for level ups on mount
   useEffect(() => {
-    const cleanup = initializeRealtime();
     checkForLevelUpCharacters();
-
-    return () => {
-      if (typeof cleanup === 'function') {
-        cleanup();
-      }
-    };
-  }, [initializeRealtime, checkForLevelUpCharacters]);
+  }, [checkForLevelUpCharacters]);
 
   // Show notification when characters to level up changes
   useEffect(() => {

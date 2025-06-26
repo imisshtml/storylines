@@ -72,25 +72,8 @@ const clearUserSession = async () => {
   }
 };
 
-// Helper function to trigger campaign fetch
-const triggerCampaignFetch = async (set: any) => {
-  try {
-    const { fetchCampaignsAtom } = await import('./campaignAtoms');
-    set(fetchCampaignsAtom, null); // Trigger the fetch action
-  } catch (error) {
-    console.error('Error triggering campaign fetch:', error);
-  }
-};
-
-// Helper function to clear campaigns
-const clearCampaigns = async (set: any) => {
-  try {
-    const { campaignsAtom } = await import('./campaignAtoms');
-    set(campaignsAtom, []);
-  } catch (error) {
-    console.error('Error clearing campaigns:', error);
-  }
-};
+// Note: Campaign fetching is now handled by the unified subscription system in app/_layout.tsx
+// No need for manual campaign fetching during auth since the unified subscription handles it
 
 // Atom to handle sign in
 export const signInAtom = atom(
@@ -132,8 +115,7 @@ export const signInAtom = atom(
         // Save to AsyncStorage for persistence
         await saveUserSession(data.session, userData);
 
-        // Fetch campaigns after successful login
-        await triggerCampaignFetch(set);
+        // Note: Campaigns will be fetched automatically by the unified subscription system
       }
 
       return data;
@@ -207,8 +189,7 @@ export const signOutAtom = atom(
       set(userAtom, null);
       set(sessionAtom, null);
 
-      // Clear campaigns when signing out
-      await clearCampaigns(set);
+      // Note: Campaigns will be cleared automatically when user atom becomes null
     } catch (error) {
       set(authErrorAtom, (error as Error).message);
       throw error;
@@ -241,8 +222,7 @@ export const initializeAuthAtom = atom(
           set(sessionAtom, currentSession);
           set(userAtom, savedUser);
 
-          // Fetch campaigns for authenticated user
-          await triggerCampaignFetch(set);
+          // Note: Campaigns will be fetched automatically by the unified subscription system
         } else {
           // Session expired, clear AsyncStorage and get fresh session
           await clearUserSession();
@@ -269,8 +249,7 @@ export const initializeAuthAtom = atom(
             set(userAtom, userData);
             await saveUserSession(freshSession, userData);
 
-            // Fetch campaigns for authenticated user
-            await triggerCampaignFetch(set);
+            // Note: Campaigns will be fetched automatically by the unified subscription system
           }
         }
       } else {
@@ -298,7 +277,7 @@ export const initializeAuthAtom = atom(
           await saveUserSession(session, userData);
 
           // Fetch campaigns for authenticated user
-          await triggerCampaignFetch(set);
+          // Note: Campaigns will be fetched automatically by the unified subscription system
         }
       }
 
@@ -325,7 +304,7 @@ export const initializeAuthAtom = atom(
           await saveUserSession(session, userData);
 
           // Fetch campaigns for authenticated user
-          await triggerCampaignFetch(set);
+          // Note: Campaigns will be fetched automatically by the unified subscription system
         } else {
           // User signed out
           await clearUserSession();
@@ -333,7 +312,7 @@ export const initializeAuthAtom = atom(
           set(sessionAtom, null);
 
           // Clear campaigns when signing out
-          await clearCampaigns(set);
+          // Note: Campaigns will be cleared automatically when user atom becomes null
         }
       });
     } catch (error) {

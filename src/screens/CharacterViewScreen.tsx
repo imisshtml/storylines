@@ -51,11 +51,12 @@ import {
 import { campaignsAtom, fetchCampaignsAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import { supabase } from '../config/supabase';
-import { withConnectionHandling } from '../utils/connectionUtils';
+
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 import AvatarSelector from '../components/AvatarSelector';
 import { useCustomAlert } from '../components/CustomAlert';
 import { startLevelUpProcessAtom, charactersToLevelUpAtom } from '../atoms/levelUpAtoms';
+import { CharacterView } from '../components/CharacterView';
 
 export default function CharacterViewScreen() {
   const { characterId } = useLocalSearchParams<{ characterId: string }>();

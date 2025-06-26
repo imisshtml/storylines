@@ -14,12 +14,11 @@ export type Campaign = {
   owner: string;
   content_level: 'kids' | 'teens' | 'adults';
   rp_focus: 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heavy_combat';
-  limit?: number; // Player limit for the campaign
+  limit?: number;
   campaign_length?: 'tale' | 'journey' | 'saga' | 'chronicle' | 'epic';
   max_level?: number;
   created_at?: string;
   uid: string;
-  // Add fields for notification tracking
   latest_message_id?: number | null;
   has_unread?: boolean;
 };
@@ -32,12 +31,9 @@ export type Player = {
 };
 
 export const campaignsAtom = atom<Campaign[]>([]);
-
-// Atom to handle loading state
 export const campaignsLoadingAtom = atom(true);
-
-// Atom to handle error state
 export const campaignsErrorAtom = atom<string | null>(null);
+export const currentCampaignAtom = atom<Campaign | null>(null);
 
 // Helper function to get latest message ID for a campaign
 const getLatestMessageId = async (campaignId: string): Promise<number | null> => {
@@ -50,7 +46,7 @@ const getLatestMessageId = async (campaignId: string): Promise<number | null> =>
       .limit(1)
       .single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+    if (error && error.code !== 'PGRST116') {
       throw error;
     }
 
@@ -69,99 +65,57 @@ const hasUnreadMessages = (
 ): boolean => {
   const readStatus = readStatuses[campaignId];
 
-  // If there's no latest message, there's nothing to read
   if (!latestMessageId) {
     return false;
   }
 
-  // If no read status exists, don't show unread until user has visited the campaign
-  // This prevents showing unread for campaigns that haven't been visited yet
   if (!readStatus) {
     return false;
   }
 
-  // If the latest message ID is greater than the last read message ID, it's unread
   return latestMessageId > (readStatus?.last_read_message_id || 0);
 };
 
-// Derived atom that fetches campaigns from Supabase with notification data
+// SUPER SIMPLE TEST VERSION - Just get campaigns without any complex logic
 export const fetchCampaignsAtom = atom(
   null,
   async (get, set) => {
     try {
+      console.log('🚀 Simple campaign fetch starting...');
       set(campaignsLoadingAtom, true);
       set(campaignsErrorAtom, null);
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // First, get campaigns where user is the owner
-      const { data: ownedCampaigns, error: ownedError } = await supabase
-        .from('campaigns')
-        .select('*')
-        .eq('owner', user.id);
-
-      if (ownedError) throw ownedError;
-
-      // Then, get all campaigns and filter client-side for ones where user is a player
-      const { data: allCampaigns, error: allError } = await supabase
-        .from('campaigns')
-        .select('*');
-
-      if (allError) throw allError;
-
-      // Filter campaigns where user is a player (but not owner to avoid duplicates)
-      const playerCampaigns = allCampaigns?.filter(campaign => {
-        // Skip if user is already the owner (already included in ownedCampaigns)
-        if (campaign.owner === user.id) return false;
-
-        // Check if user is in the players array
-        const players = campaign.players || [];
-        return players.some((player: Player) => player.id === user.id);
-      }) || [];
-
-      // Combine owned and player campaigns
-      const userCampaigns = [...(ownedCampaigns || []), ...playerCampaigns];
-
-      // Get read statuses for all campaigns
-      const { data: readStatuses, error: readError } = await supabase
-        .from('campaign_read_status')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (readError) {
-        console.error('Error fetching read statuses:', readError);
+      console.log('👤 User ID:', user?.id);
+      if (!user) {
+        console.log('❌ No user, returning');
+        return;
       }
 
-      // Convert read statuses to a map for easy lookup
-      const readStatusMap = (readStatuses || []).reduce((acc, status) => {
-        acc[status.campaign_id] = status;
-        return acc;
-      }, {} as Record<string, any>);
+      // Just get all campaigns - no filtering, no complex logic
+      console.log('📊 Fetching all campaigns...');
+      const { data: allCampaigns, error } = await supabase
+        .from('campaigns')
+        .select('id, name, owner, created_at')
+        .limit(10);
 
-      // Enhance campaigns with notification data
-      const enhancedCampaigns = await Promise.all(
-        userCampaigns.map(async (campaign) => {
-          const latestMessageId = await getLatestMessageId(campaign.id);
-          const hasUnread = hasUnreadMessages(campaign.id, latestMessageId, readStatusMap);
+      console.log('📊 Raw result:', { data: allCampaigns, error, count: allCampaigns?.length });
 
-          return {
-            ...campaign,
-            latest_message_id: latestMessageId,
-            has_unread: hasUnread,
-          };
-        })
-      );
+      if (error) {
+        console.error('❌ Query error:', error);
+        throw error;
+      }
 
-      // Sort by created_at descending
-      enhancedCampaigns.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-
-      set(campaignsAtom, enhancedCampaigns);
+             // Just set whatever we got (cast to Campaign[] for now)
+       set(campaignsAtom, (allCampaigns || []) as Campaign[]);
+      console.log('✅ Set campaigns:', allCampaigns?.length || 0);
     } catch (error) {
+      console.error('❌ Campaign fetch error:', error);
       set(campaignsErrorAtom, (error as Error).message);
-      console.error('Campaign fetch error:', error);
+      set(campaignsAtom, []);
     } finally {
       set(campaignsLoadingAtom, false);
+      console.log('🏁 Campaign fetch completed');
     }
   }
 );
@@ -225,8 +179,9 @@ export const upsertCampaignAtom = atom(
         c.id === data.id ? { ...data, latest_message_id: c.latest_message_id, has_unread: c.has_unread } : c
       );
 
-      if (!currentCampaigns.find(c => c.id === data.id)) {
-        updatedCampaigns.unshift({ ...data, latest_message_id: null, has_unread: false });
+      // If it's a new campaign, add it to the list
+      if (!currentCampaigns.some(c => c.id === data.id)) {
+        updatedCampaigns.push({ ...data, latest_message_id: null, has_unread: false });
       }
 
       set(campaignsAtom, updatedCampaigns);
@@ -240,85 +195,36 @@ export const upsertCampaignAtom = atom(
   }
 );
 
-export const currentCampaignAtom = atom<Campaign | null>(null);
-
-// Track the active campaign subscription
-let activeCampaignSubscription: any = null;
-let activeCampaignUserId: string | null = null;
-
-// Initialize Supabase real-time subscription
-export const initializeRealtimeAtom = atom(
+// Atom to delete a campaign
+export const deleteCampaignAtom = atom(
   null,
-  async (get, set) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return;
-    }
+  async (get, set, campaignId: string) => {
+    try {
+      set(campaignsLoadingAtom, true);
+      set(campaignsErrorAtom, null);
 
-    // If we already have an active subscription for this user, return the existing cleanup
-    if (activeCampaignSubscription && activeCampaignUserId === user.id) {
-      return () => {
-        if (activeCampaignSubscription) {
-          activeCampaignSubscription.unsubscribe();
-          activeCampaignSubscription = null;
-          activeCampaignUserId = null;
-        }
-      };
-    }
+      const { error } = await supabase
+        .from('campaigns')
+        .delete()
+        .eq('id', campaignId);
 
-    // Clean up any existing subscription for a different user
-    if (activeCampaignSubscription) {
-      activeCampaignSubscription.unsubscribe();
-      activeCampaignSubscription = null;
-      activeCampaignUserId = null;
-    }
+      if (error) throw error;
 
-    const subscription = supabase
-      .channel('campaigns')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'campaigns'
-        },
-        async (payload) => {
-          // Re-fetch campaigns to update notification status
-          try {
-            set(fetchCampaignsAtom);
-          } catch (error) {
-            console.error('Error re-fetching campaigns after real-time update:', error);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'campaign_history'
-        },
-        async (payload) => {
-          // When new messages are added, update campaign notification status
-          try {
-            set(fetchCampaignsAtom);
-          } catch (error) {
-            console.error('Error re-fetching campaigns after message update:', error);
-          }
-        }
-      )
-      .subscribe();
+      // Update local state
+      const currentCampaigns = get(campaignsAtom);
+      const updatedCampaigns = currentCampaigns.filter(c => c.id !== campaignId);
+      set(campaignsAtom, updatedCampaigns);
 
-    // Store the subscription and user ID
-    activeCampaignSubscription = subscription;
-    activeCampaignUserId = user.id;
-
-    return () => {
-      if (activeCampaignSubscription) {
-        activeCampaignSubscription.unsubscribe();
-        activeCampaignSubscription = null;
-        activeCampaignUserId = null;
+      // Clear current campaign if it was deleted
+      const currentCampaign = get(currentCampaignAtom);
+      if (currentCampaign?.id === campaignId) {
+        set(currentCampaignAtom, null);
       }
-    };
+    } catch (error) {
+      set(campaignsErrorAtom, (error as Error).message);
+      throw error;
+    } finally {
+      set(campaignsLoadingAtom, false);
+    }
   }
-);
+); 

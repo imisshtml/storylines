@@ -2,6 +2,7 @@ import { atom } from 'jotai';
 import { supabase } from '../config/supabase';
 import { currentCampaignAtom } from './campaignAtoms';
 import { Platform } from 'react-native';
+import { createRealtimeSubscription } from '../utils/connectionUtils';
 
 export type Friendship = {
   id: string;
@@ -341,7 +342,7 @@ export const removeFriendAtom = atom(
 );
 
 // Track the active subscription
-let activeSubscription: any = null;
+let activeFriendshipsCleanup: (() => void) | null = null;
 let activeUserId: string | null = null;
 
 // Initialize real-time subscription for friendships
@@ -350,112 +351,81 @@ export const initializeFriendshipsRealtimeAtom = atom(
   async (get, set) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
+      console.log('No user found for friendships subscription');
       return;
     }
 
     // If we already have an active subscription for this user, return the existing cleanup
-    if (activeSubscription && activeUserId === user.id) {
-      return () => {
-        if (activeSubscription) {
-          activeSubscription.unsubscribe();
-          activeSubscription = null;
-          activeUserId = null;
-        }
-      };
+    if (activeFriendshipsCleanup && activeUserId === user.id) {
+      console.log(`📡 Reusing existing friendships subscription for user: ${user.id}`);
+      return activeFriendshipsCleanup;
     }
 
     // Clean up any existing subscription for a different user
-    if (activeSubscription) {
-      activeSubscription.unsubscribe();
-      activeSubscription = null;
+    if (activeFriendshipsCleanup) {
+      console.log(`📡 Cleaning up friendships subscription for different user`);
+      activeFriendshipsCleanup();
+      activeFriendshipsCleanup = null;
       activeUserId = null;
     }
 
-    const subscription = supabase
-      .channel(`friendships:${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'friendships',
-          filter: `requester_id=eq.${user.id}`,
-        },
-        () => {
-          // Re-fetch all friend data to ensure consistency
-          setTimeout(() => {
+    console.log(`📡 Creating new robust friendships subscription for user: ${user.id}`);
+    
+    const channelName = `friendships:${user.id}`;
+    
+    // Create subscription with automatic reconnection using the new robust system
+    const cleanup = createRealtimeSubscription(
+      channelName,
+      {
+        postgres_changes: [
+          {
+            event: '*',
+            schema: 'public',
+            table: 'friendships',
+            filter: `requester_id=eq.${user.id}`,
+          },
+          {
+            event: '*',
+            schema: 'public',
+            table: 'friendships',
+            filter: `addressee_id=eq.${user.id}`,
+          },
+          {
+            event: '*',
+            schema: 'public',
+            table: 'campaign_invitations',
+            filter: `inviter_id=eq.${user.id}`,
+          },
+          {
+            event: '*',
+            schema: 'public',
+            table: 'campaign_invitations',
+            filter: `invitee_id=eq.${user.id}`,
+          }
+        ]
+      },
+      (payload) => {
+        console.log(`📨 [${channelName}] Received update:`, payload.table, payload.eventType);
+        
+        // Re-fetch all friend data to ensure consistency
+        setTimeout(() => {
+          if (payload.table === 'friendships') {
             set(fetchFriendsAtom);
             set(fetchFriendRequestsReceivedAtom);
             set(fetchFriendRequestsSentAtom);
-          }, 100);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'friendships',
-          filter: `addressee_id=eq.${user.id}`,
-        },
-        () => {
-          // Re-fetch all friend data to ensure consistency
-          setTimeout(() => {
-            set(fetchFriendsAtom);
-            set(fetchFriendRequestsReceivedAtom);
-            set(fetchFriendRequestsSentAtom);
-          }, 100);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'campaign_invitations',
-          filter: `inviter_id=eq.${user.id}`,
-        },
-        () => {
-          // Re-fetch campaign invitations
-          setTimeout(() => {
+          } else if (payload.table === 'campaign_invitations') {
             set(fetchCampaignInvitationsAtom);
-          }, 100);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'campaign_invitations',
-          filter: `invitee_id=eq.${user.id}`,
-        },
-        () => {
-          // Re-fetch campaign invitations
-          setTimeout(() => {
-            set(fetchCampaignInvitationsAtom);
-          }, 100);
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.error(`[${Platform.OS}] [Friendships Realtime] Subscription error occurred`);
-        } else if (status === 'TIMED_OUT') {
-          console.error(`[${Platform.OS}] [Friendships Realtime] Subscription timed out`);
-        }
-      });
+          }
+        }, 100);
+      },
+      5 // Max 5 reconnection attempts
+    );
 
-    // Store the subscription and user ID
-    activeSubscription = subscription;
+    // Store the cleanup function and user ID
+    activeFriendshipsCleanup = cleanup;
     activeUserId = user.id;
 
-    return () => {
-      if (activeSubscription) {
-        activeSubscription.unsubscribe();
-        activeSubscription = null;
-        activeUserId = null;
-      }
-    };
+    return cleanup;
   }
 );
 
