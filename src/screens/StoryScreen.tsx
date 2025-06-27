@@ -41,7 +41,9 @@ import EnhancedStoryChoices from '../components/EnhancedStoryChoices';
 import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
+import { initializeCampaignBroadcast, broadcastActionStarted, broadcastActionCompleted } from '../utils/connectionUtils';
 import BannerAd from '../components/BannerAd';
+import LottieView from 'lottie-react-native';
 import { BannerAdSize } from 'react-native-google-mobile-ads';
 import { purchaseManager } from '../utils/purchaseManager';
 
@@ -74,6 +76,7 @@ export default function StoryScreen() {
   const [retryCount, setRetryCount] = useState(0);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connected');
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [otherPlayerActions, setOtherPlayerActions] = useState<{[playerId: string]: {playerName: string, action: string}}>({});
 
   // Campaign history atoms
   const [campaignHistory] = useAtom(campaignHistoryAtom);
@@ -126,6 +129,9 @@ export default function StoryScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const realtimeUnsubscribeRef = useRef<(() => void) | null>(null);
   const playerActionsUnsubscribeRef = useRef<(() => void) | null>(null);
+  const subscriptionHealthCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastMessageCountRef = useRef(0);
+  const broadcastCleanupRef = useRef<(() => void) | null>(null);
 
   // Add performance tracking refs
   const lastScrollTime = useRef(0);
@@ -215,14 +221,78 @@ export default function StoryScreen() {
     // Initialize real-time subscription
     const initializeSubscription = async () => {
       try {
+        console.log('🔄 Initializing campaign history subscription for:', currentCampaign.id);
         const unsubscribe = await atomRefs.current.initializeRealtimeSubscription(currentCampaign.id);
         realtimeUnsubscribeRef.current = unsubscribe;
+        console.log('✅ Campaign history subscription initialized');
       } catch (error) {
-        console.error('Error initializing realtime subscription:', error);
+        console.error('❌ Error initializing realtime subscription:', error);
       }
     };
 
     initializeSubscription();
+
+    // Start subscription health monitoring
+    const startHealthCheck = () => {
+      console.log('🏥 Subscription health monitoring disabled - using broadcast system instead');
+      // Temporarily disable health check to let broadcast system work without interference
+    };
+    
+    startHealthCheck();
+
+    // Initialize broadcast system for real-time action coordination
+    const initializeBroadcast = () => {
+      if (broadcastCleanupRef.current) {
+        broadcastCleanupRef.current();
+      }
+      
+      broadcastCleanupRef.current = initializeCampaignBroadcast(currentCampaign.id, {
+        onActionStarted: (data) => {
+          console.log('===================^^^^^===================');
+          console.log('📢 Other player action started:', data);
+          // Don't show loading for our own actions
+          if (data.playerId !== user?.id) {
+            setOtherPlayerActions(prev => ({
+              ...prev,
+              [data.playerId]: { playerName: data.playerName, action: data.action }
+            }));
+            
+            // Simple timeout fallback - only as last resort
+            setTimeout(() => {
+              console.log('⏰ Timeout fallback: Clearing action for player:', data.playerId);
+              setOtherPlayerActions(prev => {
+                const newState = { ...prev };
+                delete newState[data.playerId];
+                return newState;
+              });
+              atomRefs.current.fetchCampaignHistory(currentCampaign.id);
+            }, 45000); // 45 second timeout
+          }
+        },
+        onActionCompleted: (data) => {
+          console.log('============================================');
+          console.log('📢 Action completed broadcast received:', data);
+          // Clear the loading state for this player
+          setOtherPlayerActions(prev => {
+            const newState = { ...prev };
+            delete newState[data.playerId];
+            return newState;
+          });
+          
+          // Refresh campaign history if the action was successful
+          if (data.success) {
+            console.log('📢 Action completed successfully, refreshing history');
+            atomRefs.current.fetchCampaignHistory(currentCampaign.id);
+          } else {
+            console.log('📢 Action completed with failure');
+          }
+        }
+      });
+      
+      console.log('📡 Campaign broadcast initialized');
+    };
+    
+    initializeBroadcast();
 
     // Mark campaign as read when entering
     if (currentCampaign.latest_message_id) {
@@ -243,6 +313,17 @@ export default function StoryScreen() {
         } catch (error) {
           console.error('Error during subscription cleanup:', error);
         }
+      }
+      
+      if (subscriptionHealthCheckRef.current) {
+        clearInterval(subscriptionHealthCheckRef.current);
+        subscriptionHealthCheckRef.current = null;
+        console.log('🧹 Subscription health monitoring stopped');
+      }
+      
+      if (broadcastCleanupRef.current) {
+        broadcastCleanupRef.current();
+        broadcastCleanupRef.current = null;
       }
     };
   }, [currentCampaign?.id]);
@@ -667,6 +748,17 @@ export default function StoryScreen() {
 
     console.log('🎭 Starting loading state');
     startLoading('sendAction');
+    
+    // Broadcast that this player is starting an action
+    try {
+      await broadcastActionStarted(currentCampaign.id, {
+        playerId: user.id,
+        playerName: user.username || 'Player',
+        action: action
+      });
+    } catch (error) {
+      console.error('Failed to broadcast action started:', error);
+    }
     setError(null);
     // Clear choices while loading
     if (currentCampaign) {
@@ -815,15 +907,46 @@ export default function StoryScreen() {
           message_type: 'gm',
         });
 
-        // Use choices from AI response (only for story-contributing messages)
+                // Use choices from AI response (only for story-contributing messages)
         if (currentCampaign && shouldContributeToStory) {
           console.log('🎭 Setting AI choices:', data.choices?.length || 0, 'choices');
           atomRefs.current.setAiChoices({ campaignId: currentCampaign.id, choices: data.choices || [] });
         }
-        
+
+        // Force refresh campaign history to ensure we have the latest data
+        // This works around potential real-time subscription issues
+        console.log('🔄 Force refreshing campaign history after story action');
+        setTimeout(() => {
+          atomRefs.current.fetchCampaignHistory(currentCampaign.id);
+        }, 1000); // Wait 1 second for server to process
+
+        // Broadcast that this player's action completed successfully
+        try {
+          console.log('📢 Broadcasting action completed (success):', { playerId: user.id, success: true });
+          await broadcastActionCompleted(currentCampaign.id, {
+            playerId: user.id,
+            success: true
+          });
+          console.log('📢 Action completed broadcast sent successfully');
+        } catch (error) {
+          console.error('❌ Failed to broadcast action completed:', error);
+        }
+
         console.log('✅ Storyteller request completed successfully');
       } else {
         console.log('🎭 Skipping AI request - shouldTriggerGM is false for input type:', typeToUse);
+        
+        // Still broadcast completion for non-GM actions
+        try {
+          console.log('📢 Broadcasting action completed (non-GM action):', { playerId: user.id, success: true });
+          await broadcastActionCompleted(currentCampaign.id, {
+            playerId: user.id,
+            success: true
+          });
+          console.log('📢 Non-GM action completed broadcast sent successfully');
+        } catch (error) {
+          console.error('❌ Failed to broadcast non-GM action completed:', error);
+        }
       }
 
     } catch (error) {
@@ -849,6 +972,18 @@ export default function StoryScreen() {
       // Clear choices on error
       if (currentCampaign) {
         atomRefs.current.clearAiChoices(currentCampaign.id);
+      }
+      
+      // Broadcast that this player's action failed
+      try {
+        console.log('📢 Broadcasting action completed (failed):', { playerId: user.id, success: false });
+        await broadcastActionCompleted(currentCampaign.id, {
+          playerId: user.id,
+          success: false
+        });
+        console.log('📢 Action failed broadcast sent successfully');
+      } catch (error) {
+        console.error('❌ Failed to broadcast action failed:', error);
       }
     } finally {
       console.log('🎭 Stopping loading state');
@@ -993,6 +1128,29 @@ export default function StoryScreen() {
             <Text style={styles.title}>{currentCampaign.name}</Text>
           </View>
 
+          <TouchableOpacity 
+            onPress={() => {
+              console.log('🔄 Manual refresh triggered');
+              atomRefs.current.fetchCampaignHistory(currentCampaign.id);
+            }} 
+            style={styles.headerButton}
+          >
+            <RefreshCw size={20} color="#2a2a2a" />
+          </TouchableOpacity>
+          
+          {/* Debug button to clear other player actions */}
+          {Object.keys(otherPlayerActions).length > 0 && (
+            <TouchableOpacity 
+              onPress={() => {
+                console.log('🧹 Manually clearing other player actions');
+                setOtherPlayerActions({});
+              }} 
+              style={styles.headerButton}
+            >
+              <X size={20} color="#ff4444" />
+            </TouchableOpacity>
+          )}
+          
           <TouchableOpacity onPress={handleCharacterPress} style={styles.headerButton}>
             <User2 size={24} color="#2a2a2a" />
           </TouchableOpacity>
@@ -1034,11 +1192,34 @@ export default function StoryScreen() {
 
             {isLoading('sendAction') && (
               <View style={styles.loadingEvent}>
+                <LottieView
+                  source={require('../../assets/lottie/writing.json')}
+                  autoPlay
+                  loop
+                  style={styles.writingAnimation}
+                  resizeMode='contain'
+                />
                 <Text style={styles.loadingEventText}>
                   Your story is being woven...
                 </Text>
               </View>
             )}
+
+            {/* Show other players' actions in progress */}
+            {Object.entries(otherPlayerActions).map(([playerId, actionData]) => (
+              <View key={playerId} style={styles.loadingEvent}>
+                <LottieView
+                  source={require('../../assets/lottie/writing.json')}
+                  autoPlay
+                  loop
+                  style={styles.writingAnimation}
+                  resizeMode='contain'
+                />
+                <Text style={styles.loadingEventText}>
+                  {actionData.playerName} is taking action...
+                </Text>
+              </View>
+            ))}
 
             {error && (
               <View style={styles.errorContainer}>
@@ -1261,16 +1442,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
     backgroundColor: 'rgba(255, 215, 0, 0.1)',
     borderRadius: 12,
     marginVertical: 8,
+  },
+  writingAnimation: {
+    width: 60,
+    height: 60,
   },
   loadingEventText: {
     color: '#1a1a1a',
     fontSize: 16,
     fontFamily: 'Inter-Regular',
-    marginLeft: 12,
+    marginLeft: 2,
     fontStyle: 'italic',
   },
   errorContainer: {

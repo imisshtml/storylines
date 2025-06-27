@@ -480,4 +480,110 @@ export const cleanupConnectionMonitoring = () => {
     appStateSubscription = null;
   }
   console.log('🧹 Connection monitoring cleaned up');
+};
+
+// Broadcast system for real-time action coordination
+let campaignBroadcastChannel: any = null;
+
+export const initializeCampaignBroadcast = (campaignId: string, callbacks: {
+  onActionStarted: (data: { playerId: string, playerName: string, action: string }) => void;
+  onActionCompleted: (data: { playerId: string, success: boolean }) => void;
+}) => {
+  console.log('📡 Initializing campaign broadcast for:', campaignId);
+  
+  // Clean up existing channel
+  if (campaignBroadcastChannel) {
+    supabase.removeChannel(campaignBroadcastChannel);
+  }
+  
+  // Create new broadcast channel
+  const channelName = `campaign_actions_${campaignId}`;
+  console.log('📡 Creating broadcast channel:', channelName);
+  
+  campaignBroadcastChannel = supabase.channel(channelName)
+    .on('broadcast', { event: 'action_started' }, (payload) => {
+      console.log('📢 Received action_started broadcast:', payload);
+      console.log('📢 action_started payload keys:', Object.keys(payload));
+      console.log('📢 action_started payload.payload:', payload.payload);
+      callbacks.onActionStarted(payload.payload);
+    })
+    .on('broadcast', { event: 'action_completed' }, (payload) => {
+      console.log('📢 Received action_completed broadcast:', payload);
+      console.log('📢 action_completed payload keys:', Object.keys(payload));
+      console.log('📢 action_completed payload.payload:', payload.payload);
+      callbacks.onActionCompleted(payload.payload);
+    })
+    .subscribe((status) => {
+      console.log('📡 Campaign broadcast status:', status, 'for channel:', channelName);
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Campaign broadcast channel ready:', channelName);
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error('❌ Campaign broadcast channel error:', channelName);
+      }
+    });
+    
+  return () => {
+    if (campaignBroadcastChannel) {
+      supabase.removeChannel(campaignBroadcastChannel);
+      campaignBroadcastChannel = null;
+      console.log('📡 Campaign broadcast cleaned up');
+    }
+  };
+};
+
+export const broadcastActionStarted = async (campaignId: string, data: {
+  playerId: string;
+  playerName: string;
+  action: string;
+}) => {
+  if (!campaignBroadcastChannel) {
+    console.warn('⚠️ No broadcast channel available for action_started');
+    return;
+  }
+  
+  console.log('📢 Broadcasting action_started:', data);
+  console.log('📢 Channel status:', campaignBroadcastChannel.state);
+  
+  try {
+    const result = await campaignBroadcastChannel.send({
+      type: 'broadcast',
+      event: 'action_started',
+      payload: data
+    });
+    console.log('📢 action_started send result:', result);
+  } catch (error) {
+    console.error('❌ action_started broadcast failed:', error);
+    console.error('❌ action_started error message:', error instanceof Error ? error.message : String(error));
+  }
+};
+
+export const broadcastActionCompleted = async (campaignId: string, data: {
+  playerId: string;
+  success: boolean;
+}) => {
+  if (!campaignBroadcastChannel) {
+    console.warn('⚠️ No broadcast channel available for action_completed');
+    return;
+  }
+  
+  console.log('📢 Broadcasting action_completed:', data);
+  console.log('📢 Channel status:', campaignBroadcastChannel.state);
+  console.log('📢 Channel topic:', campaignBroadcastChannel.topic);
+  console.log('📢 Channel joinRef:', campaignBroadcastChannel.joinRef);
+  
+  try {
+    const result = await campaignBroadcastChannel.send({
+      type: 'broadcast',
+      event: 'action_completed',
+      payload: data
+    });
+    console.log('📢 Broadcast send result:', result);
+    console.log('📢 Broadcast send result type:', typeof result);
+    console.log('📢 Broadcast send result keys:', result ? Object.keys(result) : 'null');
+  } catch (error) {
+    console.error('❌ Broadcast send failed:', error);
+    console.error('❌ Broadcast error type:', typeof error);
+    console.error('❌ Broadcast error message:', error instanceof Error ? error.message : String(error));
+    // Don't throw - just log the error like broadcastActionStarted
+  }
 }; 
