@@ -1,6 +1,6 @@
 import { atom } from 'jotai';
 import { supabase } from '../config/supabase';
-import { withConnectionRetry, checkSupabaseConnection } from '../utils/connectionUtils';
+import { withConnectionRetry, checkSupabaseConnection, createRealtimeSubscription } from '../utils/connectionUtils';
 
 export type CampaignMessage = {
   id: number;
@@ -94,86 +94,66 @@ export const addCampaignMessageAtom = atom(
 );
 
 // Track active campaign history subscriptions by campaign ID
-let activeCampaignHistorySubscriptions: Record<string, any> = {};
-let subscriptionCleanupTimeouts: Record<string, ReturnType<typeof setTimeout>> = {};
+let activeCampaignHistorySubscriptions: Record<string, (() => void)> = {};
 
 // Initialize real-time subscription for campaign history
 export const initializeCampaignHistoryRealtimeAtom = atom(
   null,
   async (get, set, campaignId: string) => {
-    // Clean up any pending cleanup timeouts for this campaign
-    if (subscriptionCleanupTimeouts[campaignId]) {
-      clearTimeout(subscriptionCleanupTimeouts[campaignId]);
-      delete subscriptionCleanupTimeouts[campaignId];
-    }
-
+    const channelName = `campaign_history:${campaignId}`;
+    
     // If we already have an active subscription for this campaign, return the existing cleanup
     if (activeCampaignHistorySubscriptions[campaignId]) {
       console.log(`📡 Reusing existing subscription for campaign: ${campaignId}`);
-      return () => {
-        // Don't immediately clean up, use delayed cleanup to prevent rapid subscribe/unsubscribe cycles
-        subscriptionCleanupTimeouts[campaignId] = setTimeout(() => {
-          if (activeCampaignHistorySubscriptions[campaignId]) {
-            console.log(`📡 Delayed cleanup of subscription for campaign: ${campaignId}`);
-            activeCampaignHistorySubscriptions[campaignId].unsubscribe();
-            delete activeCampaignHistorySubscriptions[campaignId];
-          }
-          delete subscriptionCleanupTimeouts[campaignId];
-        }, 5000); // 5 second delay before cleanup
-      };
+      return activeCampaignHistorySubscriptions[campaignId];
     }
 
-    console.log(`📡 Creating new subscription for campaign: ${campaignId}`);
+    console.log(`📡 Creating new robust subscription for campaign: ${campaignId}`);
     
-    const subscription = supabase
-      .channel(`campaign_history:${campaignId}`)
-      .on(
-        'postgres_changes',
-        {
+    // Create subscription with automatic reconnection
+    const cleanup = createRealtimeSubscription(
+      channelName,
+      {
+        postgres_changes: [{
           event: 'INSERT',
           schema: 'public',
           table: 'campaign_history',
           filter: `campaign_id=eq.${campaignId}`
-        },
-        (payload) => {
-          const newMessage = payload.new as CampaignMessage;
-          const currentHistory = get(campaignHistoryAtom);
+        }]
+      },
+      (payload) => {
+        console.log(`📨 [${channelName}] Received message:`, payload.new?.id);
+        
+        const newMessage = payload.new as CampaignMessage;
+        const currentHistory = get(campaignHistoryAtom);
 
-          // Check if message already exists to avoid duplicates
-          const messageExists = currentHistory.some(msg => msg.id === newMessage.id);
-          if (!messageExists) {
-            // Limit history size to prevent memory overflow on Android
-            const maxHistorySize = 50;
-            let updatedHistory = [...currentHistory, newMessage].sort((a, b) => {
-              const timeCompare = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-              return timeCompare !== 0 ? timeCompare : a.id - b.id;
-            });
-            
-            // Keep only the most recent messages if we exceed the limit
-            if (updatedHistory.length > maxHistorySize) {
-              updatedHistory = updatedHistory.slice(-maxHistorySize);
-            }
-            
-            set(campaignHistoryAtom, updatedHistory);
+        // Check if message already exists to avoid duplicates
+        const messageExists = currentHistory.some(msg => msg.id === newMessage.id);
+        if (!messageExists) {
+          // Limit history size to prevent memory overflow on Android
+          const maxHistorySize = 50;
+          let updatedHistory = [...currentHistory, newMessage].sort((a, b) => {
+            const timeCompare = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+            return timeCompare !== 0 ? timeCompare : a.id - b.id;
+          });
+          
+          // Keep only the most recent messages if we exceed the limit
+          if (updatedHistory.length > maxHistorySize) {
+            updatedHistory = updatedHistory.slice(-maxHistorySize);
           }
+          
+          set(campaignHistoryAtom, updatedHistory);
+        } else {
+          console.log(`📨 [${channelName}] Duplicate message ignored:`, newMessage.id);
         }
-      )
-      .subscribe();
+      },
+      5 // Max 5 reconnection attempts
+    );
 
-    // Store the subscription
-    activeCampaignHistorySubscriptions[campaignId] = subscription;
+    // Store the cleanup function
+    activeCampaignHistorySubscriptions[campaignId] = cleanup;
 
-    return () => {
-      // Use delayed cleanup to prevent rapid subscribe/unsubscribe cycles
-      subscriptionCleanupTimeouts[campaignId] = setTimeout(() => {
-        if (activeCampaignHistorySubscriptions[campaignId]) {
-          console.log(`📡 Delayed cleanup of subscription for campaign: ${campaignId}`);
-          activeCampaignHistorySubscriptions[campaignId].unsubscribe();
-          delete activeCampaignHistorySubscriptions[campaignId];
-        }
-        delete subscriptionCleanupTimeouts[campaignId];
-      }, 5000); // 5 second delay before cleanup
-    };
+    return cleanup;
   }
 );
 

@@ -1,5 +1,6 @@
 import { atom } from 'jotai';
 import { supabase } from '../config/supabase';
+import { createRealtimeSubscription } from '../utils/connectionUtils';
 
 export type ActionSummary = {
   summary: string;
@@ -83,32 +84,49 @@ function getTimeAgo(timestamp: string): string {
   return `${diffInDays}d ago`;
 }
 
+// Track active campaign summary subscriptions by campaign ID
+let activeCampaignSummarySubscriptions: Record<string, (() => void)> = {};
+
 // Initialize real-time subscription for campaign summaries
 export const initializeCampaignSummaryRealtimeAtom = atom(
   null,
   async (get, set, campaignId: string) => {
-    const subscription = supabase
-      .channel(`campaign_summaries:${campaignId}`)
-      .on(
-        'postgres_changes',
-        {
+    // If we already have an active subscription for this campaign, return the existing cleanup
+    if (activeCampaignSummarySubscriptions[campaignId]) {
+      console.log(`📡 Reusing existing campaign summary subscription for: ${campaignId}`);
+      return activeCampaignSummarySubscriptions[campaignId];
+    }
+
+    console.log(`📡 Creating new robust campaign summary subscription for: ${campaignId}`);
+    
+    const channelName = `campaign_summaries:${campaignId}`;
+    
+    // Create subscription with automatic reconnection using the new robust system
+    const cleanup = createRealtimeSubscription(
+      channelName,
+      {
+        postgres_changes: [{
           event: '*',
           schema: 'public',
           table: 'campaign_summaries',
           filter: `campaign_id=eq.${campaignId}`
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const updatedSummary = payload.new as CampaignSummary;
-            set(campaignSummaryAtom, updatedSummary);
-          }
+        }]
+      },
+      (payload) => {
+        console.log(`📨 [${channelName}] Received update:`, payload.eventType);
+        
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const updatedSummary = payload.new as CampaignSummary;
+          set(campaignSummaryAtom, updatedSummary);
         }
-      )
-      .subscribe();
+      },
+      5 // Max 5 reconnection attempts
+    );
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    // Store the cleanup function
+    activeCampaignSummarySubscriptions[campaignId] = cleanup;
+
+    return cleanup;
   }
 );
 

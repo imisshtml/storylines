@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   Modal,
   StatusBar,
 } from 'react-native';
-import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, MessageSquare, Drama, Ear, CircleHelp as HelpCircle } from 'lucide-react-native';
+import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, MessageSquare, Drama, Ear, CircleHelp as HelpCircle, RefreshCw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
@@ -71,6 +71,8 @@ export default function StoryScreen() {
   const [selectedInputType, setSelectedInputType] = useState<InputType>('say');
   const [showInputTypeDropdown, setShowInputTypeDropdown] = useState(false);
   const [whisperTarget, setWhisperTarget] = useState<string>('');
+  const [retryCount, setRetryCount] = useState(0);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connected');
 
   // Campaign history atoms
   const [campaignHistory] = useAtom(campaignHistoryAtom);
@@ -90,6 +92,36 @@ export default function StoryScreen() {
   const [, setAiChoices] = useAtom(setAiChoicesAtom);
   const [, clearAiChoices] = useAtom(clearAiChoicesAtom);
 
+  // Store refs to avoid useEffect dependency issues
+  const atomRefs = useRef({
+    fetchCampaignHistory,
+    initializeRealtimeSubscription,
+    clearCampaignHistory,
+    updateCampaignReadStatus,
+    fetchPlayerActions,
+    initializePlayerActionsRealtime,
+    getAiChoices,
+    setAiChoices,
+    clearAiChoices,
+    addCampaignMessage
+  });
+
+  // Update refs when atoms change
+  useEffect(() => {
+    atomRefs.current = {
+      fetchCampaignHistory,
+      initializeRealtimeSubscription,
+      clearCampaignHistory,
+      updateCampaignReadStatus,
+      fetchPlayerActions,
+      initializePlayerActionsRealtime,
+      getAiChoices,
+      setAiChoices,
+      clearAiChoices,
+      addCampaignMessage
+    };
+  });
+
   const scrollViewRef = useRef<ScrollView>(null);
   const realtimeUnsubscribeRef = useRef<(() => void) | null>(null);
   const playerActionsUnsubscribeRef = useRef<(() => void) | null>(null);
@@ -100,8 +132,26 @@ export default function StoryScreen() {
   const renderCount = useRef(0);
   const lastHistoryLength = useRef(0);
 
-  // Monitor connection health
-  useConnectionMonitor();
+  // Stabilize callback functions to prevent useConnectionMonitor from restarting
+  const onConnectionLost = useCallback(() => {
+    console.log('🔴 Story screen connection lost');
+    setConnectionStatus('disconnected');
+    setError('Connection lost. Stories may not load properly.');
+  }, []);
+
+  const onConnectionRestored = useCallback(() => {
+    console.log('🟢 Story screen connection restored');
+    setConnectionStatus('connected');
+    setError(null);
+    setRetryCount(0);
+  }, []);
+
+  // Enhanced connection monitoring for this critical screen
+  useConnectionMonitor({
+    onConnectionLost,
+    onConnectionRestored,
+    checkInterval: 30000 // More frequent checks for story screen (30 seconds)
+  });
 
   // Track render performance
   renderCount.current++;
@@ -142,24 +192,29 @@ export default function StoryScreen() {
     console.log('📖 Current campaign:', currentCampaign ? currentCampaign.name : 'NONE');
     console.log('📖 Campaign status:', currentCampaign?.status);
     
-    if (!currentCampaign) {
+    if (!currentCampaign && !isLoading('sendAction')) {
       console.log('📖 No current campaign, redirecting to home');
       router.replace('/home');
+      return;
+    }
+    
+    if (!currentCampaign) {
+      // Campaign is null but we're loading, so just return early
       return;
     }
     
     console.log('📖 Campaign found, initializing story screen');
 
     // Clear previous campaign history when switching campaigns
-    clearCampaignHistory();
+    atomRefs.current.clearCampaignHistory();
 
     // Initial fetch of campaign history
-    fetchCampaignHistory(currentCampaign.id);
+    atomRefs.current.fetchCampaignHistory(currentCampaign.id);
 
     // Initialize real-time subscription
     const initializeSubscription = async () => {
       try {
-        const unsubscribe = await initializeRealtimeSubscription(currentCampaign.id);
+        const unsubscribe = await atomRefs.current.initializeRealtimeSubscription(currentCampaign.id);
         realtimeUnsubscribeRef.current = unsubscribe;
       } catch (error) {
         console.error('Error initializing realtime subscription:', error);
@@ -170,7 +225,7 @@ export default function StoryScreen() {
 
     // Mark campaign as read when entering
     if (currentCampaign.latest_message_id) {
-      updateCampaignReadStatus({
+      atomRefs.current.updateCampaignReadStatus({
         campaignId: currentCampaign.id,
         messageId: currentCampaign.latest_message_id,
       }).catch(error => {
@@ -189,7 +244,7 @@ export default function StoryScreen() {
         }
       }
     };
-  }, [currentCampaign?.id, fetchCampaignHistory, initializeRealtimeSubscription, clearCampaignHistory, updateCampaignReadStatus]);
+  }, [currentCampaign?.id]);
 
   // Load player actions when campaign and user are available
   useEffect(() => {
@@ -198,7 +253,7 @@ export default function StoryScreen() {
     console.log('📋 Loading player actions for campaign:', currentCampaign.id, 'user:', user.id);
 
     // Fetch player actions from database
-    fetchPlayerActions({ campaignId: currentCampaign.id, userId: user.id });
+    atomRefs.current.fetchPlayerActions({ campaignId: currentCampaign.id, userId: user.id });
 
     // Initialize real-time subscription for player actions
     const initializePlayerActionsSubscription = async () => {
@@ -209,7 +264,7 @@ export default function StoryScreen() {
           playerActionsUnsubscribeRef.current = null;
         }
 
-        const unsubscribe = await initializePlayerActionsRealtime({
+        const unsubscribe = await atomRefs.current.initializePlayerActionsRealtime({
           campaignId: currentCampaign.id,
           userId: user.id
         });
@@ -222,7 +277,7 @@ export default function StoryScreen() {
     initializePlayerActionsSubscription();
 
     // Log current AI choices for debugging
-    const existingAiChoices = getAiChoices(currentCampaign.id);
+    const existingAiChoices = atomRefs.current.getAiChoices(currentCampaign.id);
     console.log('🎯 Existing AI choices for campaign:', existingAiChoices);
 
     // Cleanup function
@@ -236,7 +291,7 @@ export default function StoryScreen() {
         }
       }
     };
-  }, [currentCampaign?.id, user?.id, fetchPlayerActions, initializePlayerActionsRealtime, getAiChoices]);
+  }, [currentCampaign?.id, user?.id]);
 
   useEffect(() => {
     // Debounced auto-scroll to prevent excessive scrolling operations
@@ -274,7 +329,7 @@ export default function StoryScreen() {
       
       // Debounce the read status update
       const updateTimeout = setTimeout(() => {
-        updateCampaignReadStatus({
+        atomRefs.current.updateCampaignReadStatus({
           campaignId: currentCampaign.id,
           messageId: latestMessage.id,
         }).catch(error => {
@@ -402,7 +457,7 @@ export default function StoryScreen() {
         console.log('✅ Successfully generated initial story, adding message to campaign');
 
         // Add the initial story as a GM message
-        await addCampaignMessage({
+        await atomRefs.current.addCampaignMessage({
           campaign_id: currentCampaign.id,
           message: data.response,
           author: 'GM',
@@ -411,7 +466,7 @@ export default function StoryScreen() {
 
         // Set the choices from the initial story
         if (currentCampaign) {
-          setAiChoices({ campaignId: currentCampaign.id, choices: data.choices || [] });
+          atomRefs.current.setAiChoices({ campaignId: currentCampaign.id, choices: data.choices || [] });
         }
 
         console.log('✅ Initial story generation completed successfully');
@@ -429,7 +484,7 @@ export default function StoryScreen() {
     const timeoutId = setTimeout(generateInitialStory, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [currentCampaign, user, campaignHistory.length, isLoading, startLoading, stopLoading, addCampaignMessage, setAiChoices]);
+  }, [currentCampaign, user, campaignHistory.length]);
 
   // Get current user's character for this campaign
   const getCurrentCharacter = (): Character | null => {
@@ -585,7 +640,7 @@ export default function StoryScreen() {
     setError(null);
     // Clear choices while loading
     if (currentCampaign) {
-      clearAiChoices(currentCampaign.id);
+      atomRefs.current.clearAiChoices(currentCampaign.id);
     }
 
     try {
@@ -624,7 +679,7 @@ export default function StoryScreen() {
       const currentCharacter = getCurrentCharacter();
 
       // Add player message to campaign history (without dice_roll for now)
-      await addCampaignMessage({
+      await atomRefs.current.addCampaignMessage({
         campaign_id: currentCampaign.id,
         message: formattedMessage,
         author: messageAuthor,
@@ -723,7 +778,7 @@ export default function StoryScreen() {
 
         console.log('🎭 Adding GM response to campaign history');
         // Add GM response to campaign history
-        await addCampaignMessage({
+        await atomRefs.current.addCampaignMessage({
           campaign_id: currentCampaign.id,
           message: data.response,
           author: 'GM',
@@ -733,7 +788,7 @@ export default function StoryScreen() {
         // Use choices from AI response (only for story-contributing messages)
         if (currentCampaign && shouldContributeToStory) {
           console.log('🎭 Setting AI choices:', data.choices?.length || 0, 'choices');
-          setAiChoices({ campaignId: currentCampaign.id, choices: data.choices || [] });
+          atomRefs.current.setAiChoices({ campaignId: currentCampaign.id, choices: data.choices || [] });
         }
         
         console.log('✅ Storyteller request completed successfully');
@@ -763,7 +818,7 @@ export default function StoryScreen() {
       
       // Clear choices on error
       if (currentCampaign) {
-        clearAiChoices(currentCampaign.id);
+        atomRefs.current.clearAiChoices(currentCampaign.id);
       }
     } finally {
       console.log('🎭 Stopping loading state');
@@ -843,7 +898,7 @@ export default function StoryScreen() {
   };
 
   const databaseChoices = getDatabaseActionChoices();
-  const aiChoices = currentCampaign ? getAiChoices(currentCampaign.id) : [];
+  const aiChoices = currentCampaign ? atomRefs.current.getAiChoices(currentCampaign.id) : [];
 
   const choicesToShow = aiChoices.length > 0
     ? aiChoices // Use AI-generated choices first
@@ -858,6 +913,31 @@ export default function StoryScreen() {
 
   const currentCharacter = getCurrentCharacter();
   const currentInputOption = getCurrentInputOption();
+
+  // Add manual refresh connection function
+  const handleRefreshConnection = async () => {
+    setConnectionStatus('connecting');
+    try {
+      const { refreshSupabaseConnection, reconnectAllSubscriptions, monitorSubscriptionHealth } = await import('../utils/connectionUtils');
+      
+      console.log('🔄 Manual connection refresh initiated...');
+      await refreshSupabaseConnection();
+      await reconnectAllSubscriptions();
+      
+      // Wait a moment then check health
+      setTimeout(() => {
+        monitorSubscriptionHealth();
+        setConnectionStatus('connected');
+        setRetryCount(0);
+        setError(null);
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Manual refresh failed:', error);
+      setConnectionStatus('disconnected');
+      setError('Failed to refresh connection. Please try again.');
+    }
+  };
 
   return (
     <ImageBackground
@@ -928,9 +1008,29 @@ export default function StoryScreen() {
             {error && (
               <View style={styles.errorContainer}>
                 <AlertCircle size={20} color="#f44336" />
-                <Text style={styles.errorText}>
-                  Failed to connect to Storyteller. Please try again.
-                </Text>
+                <View style={styles.errorTextContainer}>
+                  <Text style={styles.errorText}>
+                    Failed to connect to Storyteller. Please try again.
+                  </Text>
+                  {(connectionStatus === 'disconnected' || connectionStatus === 'connecting') && (
+                    <TouchableOpacity 
+                      style={styles.refreshButton}
+                      onPress={handleRefreshConnection}
+                      disabled={connectionStatus === 'connecting'}
+                    >
+                      <RefreshCw 
+                        size={16} 
+                        color={connectionStatus === 'connecting' ? '#888' : '#2196F3'} 
+                      />
+                      <Text style={[
+                        styles.refreshButtonText,
+                        connectionStatus === 'connecting' && styles.refreshButtonTextDisabled
+                      ]}>
+                        {connectionStatus === 'connecting' ? 'Connecting...' : 'Refresh Connection'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             )}
 
@@ -1147,12 +1247,31 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#f44336',
   },
+  errorTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
   errorText: {
     color: '#f44336',
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     marginLeft: 8,
     flex: 1,
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  refreshButtonText: {
+    color: '#2196F3',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    marginLeft: 8,
+  },
+  refreshButtonTextDisabled: {
+    color: '#888',
   },
   inputContainer: {
     flexDirection: 'row',

@@ -1,5 +1,6 @@
 import { atom } from 'jotai';
 import { supabase } from '../config/supabase';
+import { createRealtimeSubscription } from '../utils/connectionUtils';
 
 export type CampaignReadStatus = {
   id: string;
@@ -159,7 +160,7 @@ export const hasUnreadMessagesAtom = atom(
 );
 
 // Track the active read status subscription
-let activeReadStatusSubscription: any = null;
+let activeReadStatusCleanup: (() => void) | null = null;
 let activeReadStatusUserId: string | null = null;
 
 // Initialize real-time subscription for read status updates
@@ -173,60 +174,57 @@ export const initializeCampaignReadStatusRealtimeAtom = atom(
     }
 
     // If we already have an active subscription for this user, return the existing cleanup
-    if (activeReadStatusSubscription && activeReadStatusUserId === user.id) {
-      return () => {
-        if (activeReadStatusSubscription) {
-          activeReadStatusSubscription.unsubscribe();
-          activeReadStatusSubscription = null;
-          activeReadStatusUserId = null;
-        }
-      };
+    if (activeReadStatusCleanup && activeReadStatusUserId === user.id) {
+      console.log(`📡 Reusing existing read status subscription for user: ${user.id}`);
+      return activeReadStatusCleanup;
     }
 
     // Clean up any existing subscription for a different user
-    if (activeReadStatusSubscription) {
-      activeReadStatusSubscription.unsubscribe();
-      activeReadStatusSubscription = null;
+    if (activeReadStatusCleanup) {
+      console.log(`📡 Cleaning up read status subscription for different user`);
+      activeReadStatusCleanup();
+      activeReadStatusCleanup = null;
       activeReadStatusUserId = null;
     }
 
-    const subscription = supabase
-      .channel(`campaign_read_status:${user.id}`)
-      .on(
-        'postgres_changes',
-        {
+    console.log(`📡 Creating new robust read status subscription for user: ${user.id}`);
+    
+    const channelName = `campaign_read_status:${user.id}`;
+    
+    // Create subscription with automatic reconnection using the new robust system
+    const cleanup = createRealtimeSubscription(
+      channelName,
+      {
+        postgres_changes: [{
           event: '*',
           schema: 'public',
           table: 'campaign_read_status',
           filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          const currentStatuses = get(campaignReadStatusAtom);
+        }]
+      },
+      (payload) => {
+        console.log(`📨 [${channelName}] Received update:`, payload.eventType);
+        
+        const currentStatuses = get(campaignReadStatusAtom);
 
-          if (payload.eventType === 'DELETE') {
-            const { [payload.old.campaign_id]: deleted, ...rest } = currentStatuses;
-            set(campaignReadStatusAtom, rest);
-          } else {
-            const updatedStatus = payload.new as CampaignReadStatus;
-            set(campaignReadStatusAtom, {
-              ...currentStatuses,
-              [updatedStatus.campaign_id]: updatedStatus,
-            });
-          }
+        if (payload.eventType === 'DELETE') {
+          const { [payload.old.campaign_id]: deleted, ...rest } = currentStatuses;
+          set(campaignReadStatusAtom, rest);
+        } else {
+          const updatedStatus = payload.new as CampaignReadStatus;
+          set(campaignReadStatusAtom, {
+            ...currentStatuses,
+            [updatedStatus.campaign_id]: updatedStatus,
+          });
         }
-      )
-      .subscribe();
+      },
+      5 // Max 5 reconnection attempts
+    );
 
-    // Store the subscription and user ID
-    activeReadStatusSubscription = subscription;
+    // Store the cleanup function and user ID
+    activeReadStatusCleanup = cleanup;
     activeReadStatusUserId = user.id;
 
-    return () => {
-      if (activeReadStatusSubscription) {
-        activeReadStatusSubscription.unsubscribe();
-        activeReadStatusSubscription = null;
-        activeReadStatusUserId = null;
-      }
-    };
+    return cleanup;
   }
 );

@@ -76,8 +76,8 @@ export default function HomeScreen() {
 
       withLoading(loadInitialData, 'initialLoad')();
 
-      // Initialize real-time subscription for read status
-      initializeReadStatusRealtime();
+      // Note: Read status subscription is handled globally in app/_layout.tsx
+      // Removed duplicate initializeReadStatusRealtime() call to prevent "subscribe multiple times" error
 
       // Initialize notification listeners
       const cleanupNotifications = initializeNotificationListeners();
@@ -93,7 +93,7 @@ export default function HomeScreen() {
         }
       };
     }
-  }, [user, fetchCampaigns, fetchCharacters, fetchCampaignReadStatus, fetchCampaignInvitations, fetchFriendRequestsReceived, initializeReadStatusRealtime, withLoading]);
+  }, [user, fetchCampaigns, fetchCharacters, fetchCampaignReadStatus, fetchCampaignInvitations, fetchFriendRequestsReceived, withLoading]);
 
   const handleCampaignPress = async (campaignId: string) => {
     console.log('🎯 CAMPAIGN PRESS - Starting navigation');
@@ -126,7 +126,7 @@ export default function HomeScreen() {
         router.push('/invite');
       } else {
         console.log('🎯 Navigating to /story for status:', campaign.status);
-        router.push('/story');
+        router.replace('/story');
       }
     } else {
       console.error('🎯 Campaign not found with ID:', campaignId);

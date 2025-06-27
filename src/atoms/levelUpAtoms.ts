@@ -2,6 +2,7 @@ import { atom } from 'jotai';
 import { supabase } from '../config/supabase';
 import { Character, fetchCharactersAtom } from './characterAtoms';
 import { userAtom } from './authAtoms';
+import { createRealtimeSubscription } from '../utils/connectionUtils';
 
 // Types
 export interface LevelUpCharacter {
@@ -153,36 +154,66 @@ export const prevLevelUpStepAtom = atom(
   }
 );
 
+// Track character level subscription
+let activeCharacterLevelCleanup: (() => void) | null = null;
+let activeCharacterLevelUserId: string | null = null;
+
 // Initialize real-time subscription for character level changes
 export const initializeCharacterLevelRealtimeAtom = atom(
   null,
   async (get, set) => {
     const user = get(userAtom);
-    if (!user) return;
+    if (!user) {
+      console.log('No user found for character level subscription');
+      return;
+    }
 
-    const subscription = supabase
-      .channel('character-level-changes')
-      .on(
-        'postgres_changes',
-        {
+    // If we already have an active subscription for this user, return the existing cleanup
+    if (activeCharacterLevelCleanup && activeCharacterLevelUserId === user.id) {
+      console.log(`📡 Reusing existing character level subscription for user: ${user.id}`);
+      return activeCharacterLevelCleanup;
+    }
+
+    // Clean up any existing subscription for a different user
+    if (activeCharacterLevelCleanup) {
+      console.log(`📡 Cleaning up character level subscription for different user`);
+      activeCharacterLevelCleanup();
+      activeCharacterLevelCleanup = null;
+      activeCharacterLevelUserId = null;
+    }
+
+    console.log(`📡 Creating new robust character level subscription for user: ${user.id}`);
+    
+    const channelName = `character-level-changes:${user.id}`;
+    
+    // Create subscription with automatic reconnection using the new robust system
+    const cleanup = createRealtimeSubscription(
+      channelName,
+      {
+        postgres_changes: [{
           event: 'UPDATE',
           schema: 'public',
           table: 'characters',
           filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          // Check if level has changed
-          if (payload.new.level !== payload.old.level) {
-            console.log('Character level changed:', payload.new.name, payload.old.level, '->', payload.new.level);
-            // Trigger check for level up characters
-            set(checkForLevelUpCharactersAtom);
-          }
+        }]
+      },
+      (payload) => {
+        console.log(`📨 [${channelName}] Received character update`);
+        
+        // Check if level has changed
+        if (payload.new.level !== payload.old.level) {
+          console.log('Character level changed:', payload.new.name, payload.old.level, '->', payload.new.level);
+          // Trigger check for level up characters
+          set(checkForLevelUpCharactersAtom);
         }
-      )
-      .subscribe();
+      },
+      5 // Max 5 reconnection attempts
+    );
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    // Store the cleanup function and user ID
+    activeCharacterLevelCleanup = cleanup;
+    activeCharacterLevelUserId = user.id;
+
+    return cleanup;
   }
 );

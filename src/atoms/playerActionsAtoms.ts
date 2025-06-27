@@ -1,5 +1,6 @@
 import { atom } from 'jotai';
 import { supabase } from '../config/supabase';
+import { createRealtimeSubscription } from '../utils/connectionUtils';
 
 export type PlayerActionData = {
   title: string;
@@ -134,7 +135,7 @@ export const executePlayerActionAtom = atom(
 );
 
 // Track active player action subscriptions by campaign and user ID
-let activePlayerActionSubscriptions: Record<string, any> = {};
+let activePlayerActionSubscriptions: Record<string, (() => void)> = {};
 
 // Initialize real-time subscription for player actions
 export const initializePlayerActionsRealtimeAtom = atom(
@@ -145,62 +146,71 @@ export const initializePlayerActionsRealtimeAtom = atom(
     // If we already have an active subscription for this campaign/user, return the existing cleanup
     if (activePlayerActionSubscriptions[subscriptionKey]) {
       console.log(`🎬 Reusing existing player actions subscription for: ${subscriptionKey}`);
-      return () => {
-        if (activePlayerActionSubscriptions[subscriptionKey]) {
-          activePlayerActionSubscriptions[subscriptionKey].unsubscribe();
-          delete activePlayerActionSubscriptions[subscriptionKey];
-        }
-      };
+      return activePlayerActionSubscriptions[subscriptionKey];
     }
 
-    console.log(`🎬 Creating new player actions subscription for: ${subscriptionKey}`);
+    console.log(`🎬 Creating new robust player actions subscription for: ${subscriptionKey}`);
     
-    const subscription = supabase
-      .channel(`player_actions:${campaignId}:${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'player_actions',
-          filter: `campaign_id=eq.${campaignId} AND user_id=eq.${userId}`
-        },
-        (payload) => {
-          const currentActions = get(playerActionsAtom);
-
-          if (payload.eventType === 'INSERT') {
-            const newAction = payload.new as PlayerAction;
-
-            // Check if action is not expired
-            if (!newAction.expires_at || new Date(newAction.expires_at) > new Date()) {
-              const updatedActions = [...currentActions, newAction];
-              set(playerActionsAtom, updatedActions);
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedAction = payload.new as PlayerAction;
-            const updatedActions = currentActions.map(action =>
-              action.id === updatedAction.id ? updatedAction : action
-            );
-            set(playerActionsAtom, updatedActions);
-          } else if (payload.eventType === 'DELETE') {
-            const deletedId = payload.old.id;
-            const updatedActions = currentActions.filter(action => action.id !== deletedId);
+    const channelName = `player_actions:${campaignId}:${userId}`;
+    
+    const cleanup = createRealtimeSubscription(
+      channelName,
+      {
+        postgres_changes: [
+          {
+            event: '*',
+            schema: 'public',
+            table: 'player_actions',
+            filter: `campaign_id=eq.${campaignId}`
+          },
+          {
+            event: '*',
+            schema: 'public',
+            table: 'player_actions',
+            filter: `user_id=eq.${userId}`
+          }
+        ]
+      },
+      (payload) => {
+        // ✅ Filter manually to match both
+        if (
+          payload.new?.campaign_id !== campaignId ||
+          payload.new?.user_id !== userId
+        ) {
+          return;
+        }
+    
+        console.log(`📨 [${channelName}] Received update:`, payload.eventType);
+    
+        const currentActions = get(playerActionsAtom);
+    
+        if (payload.eventType === 'INSERT') {
+          const newAction = payload.new as PlayerAction;
+    
+          if (!newAction.expires_at || new Date(newAction.expires_at) > new Date()) {
+            const updatedActions = [...currentActions, newAction];
             set(playerActionsAtom, updatedActions);
           }
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedAction = payload.new as PlayerAction;
+          const updatedActions = currentActions.map(action =>
+            action.id === updatedAction.id ? updatedAction : action
+          );
+          set(playerActionsAtom, updatedActions);
+        } else if (payload.eventType === 'DELETE') {
+          const deletedId = payload.old.id;
+          const updatedActions = currentActions.filter(action => action.id !== deletedId);
+          set(playerActionsAtom, updatedActions);
         }
-      )
-      .subscribe();
+      },
+      5 // max reconnect attempts
+    );
+    
 
-    // Store the subscription
-    activePlayerActionSubscriptions[subscriptionKey] = subscription;
+    // Store the cleanup function
+    activePlayerActionSubscriptions[subscriptionKey] = cleanup;
 
-    return () => {
-      if (activePlayerActionSubscriptions[subscriptionKey]) {
-        console.log(`🎬 Cleaning up player actions subscription for: ${subscriptionKey}`);
-        activePlayerActionSubscriptions[subscriptionKey].unsubscribe();
-        delete activePlayerActionSubscriptions[subscriptionKey];
-      }
-    };
+    return cleanup;
   }
 );
 
