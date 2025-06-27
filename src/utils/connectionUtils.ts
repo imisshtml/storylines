@@ -421,8 +421,9 @@ export const startConnectionMonitoring = (interval: number = 60000): void => {
       if (!isConnected) {
         console.log('Periodic check: Connection lost, attempting to refresh...');
         await refreshSupabaseConnection();
-        
-        // Also check subscription health
+        // Force reconnection of realtime subscriptions after refreshing auth/session
+        await reconnectAllSubscriptions();
+        // Check health after reconnection
         monitorSubscriptionHealth();
       } else {
         console.log('Periodic check: Connection healthy');

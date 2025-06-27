@@ -3,6 +3,7 @@ import { AppState, AppStateStatus } from 'react-native';
 import { 
   checkSupabaseConnection, 
   refreshSupabaseConnection, 
+  reconnectAllSubscriptions,
   startConnectionMonitoring, 
   stopConnectionMonitoring,
   isConnectionError 
@@ -55,6 +56,9 @@ export const useConnectionMonitor = (options: ConnectionMonitorOptions = {}) => 
               onConnectionLostRef.current?.();
               
               await refreshSupabaseConnection();
+              // After refreshing the auth/session connection, force all realtime
+              // channels to reconnect so listeners resume correctly.
+              await reconnectAllSubscriptions();
               
               // Check again after refresh
               const reconnectionStatus = await checkSupabaseConnection();

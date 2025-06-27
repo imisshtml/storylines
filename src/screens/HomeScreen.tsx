@@ -110,15 +110,13 @@ export default function HomeScreen() {
 
       // Mark campaign as read when entering it
       if (campaign.latest_message_id) {
-        try {
-          console.log('🎯 Updating read status...');
-          await updateCampaignReadStatus({
-            campaignId: campaign.id,
-            messageId: campaign.latest_message_id,
-          });
-        } catch (error) {
+        console.log('🎯 Updating read status (non-blocking)...');
+        updateCampaignReadStatus({
+          campaignId: campaign.id,
+          messageId: campaign.latest_message_id,
+        }).catch(error => {
           console.error('Error updating read status:', error);
-        }
+        });
       }
 
       if (campaign.status === 'creation' || campaign.status === 'open') {
@@ -657,7 +655,6 @@ export default function HomeScreen() {
       <SidebarMenu
         isVisible={isSidebarVisible}
         onClose={() => setIsSidebarVisible(false)}
-        onJoinCampaign={handleJoinCampaign}
       />
 
       <JoinCampaignModal
