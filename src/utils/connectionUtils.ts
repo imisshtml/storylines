@@ -1,9 +1,21 @@
 import { supabase } from '../config/supabase';
+import { AppState } from 'react-native';
 
 // Connection state tracking
 let lastConnectionCheck = Date.now();
 let connectionCheckInterval: ReturnType<typeof setInterval> | null = null;
 let isReconnecting = false;
+
+// Realtime subscription management
+const activeSubscriptions = new Map<string, {
+  subscription: any;
+  reconnectCount: number;
+  lastError?: string;
+  reconnectAttempts: number;
+}>();
+
+// Global registry to prevent duplicate subscriptions
+const globalChannelRegistry = new Map<string, boolean>();
 
 // Enhanced error types that indicate connection issues
 const CONNECTION_ERROR_CODES = [
@@ -53,7 +65,7 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
   try {
     const startTime = Date.now();
     
-    // Create a promise that rejects after timeout (increased to 10 seconds)
+    // Create a promise that rejects after timeout
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Connection timeout')), 10000);
     });
@@ -72,7 +84,7 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
       return false;
     }
     
-    // Consider slow responses as potential connection issues (increased threshold)
+    // Consider slow responses as potential connection issues
     if (responseTime > 15000) { // 15 seconds
       console.warn('Connection check slow:', responseTime, 'ms');
       return false;
@@ -85,6 +97,202 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
     console.error('Connection check failed:', error);
     return false;
   }
+};
+
+// Enhanced realtime subscription wrapper with automatic reconnection
+export const createRealtimeSubscription = (
+  channelName: string,
+  config: any,
+  onData: (payload: any) => void,
+  maxReconnectAttempts: number = 5
+) => {
+  // Check if this channel is already registered
+  if (globalChannelRegistry.has(channelName)) {
+    console.warn(`⚠️ Channel ${channelName} already exists. Skipping duplicate subscription.`);
+    
+    // Return a no-op cleanup function for the duplicate attempt
+    return () => {
+      console.log(`🔄 No-op cleanup for duplicate channel: ${channelName}`);
+    };
+  }
+  
+  console.log(`🔌 Creating realtime subscription: ${channelName}`);
+  globalChannelRegistry.set(channelName, true);
+  
+  const subscriptionData = {
+    subscription: null as any,
+    reconnectCount: 0,
+    reconnectAttempts: 0,
+    lastError: undefined as string | undefined
+  };
+  
+  const createSubscription = () => {
+    try {
+      // Remove channel from Supabase if it exists to prevent conflicts
+      const existingChannel = supabase.getChannels().find(ch => ch.topic === channelName);
+      if (existingChannel) {
+        console.log(`🗑️ Removing existing channel: ${channelName}`);
+        supabase.removeChannel(existingChannel);
+      }
+      
+      let channel = supabase.channel(channelName);
+      
+      // Add postgres changes listeners
+      if (config.postgres_changes) {
+        config.postgres_changes.forEach((pgConfig: any) => {
+          channel = channel.on('postgres_changes', pgConfig, onData);
+        });
+      }
+
+      channel.on('system', { event: '*' }, (event) => {
+        if (event.type === 'join') {
+          console.log('✅ Realtime joined the channel');
+        } else if (event.type === 'leave') {
+          console.warn('⚠️ Realtime left the channel');
+        } else {
+          console.log('📡 system event:', JSON.stringify(event, null, 2));
+        }
+      });
+
+      
+      // Subscribe with status monitoring
+      const subscription = channel
+        .subscribe((status: string, err?: Error) => {
+          console.log(`📡 [${channelName}] Status: ${status}`, err ? err.message : '');
+          
+          if (status === 'SUBSCRIBED') {
+            console.log(`✅ [${channelName}] Successfully connected`);
+            subscriptionData.reconnectCount = 0;
+            subscriptionData.reconnectAttempts = 0;
+            subscriptionData.lastError = undefined;
+          } 
+          else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.error(`❌ [${channelName}] Connection error: ${status}`, err);
+            subscriptionData.lastError = `${status}: ${err?.message || 'Unknown error'}`;
+            
+            // Attempt reconnection with exponential backoff
+            if (subscriptionData.reconnectAttempts < maxReconnectAttempts) {
+              const delay = Math.min(1000 * Math.pow(2, subscriptionData.reconnectAttempts), 30000);
+              subscriptionData.reconnectAttempts++;
+              
+              console.log(`🔄 [${channelName}] Scheduling reconnect attempt ${subscriptionData.reconnectAttempts}/${maxReconnectAttempts} in ${delay}ms`);
+              
+              setTimeout(() => {
+                console.log(`🔄 [${channelName}] Attempting reconnection...`);
+                
+                // Cleanup old subscription
+                try {
+                  subscription.unsubscribe();
+                } catch (cleanupError) {
+                  console.warn('Error cleaning up old subscription:', cleanupError);
+                }
+                
+                // Create new subscription
+                subscriptionData.subscription = createSubscription();
+              }, delay);
+            } else {
+              console.error(`💀 [${channelName}] Max reconnection attempts reached. Manual intervention required.`);
+            }
+          }
+          else if (status === 'CLOSED') {
+            console.log(`🚪 [${channelName}] Connection closed`);
+          }
+        });
+      
+      return subscription;
+    } catch (error) {
+      console.error(`💥 [${channelName}] Error creating subscription:`, error);
+      throw error;
+    }
+  };
+  
+  subscriptionData.subscription = createSubscription();
+  activeSubscriptions.set(channelName, subscriptionData);
+  
+  // Return cleanup function
+  return () => {
+    console.log(`🧹 [${channelName}] Cleaning up subscription`);
+    const data = activeSubscriptions.get(channelName);
+    if (data?.subscription) {
+      try {
+        data.subscription.unsubscribe();
+        supabase.removeChannel(data.subscription);
+      } catch (error) {
+        console.warn(`Warning during ${channelName} cleanup:`, error);
+      }
+    }
+    activeSubscriptions.delete(channelName);
+    globalChannelRegistry.delete(channelName);
+  };
+};
+
+export const socketListener = () => {
+  
+
+}
+
+// Monitor all active subscriptions health
+export const monitorSubscriptionHealth = () => {
+  console.log('🏥 Checking subscription health...');
+  console.log(`📊 Active Supabase channels: ${supabase.getChannels().length}`);
+  console.log(`📊 Global registry entries: ${globalChannelRegistry.size}`);
+  console.log(`📊 Active subscriptions tracked: ${activeSubscriptions.size}`);
+  
+  // List all Supabase channels
+  supabase.getChannels().forEach((channel, index) => {
+    console.log(`📺 [${index}] Supabase Channel: ${channel.topic} - State: ${channel.state}`);
+  });
+  
+  // List all tracked subscriptions
+  activeSubscriptions.forEach((data, channelName) => {
+    if (data.lastError || data.reconnectAttempts > 0) {
+      console.warn(`⚠️ [${channelName}] Health issue - Reconnect attempts: ${data.reconnectAttempts}, Last error: ${data.lastError}`);
+    } else {
+      console.log(`✅ [${channelName}] Healthy`);
+    }
+  });
+  
+  // List global registry
+  console.log('🗂️ Global channel registry:', Array.from(globalChannelRegistry.keys()));
+};
+
+// Get current subscription status
+export const getSubscriptionStatus = () => {
+  return {
+    supabaseChannels: supabase.getChannels().length,
+    globalRegistry: globalChannelRegistry.size,
+    trackedSubscriptions: activeSubscriptions.size,
+    channels: Array.from(globalChannelRegistry.keys())
+  };
+};
+
+// Force reconnect all subscriptions (for manual recovery)
+export const reconnectAllSubscriptions = async () => {
+  console.log('🔄 Force reconnecting all subscriptions...');
+  
+  // First refresh the main connection
+  await refreshSupabaseConnection();
+  
+  // Clean up all active subscriptions and registry
+  activeSubscriptions.forEach((data, channelName) => {
+    data.reconnectAttempts = 0;
+    data.lastError = undefined;
+    
+    if (data.subscription) {
+      try {
+        data.subscription.unsubscribe();
+        supabase.removeChannel(data.subscription);
+      } catch (error) {
+        console.warn(`Error unsubscribing ${channelName}:`, error);
+      }
+    }
+  });
+  
+  // Clear all registries to allow fresh subscriptions
+  activeSubscriptions.clear();
+  globalChannelRegistry.clear();
+  
+  console.log('🔄 All subscriptions and registry cleared. Ready for fresh connections.');
 };
 
 export const withConnectionRetry = async <T>(
@@ -169,6 +377,8 @@ export const refreshSupabaseConnection = async (): Promise<void> => {
       }
     } else {
       console.log('Successfully refreshed Supabase auth session');
+      // Wait briefly to avoid race with old Realtime connection
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
     
     // Test the connection with a simple query
@@ -211,6 +421,9 @@ export const startConnectionMonitoring = (interval: number = 60000): void => {
       if (!isConnected) {
         console.log('Periodic check: Connection lost, attempting to refresh...');
         await refreshSupabaseConnection();
+        
+        // Also check subscription health
+        monitorSubscriptionHealth();
       } else {
         console.log('Periodic check: Connection healthy');
       }
@@ -231,28 +444,40 @@ export const stopConnectionMonitoring = (): void => {
   }
 };
 
-// Reset connection state (useful for debugging)
-export const resetConnectionState = (): void => {
-  isReconnecting = false;
-  lastConnectionCheck = Date.now();
-  console.log('Connection state reset');
+// Handle app state changes for better connection management
+let appStateSubscription: any = null;
+
+export const initializeAppStateMonitoring = () => {
+  if (appStateSubscription) return;
+  
+  appStateSubscription = AppState.addEventListener('change', async (nextAppState) => {
+    console.log('App state changed to:', nextAppState);
+    
+    if (nextAppState === 'active') {
+      // App came to foreground - check connections
+      console.log('App became active - checking connections...');
+      
+      // Quick connection check
+      const isConnected = await checkSupabaseConnection();
+      if (!isConnected) {
+        console.log('Connection lost while app was in background - refreshing...');
+        await refreshSupabaseConnection();
+        await reconnectAllSubscriptions();
+      }
+      
+      // Monitor subscription health
+      monitorSubscriptionHealth();
+    }
+  });
+  
+  console.log('✅ App state monitoring initialized');
 };
 
-// Enhanced operation wrapper with user-friendly error messages
-export const withConnectionHandling = async <T>(
-  operation: () => Promise<T>,
-  operationName: string = 'operation',
-  userFriendlyName: string = 'operation'
-): Promise<T> => {
-  try {
-    return await withConnectionRetry(operation, 3, 1000, operationName);
-  } catch (error) {
-    console.error(`Failed to complete ${operationName}:`, error);
-    
-    if (isConnectionError(error)) {
-      throw new Error(`Connection lost while ${userFriendlyName}. Please check your internet connection and try again.`);
-    }
-    
-    throw new Error(`Failed to ${userFriendlyName}. Please try again.`);
+export const cleanupConnectionMonitoring = () => {
+  stopConnectionMonitoring();
+  if (appStateSubscription) {
+    appStateSubscription.remove();
+    appStateSubscription = null;
   }
+  console.log('🧹 Connection monitoring cleaned up');
 }; 

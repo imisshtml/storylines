@@ -27,6 +27,15 @@ export const useConnectionMonitor = (options: ConnectionMonitorOptions = {}) => 
   const lastConnectionCheck = useRef(Date.now());
   const isConnected = useRef(true);
 
+  // Store callbacks in refs to avoid dependency issues
+  const onConnectionLostRef = useRef(onConnectionLost);
+  const onConnectionRestoredRef = useRef(onConnectionRestored);
+  
+  useEffect(() => {
+    onConnectionLostRef.current = onConnectionLost;
+    onConnectionRestoredRef.current = onConnectionRestored;
+  });
+
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
       // When app comes to foreground after being in background
@@ -43,7 +52,7 @@ export const useConnectionMonitor = (options: ConnectionMonitorOptions = {}) => 
               // Connection lost
               isConnected.current = false;
               console.log('Connection lost, attempting to refresh...');
-              onConnectionLost?.();
+              onConnectionLostRef.current?.();
               
               await refreshSupabaseConnection();
               
@@ -51,18 +60,18 @@ export const useConnectionMonitor = (options: ConnectionMonitorOptions = {}) => 
               const reconnectionStatus = await checkSupabaseConnection();
               if (reconnectionStatus) {
                 isConnected.current = true;
-                onConnectionRestored?.();
+                onConnectionRestoredRef.current?.();
               }
             } else if (connectionStatus && !isConnected.current) {
               // Connection restored
               isConnected.current = true;
-              onConnectionRestored?.();
+              onConnectionRestoredRef.current?.();
             }
           } catch (error) {
             console.error('Error checking/refreshing connection:', error);
             if (isConnectionError(error)) {
               isConnected.current = false;
-              onConnectionLost?.();
+              onConnectionLostRef.current?.();
             }
           }
         }
@@ -84,7 +93,7 @@ export const useConnectionMonitor = (options: ConnectionMonitorOptions = {}) => 
       subscription?.remove();
       stopConnectionMonitoring();
     };
-  }, [checkInterval, backgroundThreshold, onConnectionLost, onConnectionRestored]);
+  }, [checkInterval, backgroundThreshold]); // Remove callback dependencies
 
   // Return connection utilities for manual use
   return {

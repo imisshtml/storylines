@@ -17,6 +17,11 @@ import { adManager } from '../src/utils/adManager';
 import LevelUpModal from '../src/components/LevelUpModal';
 import { initializeCharacterLevelRealtimeAtom } from '../src/atoms/levelUpAtoms';
 import UpdateManager from '../src/components/UpdateManager';
+import { 
+  cleanupConnectionMonitoring,
+  monitorSubscriptionHealth,
+  reconnectAllSubscriptions
+} from '../src/utils/connectionUtils';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -33,13 +38,17 @@ export default function RootLayout() {
   const [, initializeFriendshipsRealtime] = useAtom(initializeFriendshipsRealtimeAtom);
   const [, initializeCharacterLevelRealtime] = useAtom(initializeCharacterLevelRealtimeAtom);
 
-  // Global connection monitoring - runs once and persists across all navigation
+  // Enhanced connection monitoring with manual recovery options
   useConnectionMonitor({
     onConnectionLost: () => {
-      console.log('Global connection lost - this will persist across all screens');
+      console.log('🔴 Global connection lost - monitoring all subscriptions');
+      // Don't automatically reconnect here - let individual subscriptions handle it
     },
     onConnectionRestored: () => {
-      console.log('Global connection restored');
+      console.log('🟢 Global connection restored - checking subscription health');
+      setTimeout(() => {
+        monitorSubscriptionHealth();
+      }, 2000); // Give subscriptions time to reconnect
     },
     checkInterval: 120000 // Check every 2 minutes (less aggressive)
   });
@@ -59,7 +68,6 @@ export default function RootLayout() {
       try {
         console.log('🚀 Starting app initialization...');
         isInitialized = true;
-
         await initializeAuth();
 
         // Initialize realtime subscriptions with staggered timing to prevent overload
@@ -87,10 +95,22 @@ export default function RootLayout() {
         // Initialize AdManager with delay
         await new Promise(resolve => setTimeout(resolve, 500));
         await adManager.initialize();
+        
+        // Monitor subscription health after initialization
+        setTimeout(() => {
+          monitorSubscriptionHealth();
+        }, 2000);
+        
         console.log('✅ App initialization completed successfully');
       } catch (error) {
         console.error(`❌ [${Platform.OS}] [App Layout] Initialization error:`, error);
         isInitialized = false; // Allow retry
+        
+        // On critical initialization failure, try to recover connections
+        setTimeout(async () => {
+          console.log('🔄 Attempting connection recovery after initialization failure...');
+          await reconnectAllSubscriptions();
+        }, 5000);
       }
     };
 
@@ -108,6 +128,7 @@ export default function RootLayout() {
         }
       });
       cleanupFunctions = [];
+      cleanupConnectionMonitoring();
       isInitialized = false;
     };
   }, []); // Remove dependency array to prevent re-initialization
@@ -140,13 +161,7 @@ export default function RootLayout() {
                 <Stack.Screen name="create" />
                 <Stack.Screen name="characters" />
                 <Stack.Screen name="join" />
-                <Stack.Screen
-                  name="story"
-                  options={{
-                    presentation: 'fullScreenModal',
-                    animation: 'fade',
-                  }}
-                />
+                <Stack.Screen name="story" />
               </Stack>
               <StatusBar style="auto" />
               <LevelUpModal />

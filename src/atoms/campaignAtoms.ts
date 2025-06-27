@@ -1,5 +1,8 @@
 import { atom } from 'jotai';
 import { supabase } from '../config/supabase';
+import { userAtom } from './authAtoms';
+import { charactersAtom } from './characterAtoms';
+import { withConnectionRetry, createRealtimeSubscription } from '../utils/connectionUtils';
 
 export type Campaign = {
   id: string;
@@ -243,7 +246,7 @@ export const upsertCampaignAtom = atom(
 export const currentCampaignAtom = atom<Campaign | null>(null);
 
 // Track the active campaign subscription
-let activeCampaignSubscription: any = null;
+let activeCampaignCleanup: (() => void) | null = null;
 let activeCampaignUserId: string | null = null;
 
 // Initialize Supabase real-time subscription
@@ -252,73 +255,62 @@ export const initializeRealtimeAtom = atom(
   async (get, set) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
+      console.log('No user found for campaigns subscription');
       return;
     }
 
     // If we already have an active subscription for this user, return the existing cleanup
-    if (activeCampaignSubscription && activeCampaignUserId === user.id) {
-      return () => {
-        if (activeCampaignSubscription) {
-          activeCampaignSubscription.unsubscribe();
-          activeCampaignSubscription = null;
-          activeCampaignUserId = null;
-        }
-      };
+    if (activeCampaignCleanup && activeCampaignUserId === user.id) {
+      console.log(`📡 Reusing existing campaigns subscription for user: ${user.id}`);
+      return activeCampaignCleanup;
     }
 
     // Clean up any existing subscription for a different user
-    if (activeCampaignSubscription) {
-      activeCampaignSubscription.unsubscribe();
-      activeCampaignSubscription = null;
+    if (activeCampaignCleanup) {
+      console.log(`📡 Cleaning up campaigns subscription for different user`);
+      activeCampaignCleanup();
+      activeCampaignCleanup = null;
       activeCampaignUserId = null;
     }
 
-    const subscription = supabase
-      .channel('campaigns')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'campaigns'
-        },
-        async (payload) => {
-          // Re-fetch campaigns to update notification status
-          try {
-            set(fetchCampaignsAtom);
-          } catch (error) {
-            console.error('Error re-fetching campaigns after real-time update:', error);
+    console.log(`📡 Creating new robust campaigns subscription for user: ${user.id}`);
+    
+    const channelName = `campaigns:${user.id}`;
+    
+    // Create subscription with automatic reconnection using the new robust system
+    const cleanup = createRealtimeSubscription(
+      channelName,
+      {
+        postgres_changes: [
+          {
+            event: '*',
+            schema: 'public',
+            table: 'campaigns'
+          },
+          {
+            event: '*',
+            schema: 'public',
+            table: 'campaign_history'
           }
+        ]
+      },
+      async (payload) => {
+        console.log(`📨 [${channelName}] Received update:`, payload.table, payload.eventType);
+        
+        // Re-fetch campaigns to update notification status
+        try {
+          set(fetchCampaignsAtom);
+        } catch (error) {
+          console.error('Error re-fetching campaigns after real-time update:', error);
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'campaign_history'
-        },
-        async (payload) => {
-          // When new messages are added, update campaign notification status
-          try {
-            set(fetchCampaignsAtom);
-          } catch (error) {
-            console.error('Error re-fetching campaigns after message update:', error);
-          }
-        }
-      )
-      .subscribe();
+      },
+      5 // Max 5 reconnection attempts
+    );
 
-    // Store the subscription and user ID
-    activeCampaignSubscription = subscription;
+    // Store the cleanup function and user ID
+    activeCampaignCleanup = cleanup;
     activeCampaignUserId = user.id;
 
-    return () => {
-      if (activeCampaignSubscription) {
-        activeCampaignSubscription.unsubscribe();
-        activeCampaignSubscription = null;
-        activeCampaignUserId = null;
-      }
-    };
+    return cleanup;
   }
 );
