@@ -7,7 +7,6 @@ import { initializeAuthAtom } from '../src/atoms/authAtoms'
 import { initializeRealtimeAtom } from '../src/atoms/campaignAtoms';
 import { initializeCampaignReadStatusRealtimeAtom } from '../src/atoms/campaignReadStatusAtoms';
 import { initializeFriendshipsRealtimeAtom } from '../src/atoms/friendsAtoms';
-import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { useConnectionMonitor } from '../src/hooks/useConnectionMonitor';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -23,7 +22,6 @@ import UpdateManager from '../src/components/UpdateManager';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  useFrameworkReady();
   const [fontsLoaded, fontError] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Bold': Inter_700Bold,
@@ -57,35 +55,35 @@ export default function RootLayout() {
         console.log('🚫 Skipping duplicate initialization');
         return;
       }
-      
+
       try {
         console.log('🚀 Starting app initialization...');
         isInitialized = true;
-        
+
         await initializeAuth();
-        
+
         // Initialize realtime subscriptions with staggered timing to prevent overload
         console.log('📡 Initializing realtime subscriptions...');
-        
+
         const campaignCleanup = await initializeRealtime();
         if (campaignCleanup) cleanupFunctions.push(campaignCleanup);
-        
+
         // Small delay between subscriptions to prevent Android memory pressure
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         const readStatusCleanup = await initializeReadStatusRealtime();
         if (readStatusCleanup) cleanupFunctions.push(readStatusCleanup);
-        
+
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         const friendshipsCleanup = await initializeFriendshipsRealtime();
         if (friendshipsCleanup) cleanupFunctions.push(friendshipsCleanup);
-        
+
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         const characterLevelCleanup = await initializeCharacterLevelRealtime();
         if (characterLevelCleanup) cleanupFunctions.push(characterLevelCleanup);
-        
+
         // Initialize AdManager with delay
         await new Promise(resolve => setTimeout(resolve, 500));
         await adManager.initialize();

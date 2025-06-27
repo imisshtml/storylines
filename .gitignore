@@ -8,5 +8,6 @@ expo-env.d.ts
 # @end expo-cli
 
 # Expo Router type definitions
+.expo/
 .expo/types/
 .env

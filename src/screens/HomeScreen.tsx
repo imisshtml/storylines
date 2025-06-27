@@ -51,8 +51,8 @@ export default function HomeScreen() {
   const { showAlert } = useCustomAlert();
   const { isLoading, withLoading } = useLoading();
   const { checkCampaignLimit } = useLimitEnforcement();
-  const { 
-    showNotification: showLevelUpNotification, 
+  const {
+    showNotification: showLevelUpNotification,
     dismissNotification: dismissLevelUpNotification,
     charactersToLevelUp
   } = useLevelUpNotification();
@@ -99,11 +99,11 @@ export default function HomeScreen() {
     console.log('🎯 CAMPAIGN PRESS - Starting navigation');
     console.log('🎯 Campaign ID:', campaignId);
     console.log('🎯 Available campaigns:', campaigns.length);
-    
+
     const campaign = campaigns.find(c => c.id === campaignId);
     console.log('🎯 Found campaign:', campaign ? campaign.name : 'NOT FOUND');
     console.log('🎯 Campaign status:', campaign?.status);
-    
+
     if (campaign) {
       console.log('🎯 Setting current campaign...');
       setCurrentCampaign(campaign);
@@ -324,8 +324,8 @@ export default function HomeScreen() {
 
           <View style={styles.contentContainer}>
             <View style={styles.campaignsContainer}>
-              <ScrollView 
-                style={styles.campaignsScrollView} 
+              <ScrollView
+                style={styles.campaignsScrollView}
                 contentContainerStyle={styles.campaignsScrollContent}
                 showsVerticalScrollIndicator={false}
               >
@@ -347,7 +347,7 @@ export default function HomeScreen() {
                         <Text style={styles.buttonText}>Create Character</Text>
                       </TouchableOpacity>
                     </View>
-                    <View style={styles.divider}/>
+                    <View style={styles.divider} />
                   </>
                 )}
                 {characters.length > 0 && (
@@ -361,50 +361,50 @@ export default function HomeScreen() {
                       {characters
                         .slice(0, 20)
                         .map(character => (
-                        <TouchableOpacity
-                          key={character.id}
-                          style={styles.characterCard}
-                          onPress={() => handleCharacterPress(character)}
-                        >
-                          <View style={styles.characterAvatarContainer}>
-                            <Image
-                              source={getCharacterAvatar(character)}
-                              style={[
-                                styles.characterAvatar,
-                                character.retired && styles.retiredCharacterAvatar
-                              ]}
-                              onError={() => {
-                                console.warn('Character avatar load failed:', character.id);
-                              }}
-                              resizeMode="cover"
-                              fadeDuration={100}
-                            />
-                            <View style={[
-                              styles.characterLevelBadge,
-                              character.retired && styles.retiredCharacterLevelBadge
-                            ]}>
-                              <Star size={8} color="#fff" fill="#fff" />
-                              <Text style={styles.characterLevel}>
-                                {character.level || 1}
+                          <TouchableOpacity
+                            key={character.id}
+                            style={styles.characterCard}
+                            onPress={() => handleCharacterPress(character)}
+                          >
+                            <View style={styles.characterAvatarContainer}>
+                              <Image
+                                source={getCharacterAvatar(character)}
+                                style={[
+                                  styles.characterAvatar,
+                                  character.retired && styles.retiredCharacterAvatar
+                                ]}
+                                onError={() => {
+                                  console.warn('Character avatar load failed:', character.id);
+                                }}
+                                resizeMode="cover"
+                                fadeDuration={100}
+                              />
+                              <View style={[
+                                styles.characterLevelBadge,
+                                character.retired && styles.retiredCharacterLevelBadge
+                              ]}>
+                                <Star size={8} color="#fff" fill="#fff" />
+                                <Text style={styles.characterLevel}>
+                                  {character.level || 1}
+                                </Text>
+                              </View>
+
+                              {/* Level Up Badge - don't show for retired characters */}
+                              {hasLeveledUp(character) && !character.retired && (
+                                <LevelUpBadge
+                                  visible={true}
+                                  size="small"
+                                  style={styles.levelUpBadge}
+                                />
+                              )}
+                            </View>
+                            <View style={styles.characterInfo}>
+                              <Text style={styles.characterName} numberOfLines={1}>
+                                {character.name || 'Unnamed'}
                               </Text>
                             </View>
-                            
-                            {/* Level Up Badge - don't show for retired characters */}
-                            {hasLeveledUp(character) && !character.retired && (
-                              <LevelUpBadge 
-                                visible={true}
-                                size="small"
-                                style={styles.levelUpBadge}
-                              />
-                            )}
-                          </View>
-                          <View style={styles.characterInfo}>
-                            <Text style={styles.characterName} numberOfLines={1}>
-                              {character.name || 'Unnamed'}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      ))}
+                          </TouchableOpacity>
+                        ))}
                     </ScrollView>
                   </View>
                 )}
@@ -494,7 +494,7 @@ export default function HomeScreen() {
                     // Sort so completed/failed campaigns appear at the bottom
                     const aIsCompleted = a.status === 'completed' || a.status === 'failed';
                     const bIsCompleted = b.status === 'completed' || b.status === 'failed';
-                    
+
                     if (aIsCompleted && !bIsCompleted) return 1;
                     if (!aIsCompleted && bIsCompleted) return -1;
                     return 0; // Keep original order for campaigns of same completion status
@@ -526,7 +526,7 @@ export default function HomeScreen() {
                                 />
                                 {/* Level Up Badge for campaign character - don't show for retired characters */}
                                 {hasLeveledUp(campaignCharacter) && !campaignCharacter.retired && (
-                                  <LevelUpBadge 
+                                  <LevelUpBadge
                                     visible={true}
                                     size="small"
                                     style={styles.campaignCharacterLevelUpBadge}
@@ -562,7 +562,7 @@ export default function HomeScreen() {
                         if (campaign.status === 'completed' || campaign.status === 'failed') {
                           return null;
                         }
-                        
+
                         // Show creation buttons for campaigns in creation/open status and user is owner
                         if ((campaign.status === 'creation' || campaign.status === 'open') && isOwner(campaign)) {
                           return (
@@ -584,7 +584,7 @@ export default function HomeScreen() {
                             </View>
                           );
                         }
-                        
+
                         // Show continue button for other statuses
                         return (
                           <TouchableOpacity
@@ -630,7 +630,7 @@ export default function HomeScreen() {
                         style={styles.joinButton}
                         onPress={handleJoinCampaign}
                       >
-                        <Users size={20} color="#fff" style={styles.gap}/>
+                        <Users size={20} color="#fff" style={styles.gap} />
                         <Text style={styles.buttonText}>Join a Campaign</Text>
                       </TouchableOpacity>
                     </View>
@@ -642,13 +642,13 @@ export default function HomeScreen() {
         </View>
       </ActivityIndicator>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.boltLogo}
         onPress={handleBoltPress}
         activeOpacity={0.7}
       >
-        <Image 
-          source={require('../../assets/images/logotext_poweredby_360w.png')} 
+        <Image
+          source={require('../../assets/images/logotext_poweredby_360w.png')}
           style={styles.boltLogoImage}
           resizeMode="contain"
         />
