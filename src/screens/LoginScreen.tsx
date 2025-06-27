@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { LogIn, UserPlus, Eye, EyeOff, Phone, Zap } from 'lucide-react-native';
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, Image, Linking, ScrollView } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, Image, Linking, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useAtom } from 'jotai';
 import { signInAtom, signUpAtom, authLoadingAtom, authErrorAtom } from '../atoms/authAtoms';
 import ActivityIndicator from '../components/ActivityIndicator';
@@ -104,13 +104,17 @@ export default function LoginScreen() {
         fullScreen 
         text={isSignUp ? "Creating your account..." : "Logging in..."}
       >
-        <View style={styles.overlay}>
-          <ScrollView 
-            style={styles.scrollView}
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoidingView}
+        >
+          <View style={styles.overlay}>
+            <ScrollView 
+              style={styles.scrollView}
+              contentContainerStyle={styles.content}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
             <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
             <View style={styles.form}>
               {error && (
@@ -252,6 +256,7 @@ export default function LoginScreen() {
             </View>
           </ScrollView>
         </View>
+        </KeyboardAvoidingView>
       </ActivityIndicator>
 
       <TouchableOpacity 
@@ -271,6 +276,9 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  keyboardAvoidingView: {
     flex: 1,
   },
   backgroundImage: {

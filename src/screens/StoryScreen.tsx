@@ -73,6 +73,7 @@ export default function StoryScreen() {
   const [whisperTarget, setWhisperTarget] = useState<string>('');
   const [retryCount, setRetryCount] = useState(0);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connected');
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   // Campaign history atoms
   const [campaignHistory] = useAtom(campaignHistoryAtom);
@@ -293,9 +294,38 @@ export default function StoryScreen() {
     };
   }, [currentCampaign?.id, user?.id]);
 
+  // Track when initial data loading is complete
+  useEffect(() => {
+    if (!currentCampaign || !user) {
+      setIsInitialLoading(true);
+      return;
+    }
+
+    // Check if all essential data has loaded
+    const hasHistoryLoaded = campaignHistory.length >= 0; // Even empty history counts as "loaded"
+    const hasPlayerActionsLoaded = playerActions.length >= 0; // Even empty actions counts as "loaded"
+    
+    if (hasHistoryLoaded && hasPlayerActionsLoaded) {
+      // Wait 500ms before dismissing the campfire loader
+      const dismissTimeout = setTimeout(() => {
+        setIsInitialLoading(false);
+        
+        // Scroll to bottom after loader is dismissed and UI has updated
+        setTimeout(() => {
+          if (scrollViewRef.current && campaignHistory.length > 0) {
+            scrollViewRef.current.scrollToEnd({ animated: true });
+          }
+        }, 100); // Small delay to ensure UI has updated
+      }, 500);
+
+      return () => clearTimeout(dismissTimeout);
+    }
+  }, [currentCampaign, user, campaignHistory.length, playerActions.length]);
+
   useEffect(() => {
     // Debounced auto-scroll to prevent excessive scrolling operations
-    if (scrollViewRef.current && campaignHistory.length > 0) {
+    // Don't auto-scroll while initial loader is showing
+    if (scrollViewRef.current && campaignHistory.length > 0 && !isInitialLoading) {
       const now = Date.now();
       
       // Only scroll if enough time has passed since last scroll
@@ -320,7 +350,7 @@ export default function StoryScreen() {
         clearTimeout(scrollDebounceTimeout.current);
       }
     };
-  }, [campaignHistory.length]); // Only depend on length, not full array
+  }, [campaignHistory.length, isInitialLoading]); // Include isInitialLoading in dependencies
 
   useEffect(() => {
     // Debounced read status update to prevent excessive API calls
@@ -944,7 +974,12 @@ export default function StoryScreen() {
       source={require('../../assets/images/paper_background.jpg')}
       style={styles.container}
     >
-      <SafeAreaView style={styles.safeArea}>
+      <ActivityIndicator
+        isLoading={isInitialLoading}
+        text="Loading your adventure..."
+        fullScreen={true}
+      >
+        <SafeAreaView style={styles.safeArea}>
         {/* Banner Ad */}
         {!shouldHideAds && (
           <BannerAd size={BannerAdSize.BANNER} style={styles.bannerAd} />
@@ -966,7 +1001,7 @@ export default function StoryScreen() {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.content}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           <ScrollView
             ref={scrollViewRef}
@@ -1153,6 +1188,7 @@ export default function StoryScreen() {
           </View>
         </Modal>
       </SafeAreaView>
+      </ActivityIndicator>
     </ImageBackground>
   );
 }
@@ -1341,6 +1377,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     maxHeight: 100,
+    marginBottom: Platform.OS === 'android' ? 40 : 0,
   },
   sendButton: {
     width: 48,

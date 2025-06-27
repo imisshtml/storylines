@@ -316,7 +316,7 @@ export default function HomeScreen() {
               <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
               {user && (
                 <Text style={styles.welcomeText}>
-                  Welcome back!!, {user.username || user.email}!
+                  Welcome back, {user.username || user.email}!
                 </Text>
               )}
             </View>
@@ -683,7 +683,6 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   header: {
     flexDirection: 'row',

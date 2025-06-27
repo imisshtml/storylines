@@ -600,9 +600,10 @@ export default function FriendsScreen() {
       </View>
 
       <ActivityIndicator
-        isLoading={isLoading('initialLoad')}
-        text="Loading friends data..."
+        isLoading={isLoading('initialLoad') || isLoading('sendFriendRequest')}
+        text={isLoading('sendFriendRequest') ? "Sending friend request..." : "Loading friends data..."}
         style={styles.content}
+        fullScreen={isLoading('sendFriendRequest')}
       >
         <View style={styles.content}>
           {activeTab === 'friends' && renderFriendsList()}

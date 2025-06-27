@@ -40,9 +40,9 @@ export default function ProfileScreen() {
   const { showAlert, hideAlert } = useCustomAlert();
   
   // Settings state
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [turnNotifications, setTurnNotifications] = useState(true);
-  const [receiveEmails, setReceiveEmails] = useState(true);
+  const [pushNotifications, setPushNotifications] = useState(false);
+  const [turnNotifications, setTurnNotifications] = useState(false);
+  const [receiveEmails, setReceiveEmails] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
   // Profile data state
