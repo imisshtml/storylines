@@ -1,4 +1,3 @@
- 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
@@ -12,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  Animated,
   StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import { useAtom } from 'jotai';
 import { currentCampaignAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
+import PartyDisplay from '../components/PartyDisplay';
 import {
   campaignHistoryAtom,
   fetchCampaignHistoryAtom,
@@ -67,6 +68,7 @@ export default function StoryScreen() {
   const [characters] = useAtom(charactersAtom);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
   const [isCharacterSheetVisible, setIsCharacterSheetVisible] = useState(false);
+  const [isPartyDisplayExpanded, setIsPartyDisplayExpanded] = useState(false);
   const [showChoices, setShowChoices] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { isLoading, startLoading, stopLoading, withLoading } = useLoading();
@@ -134,6 +136,7 @@ export default function StoryScreen() {
   const playerActionsUnsubscribeRef = useRef<(() => void) | null>(null);
   const subscriptionHealthCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastMessageCountRef = useRef(0);
+  const [animation] = useState(new Animated.Value(0));
   const broadcastCleanupRef = useRef<(() => void) | null>(null);
 
   // Add performance tracking refs
@@ -167,6 +170,15 @@ export default function StoryScreen() {
   if (renderCount.current % 10 === 0) {
     console.log(`📊 StoryScreen render count: ${renderCount.current}`);
   }
+
+  useEffect(() => {
+    const toValue = isPartyDisplayExpanded ? 1 : 0;
+    Animated.timing(animation, {
+      toValue,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [isPartyDisplayExpanded, animation]);
 
   // Check if ads should be hidden based on purchases
   useEffect(() => {
@@ -1037,6 +1049,12 @@ export default function StoryScreen() {
   const handleCharacterPress = () => {
     setIsCharacterSheetVisible(true);
   };
+
+  const arrowRotation = animation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
   const renderLoading = !currentCampaign;
 
   // Use dynamic choices from AI, database actions, or fallback to defaults
@@ -1135,6 +1153,10 @@ export default function StoryScreen() {
       }
     };
   }, [currentCampaign?.id]);
+
+  const closeCharacterView = () => {
+    setIsCharacterSheetVisible(false);
+  }
   // Allowed to send now? Say/RP require turn; OoC/Ask/Whisper allowed anytime
   const allowedAnytime: InputType[] = ['whisper', 'ask', 'ooc'];
   const canSendNow = isPlayerTurn || allowedAnytime.includes(selectedInputType);
@@ -1162,41 +1184,60 @@ export default function StoryScreen() {
         {!shouldHideAds && (
           <BannerAd size={BannerAdSize.BANNER} style={styles.bannerAd} />
         )}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleHomePress} style={styles.headerButton}>
-            <Home size={24} color="#2a2a2a" />
-          </TouchableOpacity>
+        <View style={styles.headerWrapper}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={handleHomePress} style={styles.headerButton}>
+              <Home size={24} color="#2a2a2a" />
+            </TouchableOpacity>
 
-          <View style={styles.headerTitle}>
-            <Text style={styles.title}>{currentCampaign.name}</Text>
-          </View>
+            <TouchableOpacity 
+              style={styles.headerTitle}
+              onPress={() => setIsPartyDisplayExpanded(!isPartyDisplayExpanded)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.title}>{currentCampaign.name}</Text>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <Text style={styles.subTitle}>Turn Tracker</Text>
+                <Animated.View style={{marginLeft: 5, transform: [{ rotate: arrowRotation }] }}>
+                  <ChevronDown size={18} color="#666" />
+                </Animated.View>
+              </View>
+            </TouchableOpacity>
 
-          <TouchableOpacity 
-            onPress={() => {
-              console.log('🔄 Manual refresh triggered');
-              atomRefs.current.fetchCampaignHistory(currentCampaign.id);
-            }} 
-            style={styles.headerButton}
-          >
-            <RefreshCw size={20} color="#2a2a2a" />
-          </TouchableOpacity>
-          
-          {/* Debug button to clear other player actions */}
-          {Object.keys(otherPlayerActions).length > 0 && (
             <TouchableOpacity 
               onPress={() => {
-                console.log('🧹 Manually clearing other player actions');
-                setOtherPlayerActions({});
+                console.log('🔄 Manual refresh triggered');
+                atomRefs.current.fetchCampaignHistory(currentCampaign.id);
               }} 
               style={styles.headerButton}
             >
-              <X size={20} color="#ff4444" />
+              <RefreshCw size={20} color="#2a2a2a" />
             </TouchableOpacity>
-          )}
-          
-          <TouchableOpacity onPress={handleCharacterPress} style={styles.headerButton}>
-            <User2 size={24} color="#2a2a2a" />
-          </TouchableOpacity>
+            
+            {/* Debug button to clear other player actions */}
+            {Object.keys(otherPlayerActions).length > 0 && (
+              <TouchableOpacity 
+                onPress={() => {
+                  console.log('🧹 Manually clearing other player actions');
+                  setOtherPlayerActions({});
+                }} 
+                style={styles.headerButton}
+              >
+                <X size={20} color="#ff4444" />
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity onPress={handleCharacterPress} style={styles.headerButton}>
+              <User2 size={24} color="#2a2a2a" />
+            </TouchableOpacity>
+          </View>
+          {/* Party Display */}
+          <PartyDisplay 
+            campaign={currentCampaign} 
+            currentUserId={user?.id}
+            isExpanded={isPartyDisplayExpanded}
+            onToggle={() => setIsPartyDisplayExpanded(!isPartyDisplayExpanded)}
+          />
         </View>
 
         <KeyboardAvoidingView
@@ -1377,31 +1418,8 @@ export default function StoryScreen() {
         >
           <View style={styles.modalOverlay}>
             <View style={styles.bottomSheet}>
-              <View style={styles.bottomSheetHeader}>
-                <View style={styles.sheetHeader}>
-                  {currentCharacter ? (
-                    <>
-                      <Text style={styles.characterName}>{currentCharacter.name}</Text>
-                      <Text style={styles.characterClass}>
-                        Level {currentCharacter.level} {currentCharacter.race} {currentCharacter.class}
-                      </Text>
-                    </>
-                  ) : (
-                    <>
-                      <Text style={styles.characterName}>No Character</Text>
-                      <Text style={styles.characterClass}>Select a character for this campaign</Text>
-                    </>
-                  )}
-                </View>
-                <TouchableOpacity
-                  onPress={() => setIsCharacterSheetVisible(false)}
-                  style={styles.closeButton}
-                >
-                  <X size={24} color="#fff" />
-                </TouchableOpacity>
-              </View>
               {currentCharacter ? (
-                <CharacterView character={currentCharacter} />
+                <CharacterView character={currentCharacter} onClose={closeCharacterView} />
               ) : (
                 <View style={styles.noCharacterContainer}>
                   <Text style={styles.noCharacterText}>
@@ -1441,10 +1459,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 6,
-    paddingVertical: 12,
+    paddingTop: 10,
+    marginHorizontal: 20,
+  },
+  headerWrapper: {
     borderBottomWidth: 1,
     borderBottomColor: '#2a2a2a',
-    marginHorizontal: 20,
+    paddingBottom: 6,
   },
   headerButton: {
     width: 40,
@@ -1455,11 +1476,18 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
-    fontSize: 20,
+    fontSize: 18,
     color: '#2a2a2a',
     fontFamily: 'Inter-Bold',
+    textAlign: 'center',
+  },
+  subTitle: {
+    fontSize: 12,
+    color: '#2a2a2a',
+    fontFamily: 'Inter-Regular',
     textAlign: 'center',
   },
   content: {
