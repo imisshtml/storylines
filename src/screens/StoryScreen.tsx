@@ -14,6 +14,7 @@ import {
   Modal,
   StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, MessageSquare, Drama, Ear, CircleHelp as HelpCircle, RefreshCw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
@@ -59,7 +60,7 @@ interface InputOption {
 }
 
 export default function StoryScreen() {
-  console.log('::: ================================= 1')
+  const insets = useSafeAreaInsets();
   const [userInput, setUserInput] = useState('');
   const [currentCampaign, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [user] = useAtom(userAtom);
@@ -97,7 +98,7 @@ export default function StoryScreen() {
   const [getAiChoices] = useAtom(getAiChoicesAtom);
   const [, setAiChoices] = useAtom(setAiChoicesAtom);
   const [, clearAiChoices] = useAtom(clearAiChoicesAtom);
-  console.log('::: ================================= 2')
+
   // Store refs to avoid useEffect dependency issues
   const atomRefs = useRef({
     fetchCampaignHistory,
@@ -140,7 +141,6 @@ export default function StoryScreen() {
   const scrollDebounceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderCount = useRef(0);
   const lastHistoryLength = useRef(0);
-  console.log('::: ================================= 3')
   // Stabilize callback functions to prevent useConnectionMonitor from restarting
   const onConnectionLost = useCallback(() => {
     console.log('🔴 Story screen connection lost');
@@ -191,7 +191,6 @@ export default function StoryScreen() {
   }, [user?.id]);
 
   useEffect(() => {
-    console.log('::: ================================= --- 1')
     if (user) {
       fetchCharacters();
     }
@@ -240,7 +239,6 @@ export default function StoryScreen() {
       console.log('🏥 Subscription health monitoring disabled - using broadcast system instead');
       // Temporarily disable health check to let broadcast system work without interference
     };
-    console.log('::: ================================= 5')
     startHealthCheck();
 
     // Initialize broadcast system for real-time action coordination
@@ -330,11 +328,9 @@ export default function StoryScreen() {
       }
     };
   }, [currentCampaign?.id]);
-  console.log('::: ================================= 6')
   // Load player actions when campaign and user are available
   useEffect(() => {
     if (!currentCampaign || !user) return;
-    console.log('::: ================================= -- 333')
     console.log('📋 Loading player actions for campaign:', currentCampaign.id, 'user:', user.id);
 
     // Fetch player actions from database
@@ -384,7 +380,6 @@ export default function StoryScreen() {
       setIsInitialLoading(true);
       return;
     }
-    console.log('::: ================================= --- 4444')
     // Check if all essential data has loaded
     const hasHistoryLoaded = campaignHistory.length >= 0; // Even empty history counts as "loaded"
     const hasPlayerActionsLoaded =
@@ -436,7 +431,6 @@ export default function StoryScreen() {
       }
     };
   }, [campaignHistory.length, isInitialLoading]); // Include isInitialLoading in dependencies
-  console.log('::: ================================= 7')
   useEffect(() => {
     // Debounced read status update to prevent excessive API calls
     if (currentCampaign && campaignHistory.length > lastHistoryLength.current) {
@@ -600,7 +594,6 @@ export default function StoryScreen() {
 
     return () => clearTimeout(timeoutId);
   }, [currentCampaign, user, campaignHistory.length]);
-  console.log('::: ================================= 8')
   // Get current user's character for this campaign
   const getCurrentCharacter = (): Character | null => {
     if (!user || !currentCampaign) return null;
@@ -660,7 +653,6 @@ export default function StoryScreen() {
 
     return baseOptions;
   };
-  console.log('::: ================================= 9')
   const getCurrentPlaceholder = () => {
     const options = getInputOptions();
     if (selectedInputType === 'whisper' && whisperTarget) {
@@ -755,9 +747,10 @@ export default function StoryScreen() {
     
     // Broadcast that this player is starting an action
     try {
+      const currentCharacter = getCurrentCharacter();
       await broadcastActionStarted(currentCampaign.id, {
         playerId: user.id,
-        playerName: user.username || 'Player',
+        playerName: currentCharacter?.name || 'Player',
         action: action
       });
     } catch (error) {
@@ -995,15 +988,11 @@ export default function StoryScreen() {
     }
   };
   
-  console.log('::: ================================= 10')
   const alwaysAllowedTypes: InputType[] = ['whisper', 'ask', 'ooc'];
   const currentCharacter = getCurrentCharacter();
-  console.log('::: ================================= 10 1')
   const isTurn = currentCharacter?.id && currentCampaign?.current_player === currentCharacter.id && !currentCampaign?.paused;
   const canSend = isTurn || alwaysAllowedTypes.includes(selectedInputType);
-  console.log('::: ================================= 10 2')
   //if (!userInput.trim() || isLoading('sendAction') || !canSend) return;
-  console.log('::: ================================= 11')
   const handleSend = async () => {
     if (!userInput.trim() || isLoading('sendAction') || !canSend) return;
 
@@ -1023,7 +1012,6 @@ export default function StoryScreen() {
       setTimeout(() => setShowChoices(true), 1000);
     }
   };
-  console.log('::: ================================= 12')
   const handleChoiceSelect = async (choice: string) => {
     if (isLoading('sendAction')) return;
 
@@ -1049,7 +1037,6 @@ export default function StoryScreen() {
   const handleCharacterPress = () => {
     setIsCharacterSheetVisible(true);
   };
-  console.log('::: ================================= 13')
   const renderLoading = !currentCampaign;
 
   // Use dynamic choices from AI, database actions, or fallback to defaults
@@ -1066,10 +1053,8 @@ export default function StoryScreen() {
     // Convert action data to choice strings
     return modeActions.map(action => action.action_data.title);
   };
-  console.log('::: ================================= 14')
   const databaseChoices = getDatabaseActionChoices();
   const aiChoices = currentCampaign ? atomRefs.current.getAiChoices(currentCampaign.id) : [];
-  console.log('::: ================================= 15')
   const choicesToShow = aiChoices.length > 0
     ? aiChoices // Use AI-generated choices first
     : databaseChoices.length > 0
@@ -1082,7 +1067,6 @@ export default function StoryScreen() {
       ]; // Fallback to defaults last
 
   const currentInputOption = getCurrentInputOption();
-  console.log('::: =================================16')
   // Add manual refresh connection function
   const handleRefreshConnection = async () => {
     setConnectionStatus('connecting');
@@ -1113,7 +1097,6 @@ export default function StoryScreen() {
 
   // Subscribe to campaign row updates to track current_player / paused changes
   const campaignSubscriptionRef = useRef<(() => void) | null>(null);
-  console.log('::: ================================= 17')
   useEffect(() => {
     if (!currentCampaign) return;
 
@@ -1152,11 +1135,9 @@ export default function StoryScreen() {
       }
     };
   }, [currentCampaign?.id]);
-  console.log('::: ================================= 18')
   // Allowed to send now? Say/RP require turn; OoC/Ask/Whisper allowed anytime
   const allowedAnytime: InputType[] = ['whisper', 'ask', 'ooc'];
   const canSendNow = isPlayerTurn || allowedAnytime.includes(selectedInputType);
-  console.log('⏳ isRenderLoading', renderLoading)
   if (renderLoading) {
     return (
       <ActivityIndicator
@@ -1166,9 +1147,6 @@ export default function StoryScreen() {
       />
     );
   }
-  console.log('::: =================================')
-  console.log('⏳ isInitialLoading', isInitialLoading)
-
   return (
     <ImageBackground
       source={require('../../assets/images/paper_background.jpg')}
@@ -1222,13 +1200,14 @@ export default function StoryScreen() {
         </View>
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
           style={styles.content}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 10}
         >
           <ScrollView
             ref={scrollViewRef}
             style={styles.storyContainer}
+            contentContainerStyle={{ paddingBottom: 20 }}
             showsVerticalScrollIndicator={false}
           >
             {/* Campaign History */}
@@ -1316,10 +1295,10 @@ export default function StoryScreen() {
             )}
 
             {/* Waiting for turn notification */}
-            {!isPlayerTurn && (
+            {!isPlayerTurn && Object.keys(otherPlayerActions).length === 0 && (
               <View style={styles.loadingEvent}>
                 <Text style={styles.loadingEventText}>
-                  {currentCampaign?.players?.find(p => p?.character?.id === currentCampaign?.current_player)?.character?.name || 'Another player'} is writing their verse...
+                  {currentCampaign?.current_player_name || 'Another player'} is writing their verse...
                 </Text>
               </View>
             )}
@@ -1334,7 +1313,7 @@ export default function StoryScreen() {
             )}
           </ScrollView>
 
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer, Platform.OS === 'android' && {marginBottom: insets.bottom}]}>
             {/* Input Type Selector */}
             <View style={styles.inputTypeContainer}>
               <TouchableOpacity
@@ -1385,7 +1364,7 @@ export default function StoryScreen() {
               disabled={userInput.trim().length === 0 || isLoading('sendAction') || !canSendNow}
             >
 
-              <Forward size={24} color={userInput.trim() ? '#fff' : '#666'} />
+              <Forward size={18} color={userInput.trim() ? '#fff' : '#666'} />
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -1505,13 +1484,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
   },
-  instructionText: {
-    fontSize: 16,
-    color: '#1a1a1a',
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-    opacity: 0.8,
-  },
   loadingEvent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1520,6 +1492,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 215, 0, 0.1)',
     borderRadius: 12,
     marginVertical: 8,
+    //marginBottom: 15,
   },
   writingAnimation: {
     width: 60,
@@ -1570,12 +1543,13 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: 16,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     backgroundColor: 'rgba(26, 26, 26, 0.9)',
     borderTopWidth: 1,
     borderTopColor: '#333',
     gap: 6,
-    position: 'relative',
   },
   inputTypeContainer: {
     position: 'relative',
@@ -1584,15 +1558,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    gap: 6,
-    minWidth: 70,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    gap: 4,
+    minWidth: 60,
+    height: 32,
   },
   inputTypeText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: 'Inter-Bold',
   },
   inputTypeDropdown: {
@@ -1602,11 +1577,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
     marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 8,
     zIndex: 1000,
     minWidth: 180,
   },
@@ -1630,19 +1600,19 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Regular',
-    maxHeight: 100,
-    marginBottom: Platform.OS === 'android' ? 40 : 0,
+    height: 32,
   },
   sendButton: {
-    width: 48,
-    height: 48,
+    width: 32,
+    height: 32,
     backgroundColor: '#4CAF50',
-    borderRadius: 24,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
