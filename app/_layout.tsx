@@ -20,7 +20,8 @@ import UpdateManager from '../src/components/UpdateManager';
 import { 
   cleanupConnectionMonitoring,
   monitorSubscriptionHealth,
-  reconnectAllSubscriptions
+  reconnectAllSubscriptions,
+  initializeAppStateMonitoring
 } from '../src/utils/connectionUtils';
 
 // Prevent splash screen from auto-hiding
@@ -95,6 +96,9 @@ export default function RootLayout() {
         // Initialize AdManager with delay
         await new Promise(resolve => setTimeout(resolve, 500));
         await adManager.initialize();
+        
+        // Initialize app state monitoring for online status tracking
+        initializeAppStateMonitoring();
         
         // Monitor subscription health after initialization
         setTimeout(() => {

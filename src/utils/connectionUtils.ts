@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabase';
 import { AppState } from 'react-native';
+import { addUserToOnlineStatus, removeUserFromOnlineStatus } from './onlineStatusManager';
 
 // Connection state tracking
 let lastConnectionCheck = Date.now();
@@ -468,6 +469,28 @@ export const initializeAppStateMonitoring = () => {
       
       // Monitor subscription health
       monitorSubscriptionHealth();
+
+      // Add user to online status when app becomes active
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id) {
+          console.log('🟢 App active: Adding user to online status');
+          await addUserToOnlineStatus(user.id);
+        }
+      } catch (error) {
+        console.error('Error updating online status on app active:', error);
+      }
+    } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+      // App went to background - remove from online status
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id) {
+          console.log('🔴 App background: Removing user from online status');
+          await removeUserFromOnlineStatus(user.id);
+        }
+      } catch (error) {
+        console.error('Error updating online status on app background:', error);
+      }
     }
   });
   

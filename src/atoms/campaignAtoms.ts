@@ -19,9 +19,9 @@ export type Campaign = {
   rp_focus: 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heavy_combat';
   limit?: number; // Player limit for the campaign
   campaign_length?: 'tale' | 'journey' | 'saga' | 'chronicle' | 'epic';
+  verbosity?: 'concise' | 'detailed' | 'cinematic';
   max_level?: number;
   created_at?: string;
-  uid: string;
   // Initiative system fields
   current_player?: string | null; // character UUID of player whose turn it is
   current_player_name?: string | null; // character name for display
@@ -32,6 +32,8 @@ export type Campaign = {
   // Add fields for notification tracking
   latest_message_id?: number | null;
   has_unread?: boolean;
+  // Online status tracking
+  players_online?: Record<string, string>; // user_id -> character_name
 };
 
 export type Player = {
