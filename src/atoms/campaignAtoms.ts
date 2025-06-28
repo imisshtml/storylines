@@ -24,6 +24,7 @@ export type Campaign = {
   uid: string;
   // Initiative system fields
   current_player?: string | null; // character UUID of player whose turn it is
+  current_player_name?: string | null; // character name for display
   turn_timer?: number | null; // minutes for turn timer
   turn_start?: string | null; // ISO timestamp when turn started
   auto_boot_limit?: number | null; // number of times bypass allowed
