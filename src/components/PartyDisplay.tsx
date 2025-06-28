@@ -8,6 +8,7 @@ import {
   Modal,
   Animated,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { useAtom } from 'jotai';
 import { fetchCampaignCharactersAtom } from '../atoms/characterAtoms';
@@ -124,50 +125,52 @@ export default function PartyDisplay({ campaign, currentUserId, isExpanded = fal
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.expandedContent, { height: animatedHeight }]}>
-        <View style={styles.avatarsContainer}>
-          {sortedPartyMembers.map((member, index) => (
-             <TouchableOpacity
-               key={member.character?.id || member.player.id}
-               style={[
-                 styles.avatarItem,
-                 member.isCurrentPlayer && styles.currentPlayerAvatar,
-               ]}
-               onPress={() => member.character && handleCharacterPress(member.character)}
-               activeOpacity={member.character ? 0.8 : 0.4}
-               disabled={!member.character}
-             >
-               <View style={styles.avatarWrapper}>
-                 <Image
-                   source={member.character ? getCharacterAvatarUrl(member.character) : require('../../assets/images/avatars/bbbjkk.jpg')}
-                   style={[
-                     styles.avatar,
-                     member.isCurrentPlayer && styles.currentPlayer,
-                     !member.isOnline && styles.offlineAvatar,
-                     !member.character && styles.noCharacterAvatar,
-                   ]}
-                 />
-                 
-                 {/* Current player indicator */}
-                 {false && member.isCurrentPlayer && (
-                   <View style={styles.currentPlayerIndicator}>
-                     <View style={styles.currentPlayerDot} />
-                   </View>
-                 )}
-               </View>
-               
-               <Text 
-                 style={[
-                   styles.characterName,
-                   !member.isOnline && styles.offlineText,
-                   !member.character && styles.noCharacterText,
-                 ]} 
-                 numberOfLines={1}
-               >
-                 {member.character?.name || member.player.name || 'Player'}
-               </Text>
-             </TouchableOpacity>
-           ))}
-        </View>
+        <ScrollView horizontal>
+          <View style={styles.avatarsContainer}>
+            {sortedPartyMembers.map((member, index) => (
+              <TouchableOpacity
+                key={member.character?.id || member.player.id}
+                style={[
+                  styles.avatarItem,
+                  member.isCurrentPlayer && styles.currentPlayerAvatar,
+                ]}
+                onPress={() => member.character && handleCharacterPress(member.character)}
+                activeOpacity={member.character ? 0.8 : 0.4}
+                disabled={!member.character}
+              >
+                <View style={styles.avatarWrapper}>
+                  <Image
+                    source={member.character ? getCharacterAvatarUrl(member.character) : require('../../assets/images/avatars/bbbjkk.jpg')}
+                    style={[
+                      styles.avatar,
+                      member.isCurrentPlayer && styles.currentPlayer,
+                      !member.isOnline && styles.offlineAvatar,
+                      !member.character && styles.noCharacterAvatar,
+                    ]}
+                  />
+                  
+                  {/* Current player indicator */}
+                  {false && member.isCurrentPlayer && (
+                    <View style={styles.currentPlayerIndicator}>
+                      <View style={styles.currentPlayerDot} />
+                    </View>
+                  )}
+                </View>
+                
+                <Text 
+                  style={[
+                    styles.characterName,
+                    !member.isOnline && styles.offlineText,
+                    !member.character && styles.noCharacterText,
+                  ]} 
+                  numberOfLines={1}
+                >
+                  {member.character?.name || member.player.name || 'Player'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
       </Animated.View>
 
       {/* Character View Modal */}
