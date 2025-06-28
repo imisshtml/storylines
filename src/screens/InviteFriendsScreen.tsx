@@ -15,25 +15,26 @@ import {
   StatusBar,
 } from 'react-native';
 import { useAtom } from 'jotai';
+import { router } from 'expo-router';
 import { currentCampaignAtom, campaignsLoadingAtom, campaignsErrorAtom, upsertCampaignAtom } from '../atoms/campaignAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
 import { userAtom } from '../atoms/authAtoms';
-import {
+import { 
   friendsAtom,
   fetchFriendsAtom,
-  sendCampaignInvitationAtom,
+  sendCampaignInvitationAtom, 
   campaignInvitationsAtom,
   fetchCampaignInvitationsAtom,
   type Friendship
 } from '../atoms/friendsAtoms';
 import { Copy, Share as ShareIcon, Users, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, ArrowLeft, Send, ChevronDown, ChevronUp, X, Plus, Crown, Info, UserPlus, Clock, UserMinus, Trash2, LogOut } from 'lucide-react-native';
-import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as SMS from 'expo-sms';
 import { supabase } from '../config/supabase';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 import { ADVENTURES } from '../components/AdventureSelectSheet';
 import { useCustomAlert } from '../components/CustomAlert';
+import { updateUserCharacterName } from '../utils/onlineStatusManager';
 
 export default function InviteFriendsScreen() {
   const [currentCampaign, setCurrentCampaign] = useAtom(currentCampaignAtom);
@@ -405,6 +406,11 @@ export default function InviteFriendsScreen() {
         ...currentCampaign,
         players: updatedPlayers,
       });
+
+      // Update online status with new character name if user is currently online
+      if (selectedCharacter) {
+        await updateUserCharacterName(userId, currentCampaign.id, selectedCharacter.name);
+      }
 
       // Refresh characters
       await fetchCharacters();

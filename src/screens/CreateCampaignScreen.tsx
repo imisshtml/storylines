@@ -16,6 +16,7 @@ type Tone = 'serious' | 'humorous' | 'grimdark';
 type ContentLevel = 'kids' | 'teens' | 'adults';
 type RPFocus = 'heavy_rp' | 'rp_focused' | 'balanced' | 'combat_focused' | 'heavy_combat';
 type CampaignLength = 'tale' | 'journey' | 'saga' | 'chronicle' | 'epic';
+type Verbosity = 'concise' | 'detailed' | 'cinematic';
 
 const contentTags = [
   'Gore',
@@ -55,6 +56,18 @@ const campaignLengthDescriptions: Record<CampaignLength, string> = {
   'epic': 'An epic experience that defines legends.',
 };
 
+const verbosityLabels: Record<Verbosity, string> = {
+  'concise': 'Concise',
+  'detailed': 'Detailed',
+  'cinematic': 'Cinematic',
+};
+
+const verbosityDescriptions: Record<Verbosity, string> = {
+  'concise': 'Just the facts',
+  'detailed': 'Balanced storytelling with setting, emotion, and action',
+  'cinematic': 'Rich, immersive story with a focus on roleplay',
+};
+
 const contentLevelDescriptions: Record<ContentLevel, string> = {
   'kids': 'Suitable for children. No mature themes or violence.',
   'teens': 'Mild themes and fantasy violence. Similar to YA content.',
@@ -84,6 +97,7 @@ export default function CreateCampaignScreen() {
   const [capabilitiesLoaded, setCapabilitiesLoaded] = useState(false);
   const [isOpenCampaign, setIsOpenCampaign] = useState(false);
   const [campaignLengthValue, setCampaignLengthValue] = useState(2); // 0-4 scale, 2 = saga (default)
+  const [verbosityValue, setVerbosityValue] = useState(1); // 0-2 scale, 1 = detailed (default)
   const [maxLevel, setMaxLevel] = useState(20);
   const [isMaxLevelDropdownVisible, setIsMaxLevelDropdownVisible] = useState(false);
 
@@ -122,6 +136,7 @@ export default function CreateCampaignScreen() {
       setPlayerLimit(Math.min(currentCampaign.limit || 3, maxGroupSize));
       setIsOpenCampaign(currentCampaign.status === 'open');
       setCampaignLengthValue(getValueFromCampaignLength(currentCampaign.campaign_length || 'saga'));
+      setVerbosityValue(getValueFromVerbosity(currentCampaign.verbosity || 'detailed'));
       setMaxLevel(currentCampaign.max_level || 20);
       // Set the selected adventure from the campaign's adventure ID
       const adventure = ADVENTURES.find((a: Adventure) => a.id === currentCampaign.adventure);
@@ -140,6 +155,7 @@ export default function CreateCampaignScreen() {
       setSelectedAdventure(null);
       setIsOpenCampaign(false);
       setCampaignLengthValue(2); // saga (default)
+      setVerbosityValue(1); // detailed (default)
       setMaxLevel(20);
     }
   }, [currentCampaign, isEditing, maxGroupSize, capabilitiesLoaded]);
@@ -164,6 +180,17 @@ export default function CreateCampaignScreen() {
   
   const getValueFromCampaignLength = (length: CampaignLength): number => {
     return campaignLengthOptions.indexOf(length);
+  };
+
+  // Helper functions to convert between slider value and Verbosity enum
+  const verbosityOptions: Verbosity[] = ['concise', 'detailed', 'cinematic'];
+  
+  const getVerbosityFromValue = (value: number): Verbosity => {
+    return verbosityOptions[Math.round(value)] || 'detailed';
+  };
+  
+  const getValueFromVerbosity = (verbosity: Verbosity): number => {
+    return verbosityOptions.indexOf(verbosity);
   };
 
   const handleBack = () => {
@@ -209,6 +236,7 @@ export default function CreateCampaignScreen() {
         rp_focus: getRpFocusFromValue(rpFocusValue),
         limit: playerLimit,
         campaign_length: getCampaignLengthFromValue(campaignLengthValue),
+        verbosity: getVerbosityFromValue(verbosityValue),
         max_level: maxLevel,
       };
 
@@ -496,6 +524,42 @@ export default function CreateCampaignScreen() {
             </Text>
             <Text style={styles.contentLevelDescription}>
               {campaignLengthDescriptions[getCampaignLengthFromValue(campaignLengthValue)]}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Narrative</Text>
+          <View style={styles.sliderContainer}>
+            <View style={styles.sliderLabels}>
+              <Text style={styles.sliderLabelText}>Concise</Text>
+              <Text style={styles.sliderLabelText}>Cinematic</Text>
+            </View>
+            <View style={styles.customSlider}>
+              <View style={styles.sliderTrack}>
+                <View 
+                  style={[
+                    styles.sliderThumb, 
+                    { left: `${(verbosityValue / 2) * 100}%` }
+                  ]} 
+                />
+                {[0, 1, 2].map((value) => (
+                  <TouchableOpacity
+                    key={value}
+                    style={[
+                      styles.sliderStep,
+                      { left: `${(value / 2) * 100}%` }
+                    ]}
+                    onPress={() => setVerbosityValue(value)}
+                  />
+                ))}
+              </View>
+            </View>
+            <Text style={styles.currentFocusLabel}>
+              {verbosityLabels[getVerbosityFromValue(verbosityValue)]}
+            </Text>
+            <Text style={styles.contentLevelDescription}>
+              {verbosityDescriptions[getVerbosityFromValue(verbosityValue)]}
             </Text>
           </View>
         </View>

@@ -2,6 +2,7 @@ import { atom } from 'jotai';
 import { supabase } from '../config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { User, Session } from '@supabase/supabase-js';
+import { addUserToOnlineStatus, removeUserFromOnlineStatus } from '../utils/onlineStatusManager';
 
 export type AuthUser = {
   id: string;
@@ -134,6 +135,9 @@ export const signInAtom = atom(
 
         // Fetch campaigns after successful login
         await triggerCampaignFetch(set);
+
+        // Add user to online status for all their campaigns
+        await addUserToOnlineStatus(data.user.id);
       }
 
       return data;
@@ -198,6 +202,13 @@ export const signOutAtom = atom(
       set(authLoadingAtom, true);
       set(authErrorAtom, null);
 
+      const user = get(userAtom);
+      
+      // Remove user from online status before signing out
+      if (user?.id) {
+        await removeUserFromOnlineStatus(user.id);
+      }
+
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
@@ -243,6 +254,9 @@ export const initializeAuthAtom = atom(
 
           // Fetch campaigns for authenticated user
           await triggerCampaignFetch(set);
+
+          // Add user to online status when app initializes with valid session
+          await addUserToOnlineStatus(currentSession.user.id);
         } else {
           // Session expired, clear AsyncStorage and get fresh session
           await clearUserSession();
@@ -271,6 +285,9 @@ export const initializeAuthAtom = atom(
 
             // Fetch campaigns for authenticated user
             await triggerCampaignFetch(set);
+
+            // Add user to online status with fresh session
+            await addUserToOnlineStatus(freshSession.user.id);
           }
         }
       } else {
@@ -299,6 +316,9 @@ export const initializeAuthAtom = atom(
 
           // Fetch campaigns for authenticated user
           await triggerCampaignFetch(set);
+
+          // Add user to online status
+          await addUserToOnlineStatus(session.user.id);
         }
       }
 
@@ -326,8 +346,16 @@ export const initializeAuthAtom = atom(
 
           // Fetch campaigns for authenticated user
           await triggerCampaignFetch(set);
+
+          // Add user to online status on auth state change
+          await addUserToOnlineStatus(session.user.id);
         } else {
           // User signed out
+          const currentUser = get(userAtom);
+          if (currentUser?.id) {
+            await removeUserFromOnlineStatus(currentUser.id);
+          }
+          
           await clearUserSession();
           set(userAtom, null);
           set(sessionAtom, null);
@@ -338,8 +366,7 @@ export const initializeAuthAtom = atom(
       });
     } catch (error) {
       set(authErrorAtom, (error as Error).message);
-      // Clear potentially corrupted data
-      await clearUserSession();
+      console.error('Auth initialization error:', error);
     } finally {
       set(authLoadingAtom, false);
     }
