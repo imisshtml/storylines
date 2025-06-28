@@ -1,15 +1,16 @@
 import React, { memo } from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
-import { User, Crown, Info } from 'lucide-react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { User, Crown, Info, Flag } from 'lucide-react-native';
 import { CampaignMessage } from '../atoms/campaignHistoryAtoms';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 
 interface StoryEventItemProps {
   message: CampaignMessage;
+  campaignId: string;
+  onReport?: (message: CampaignMessage) => void;
 }
 
-const StoryEventItem = memo(({ message }: StoryEventItemProps) => {
-
+const StoryEventItem = memo(({ message, campaignId, onReport }: StoryEventItemProps) => {
   // Dice roll logic temporarily disabled to prevent ExoPlayer crashes on Android
 
   const getEventIcon = () => {
@@ -90,12 +91,24 @@ const StoryEventItem = memo(({ message }: StoryEventItemProps) => {
             message.message_type === 'player' ? (message.character_name || message.author) :
               'System'}
         </Text>
-        <Text style={styles.timestamp}>
-          {new Date(message.timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
-          })}
-        </Text>
+        <View style={styles.rightHeader}>
+          <Text style={styles.timestamp}>
+            {new Date(message.timestamp).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </Text>
+          {/* Show report button only for storyteller messages */}
+          {message.message_type === 'gm' && onReport && (
+            <TouchableOpacity
+              style={styles.reportButton}
+              onPress={() => onReport(message)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Flag size={16} color="#666" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
       <View style={styles.contentContainer}>
         <Text style={[styles.content, eventStyles.text]}>
@@ -149,6 +162,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     marginLeft: 8,
     flex: 1,
+  },
+  rightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   timestamp: {
     fontSize: 12,
@@ -205,5 +223,10 @@ const styles = StyleSheet.create({
   systemText: {
     color: '#1a1a1a',
     fontStyle: 'italic',
+  },
+  reportButton: {
+    padding: 4,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
 });

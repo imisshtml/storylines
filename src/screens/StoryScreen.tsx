@@ -41,6 +41,7 @@ import {
 import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
 import EnhancedStoryChoices from '../components/EnhancedStoryChoices';
+import ContentReportModal from '../components/ContentReportModal';
 import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
@@ -82,6 +83,9 @@ export default function StoryScreen() {
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connected');
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [otherPlayerActions, setOtherPlayerActions] = useState<{[playerId: string]: {playerName: string, action: string}}>({});
+  const [reportingMessage, setReportingMessage] = useState<typeof campaignHistory[0] | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showCharacterModal, setShowCharacterModal] = useState(false);
 
   // Campaign history atoms
   const [campaignHistory] = useAtom(campaignHistoryAtom);
@@ -1169,6 +1173,17 @@ export default function StoryScreen() {
       />
     );
   }
+
+  const handleReport = (message: typeof campaignHistory[0]) => {
+    setReportingMessage(message);
+    setShowReportModal(true);
+  };
+
+  const handleCloseReport = () => {
+    setShowReportModal(false);
+    setReportingMessage(null);
+  };
+
   return (
     <ImageBackground
       source={require('../../assets/images/paper_background.jpg')}
@@ -1263,7 +1278,12 @@ export default function StoryScreen() {
               campaignHistory
                 .slice(-30) // Only show last 30 messages to prevent memory overflow
                 .map((message, index) => (
-                  <StoryEventItem key={`${message.id}-${index}`} message={message} />
+                  <StoryEventItem 
+                    key={`${message.id}-${index}`} 
+                    message={message} 
+                    campaignId={currentCampaign.id}
+                    onReport={handleReport}
+                  />
                 ))
             )}
 
@@ -1439,6 +1459,14 @@ export default function StoryScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* Content Report Modal */}
+        <ContentReportModal
+          visible={showReportModal}
+          onClose={handleCloseReport}
+          message={reportingMessage}
+          campaignId={currentCampaign?.id || ''}
+        />
       </SafeAreaView>
       </ActivityIndicator>
     </ImageBackground>
