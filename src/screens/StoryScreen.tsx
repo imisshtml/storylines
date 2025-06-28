@@ -1,3 +1,4 @@
+ 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
@@ -41,7 +42,7 @@ import EnhancedStoryChoices from '../components/EnhancedStoryChoices';
 import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
-import { initializeCampaignBroadcast, broadcastActionStarted, broadcastActionCompleted } from '../utils/connectionUtils';
+import { initializeCampaignBroadcast, broadcastActionStarted, broadcastActionCompleted, createRealtimeSubscription } from '../utils/connectionUtils';
 import BannerAd from '../components/BannerAd';
 import LottieView from 'lottie-react-native';
 import { BannerAdSize } from 'react-native-google-mobile-ads';
@@ -58,8 +59,9 @@ interface InputOption {
 }
 
 export default function StoryScreen() {
+  console.log('::: ================================= 1')
   const [userInput, setUserInput] = useState('');
-  const [currentCampaign] = useAtom(currentCampaignAtom);
+  const [currentCampaign, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [user] = useAtom(userAtom);
   const [characters] = useAtom(charactersAtom);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
@@ -95,7 +97,7 @@ export default function StoryScreen() {
   const [getAiChoices] = useAtom(getAiChoicesAtom);
   const [, setAiChoices] = useAtom(setAiChoicesAtom);
   const [, clearAiChoices] = useAtom(clearAiChoicesAtom);
-
+  console.log('::: ================================= 2')
   // Store refs to avoid useEffect dependency issues
   const atomRefs = useRef({
     fetchCampaignHistory,
@@ -138,7 +140,7 @@ export default function StoryScreen() {
   const scrollDebounceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderCount = useRef(0);
   const lastHistoryLength = useRef(0);
-
+  console.log('::: ================================= 3')
   // Stabilize callback functions to prevent useConnectionMonitor from restarting
   const onConnectionLost = useCallback(() => {
     console.log('🔴 Story screen connection lost');
@@ -189,6 +191,7 @@ export default function StoryScreen() {
   }, [user?.id]);
 
   useEffect(() => {
+    console.log('::: ================================= --- 1')
     if (user) {
       fetchCharacters();
     }
@@ -237,7 +240,7 @@ export default function StoryScreen() {
       console.log('🏥 Subscription health monitoring disabled - using broadcast system instead');
       // Temporarily disable health check to let broadcast system work without interference
     };
-    
+    console.log('::: ================================= 5')
     startHealthCheck();
 
     // Initialize broadcast system for real-time action coordination
@@ -327,11 +330,11 @@ export default function StoryScreen() {
       }
     };
   }, [currentCampaign?.id]);
-
+  console.log('::: ================================= 6')
   // Load player actions when campaign and user are available
   useEffect(() => {
     if (!currentCampaign || !user) return;
-
+    console.log('::: ================================= -- 333')
     console.log('📋 Loading player actions for campaign:', currentCampaign.id, 'user:', user.id);
 
     // Fetch player actions from database
@@ -381,10 +384,11 @@ export default function StoryScreen() {
       setIsInitialLoading(true);
       return;
     }
-
+    console.log('::: ================================= --- 4444')
     // Check if all essential data has loaded
     const hasHistoryLoaded = campaignHistory.length >= 0; // Even empty history counts as "loaded"
-    const hasPlayerActionsLoaded = playerActions.length >= 0; // Even empty actions counts as "loaded"
+    const hasPlayerActionsLoaded =
+      Array.isArray(playerActions) || playerActions === undefined; // Even undefined actions counts as "loaded"
     
     if (hasHistoryLoaded && hasPlayerActionsLoaded) {
       // Wait 500ms before dismissing the campfire loader
@@ -432,7 +436,7 @@ export default function StoryScreen() {
       }
     };
   }, [campaignHistory.length, isInitialLoading]); // Include isInitialLoading in dependencies
-
+  console.log('::: ================================= 7')
   useEffect(() => {
     // Debounced read status update to prevent excessive API calls
     if (currentCampaign && campaignHistory.length > lastHistoryLength.current) {
@@ -596,7 +600,7 @@ export default function StoryScreen() {
 
     return () => clearTimeout(timeoutId);
   }, [currentCampaign, user, campaignHistory.length]);
-
+  console.log('::: ================================= 8')
   // Get current user's character for this campaign
   const getCurrentCharacter = (): Character | null => {
     if (!user || !currentCampaign) return null;
@@ -656,7 +660,7 @@ export default function StoryScreen() {
 
     return baseOptions;
   };
-
+  console.log('::: ================================= 9')
   const getCurrentPlaceholder = () => {
     const options = getInputOptions();
     if (selectedInputType === 'whisper' && whisperTarget) {
@@ -990,9 +994,18 @@ export default function StoryScreen() {
       stopLoading('sendAction');
     }
   };
-
+  
+  console.log('::: ================================= 10')
+  const alwaysAllowedTypes: InputType[] = ['whisper', 'ask', 'ooc'];
+  const currentCharacter = getCurrentCharacter();
+  console.log('::: ================================= 10 1')
+  const isTurn = currentCharacter?.id && currentCampaign?.current_player === currentCharacter.id && !currentCampaign?.paused;
+  const canSend = isTurn || alwaysAllowedTypes.includes(selectedInputType);
+  console.log('::: ================================= 10 2')
+  //if (!userInput.trim() || isLoading('sendAction') || !canSend) return;
+  console.log('::: ================================= 11')
   const handleSend = async () => {
-    if (!userInput.trim() || isLoading('sendAction')) return;
+    if (!userInput.trim() || isLoading('sendAction') || !canSend) return;
 
     const action = userInput.trim();
     setUserInput('');
@@ -1010,7 +1023,7 @@ export default function StoryScreen() {
       setTimeout(() => setShowChoices(true), 1000);
     }
   };
-
+  console.log('::: ================================= 12')
   const handleChoiceSelect = async (choice: string) => {
     if (isLoading('sendAction')) return;
 
@@ -1036,16 +1049,8 @@ export default function StoryScreen() {
   const handleCharacterPress = () => {
     setIsCharacterSheetVisible(true);
   };
-
-  if (!currentCampaign) {
-    return (
-      <ActivityIndicator
-        isLoading={true}
-        fullScreen
-        text="Loading campaign..."
-      />
-    );
-  }
+  console.log('::: ================================= 13')
+  const renderLoading = !currentCampaign;
 
   // Use dynamic choices from AI, database actions, or fallback to defaults
   const getDatabaseActionChoices = () => {
@@ -1061,10 +1066,10 @@ export default function StoryScreen() {
     // Convert action data to choice strings
     return modeActions.map(action => action.action_data.title);
   };
-
+  console.log('::: ================================= 14')
   const databaseChoices = getDatabaseActionChoices();
   const aiChoices = currentCampaign ? atomRefs.current.getAiChoices(currentCampaign.id) : [];
-
+  console.log('::: ================================= 15')
   const choicesToShow = aiChoices.length > 0
     ? aiChoices // Use AI-generated choices first
     : databaseChoices.length > 0
@@ -1076,9 +1081,8 @@ export default function StoryScreen() {
         'Listen carefully for any sounds',
       ]; // Fallback to defaults last
 
-  const currentCharacter = getCurrentCharacter();
   const currentInputOption = getCurrentInputOption();
-
+  console.log('::: =================================16')
   // Add manual refresh connection function
   const handleRefreshConnection = async () => {
     setConnectionStatus('connecting');
@@ -1103,6 +1107,67 @@ export default function StoryScreen() {
       setError('Failed to refresh connection. Please try again.');
     }
   };
+
+  // Determine if it is the current player's turn
+  const isPlayerTurn = currentCharacter?.id && currentCampaign?.current_player === currentCharacter.id && !currentCampaign?.paused;
+
+  // Subscribe to campaign row updates to track current_player / paused changes
+  const campaignSubscriptionRef = useRef<(() => void) | null>(null);
+  console.log('::: ================================= 17')
+  useEffect(() => {
+    if (!currentCampaign) return;
+
+    // Clean existing subscription first
+    if (campaignSubscriptionRef.current) {
+      campaignSubscriptionRef.current();
+      campaignSubscriptionRef.current = null;
+    }
+
+    const channelName = `campaign_${currentCampaign.id}`;
+    const cleanup = createRealtimeSubscription(
+      channelName,
+      {
+        postgres_changes: [{
+          event: '*',
+          schema: 'public',
+          table: 'campaigns',
+          filter: `id=eq.${currentCampaign.id}`
+        }]
+      },
+      (payload) => {
+        console.log('📡 Campaign update received', payload);
+        if (payload.new) {
+          setCurrentCampaign(payload.new);
+        }
+      },
+      5
+    );
+
+    campaignSubscriptionRef.current = cleanup;
+
+    return () => {
+      if (campaignSubscriptionRef.current) {
+        campaignSubscriptionRef.current();
+        campaignSubscriptionRef.current = null;
+      }
+    };
+  }, [currentCampaign?.id]);
+  console.log('::: ================================= 18')
+  // Allowed to send now? Say/RP require turn; OoC/Ask/Whisper allowed anytime
+  const allowedAnytime: InputType[] = ['whisper', 'ask', 'ooc'];
+  const canSendNow = isPlayerTurn || allowedAnytime.includes(selectedInputType);
+  console.log('⏳ isRenderLoading', renderLoading)
+  if (renderLoading) {
+    return (
+      <ActivityIndicator
+        isLoading={true}
+        fullScreen
+        text="Loading campaign..."
+      />
+    );
+  }
+  console.log('::: =================================')
+  console.log('⏳ isInitialLoading', isInitialLoading)
 
   return (
     <ImageBackground
@@ -1250,7 +1315,16 @@ export default function StoryScreen() {
               </View>
             )}
 
-            {showChoices && !isLoading('sendAction') &&
+            {/* Waiting for turn notification */}
+            {!isPlayerTurn && (
+              <View style={styles.loadingEvent}>
+                <Text style={styles.loadingEventText}>
+                  {currentCampaign?.players?.find(p => p?.character?.id === currentCampaign?.current_player)?.character?.name || 'Another player'} is writing their verse...
+                </Text>
+              </View>
+            )}
+
+            {showChoices && isPlayerTurn && !isLoading('sendAction') &&
               (selectedInputType === 'say' || selectedInputType === 'rp' || selectedInputType === 'action') && (
                 <EnhancedStoryChoices
                   choices={choicesToShow}
@@ -1305,10 +1379,10 @@ export default function StoryScreen() {
             <TouchableOpacity
               style={[
                 styles.sendButton,
-                (!userInput.trim() || isLoading('sendAction')) && styles.sendButtonDisabled
+                (userInput.trim().length === 0 || isLoading('sendAction') || !canSendNow) && styles.sendButtonDisabled
               ]}
               onPress={handleSend}
-              disabled={!userInput.trim() || isLoading('sendAction')}
+              disabled={userInput.trim().length === 0 || isLoading('sendAction') || !canSendNow}
             >
 
               <Forward size={24} color={userInput.trim() ? '#fff' : '#666'} />

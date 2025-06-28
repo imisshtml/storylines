@@ -22,6 +22,12 @@ export type Campaign = {
   max_level?: number;
   created_at?: string;
   uid: string;
+  // Initiative system fields
+  current_player?: string | null; // character UUID of player whose turn it is
+  turn_timer?: number | null; // minutes for turn timer
+  turn_start?: string | null; // ISO timestamp when turn started
+  auto_boot_limit?: number | null; // number of times bypass allowed
+  paused?: boolean | null; // campaign paused flag
   // Add fields for notification tracking
   latest_message_id?: number | null;
   has_unread?: boolean;
