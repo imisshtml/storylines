@@ -457,6 +457,27 @@ export const fetchCharactersAtom = atom(
   }
 );
 
+// Fetch characters for a specific campaign (all players)
+export const fetchCampaignCharactersAtom = atom(
+  null,
+  async (get, set, campaignId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('characters')
+        .select('*')
+        .eq('campaign_id', campaignId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching campaign characters:', error);
+      return [];
+    }
+  }
+);
+
 // Reset character creation state
 export const resetCharacterCreationAtom = atom(
   null,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Image } from 'react-native';
 import { Shield, Swords, Brain, Heart, Footprints, Star, Package, BookOpen, Medal, Scroll, Sword, Sparkles, Zap, ChevronUp, ChevronDown, Moon, LogOut, X } from 'lucide-react-native';
 import { Character, type DnDAbilities, isTwoHandedWeapon } from '../atoms/characterAtoms';
 import { supabase } from '../config/supabase';
@@ -10,6 +10,7 @@ import SpellSlotTracker from './SpellSlotTracker';
 import AbilityUsageTracker from './AbilityUsageTracker';
 import { useCustomAlert } from './CustomAlert';
 import { useAds } from '../hooks/useAds';
+import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 
 type CoreStat = {
   name: string;
@@ -66,9 +67,10 @@ interface CharacterViewProps {
   character?: Character | null;
   onClose?: () => void;
   onLeaveCampaign?: () => void;
+  readonly?: boolean;
 }
 
-export default function CharacterView({ character, onClose, onLeaveCampaign }: CharacterViewProps) {
+export default function CharacterView({ character, onClose, onLeaveCampaign, readonly = false }: CharacterViewProps) {
   const [activeTab, setActiveTab] = useState<'stats' | 'features' | 'inventory' | 'spells' | 'equipment'>('stats');
   const [expandedSpell, setExpandedSpell] = useState<string | null>(null);
   const [expandedTraits, setExpandedTraits] = useState<Set<string>>(new Set());
@@ -978,6 +980,26 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
 
   return (
     <View style={styles.container}>
+      {/* Character Header */}
+      <View style={styles.characterHeader}>
+        <Image
+          source={getCharacterAvatarUrl(character)}
+          style={styles.headerAvatar}
+        />
+        <View style={styles.characterInfo}>
+          <Text style={styles.characterName}>{character.name}</Text>
+          <Text style={styles.characterDetails}>
+            Level {character.level} {character.race} {character.class}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => onClose && onClose()}
+          style={styles.closeButton}
+        >
+          <X size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.tabs}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'stats' && styles.activeTab]}
@@ -1030,16 +1052,18 @@ export default function CharacterView({ character, onClose, onLeaveCampaign }: C
       </ScrollView>
 
       {/* Leave Campaign Button */}
-      <View style={styles.leaveCampaignContainer}>
-        <TouchableOpacity
-          style={styles.leaveCampaignButton}
-          onPress={handleLeaveCampaign}
-          activeOpacity={0.7}
-        >
-          <LogOut size={20} color="#ff5252" />
-          <Text style={styles.leaveCampaignText}>Leave Campaign</Text>
-        </TouchableOpacity>
-      </View>
+      {!readonly && (
+        <View style={styles.leaveCampaignContainer}>
+          <TouchableOpacity
+            style={styles.leaveCampaignButton}
+            onPress={handleLeaveCampaign}
+            activeOpacity={0.7}
+          >
+            <LogOut size={20} color="#ff5252" />
+            <Text style={styles.leaveCampaignText}>Leave Campaign</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Leave Campaign Confirmation Modal */}
       <Modal
@@ -1094,6 +1118,37 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
+  },
+  characterHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+    gap: 12,
+  },
+  headerAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
+  characterInfo: {
+    flex: 1,
+  },
+  characterName: {
+    fontSize: 18,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+  },
+  characterDetails: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontFamily: 'Inter-Regular',
+    marginTop: 2,
   },
   noCharacterContainer: {
     flex: 1,
