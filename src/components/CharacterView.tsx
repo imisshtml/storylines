@@ -853,27 +853,19 @@ export default function CharacterView({ character, onClose, onLeaveCampaign, rea
   };
 
   const handleLeaveCampaign = () => {
-    if (onClose) {
-      onClose(); // Close the CharacterView modal first
-    }
-    // Show confirmation modal after a brief delay to ensure CharacterView closes
-    setTimeout(() => {
-      setShowLeaveCampaignModal(true);
-    }, 100);
+    setShowLeaveCampaignModal(true);
   };
 
   const confirmLeaveCampaign = async () => {
     setShowLeaveCampaignModal(false);
 
     try {
-      // Show interstitial ad before leaving campaign
-      await showInterstitial('leave_campaign');
-      
       console.log('Starting leave campaign process for character:', character.id, 'campaign:', character.campaign_id);
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         console.error('No authenticated user found');
+        showAlert('Error', 'Authentication error. Please try again.', [{ text: 'OK' }], 'error');
         return;
       }
 
@@ -883,16 +875,18 @@ export default function CharacterView({ character, onClose, onLeaveCampaign, rea
       const { data: campaign, error: campaignQueryError } = await supabase
         .from('campaigns')
         .select('*')
-        .eq('uid', character.campaign_id)
+        .eq('id', character.campaign_id)
         .single();
 
       if (campaignQueryError) {
         console.error('Error fetching campaign:', campaignQueryError);
-        throw campaignQueryError;
+        showAlert('Error', 'Failed to find campaign. Please try again.', [{ text: 'OK' }], 'error');
+        return;
       }
 
       if (!campaign) {
         console.error('Campaign not found');
+        showAlert('Error', 'Campaign not found.', [{ text: 'OK' }], 'error');
         return;
       }
 
@@ -912,7 +906,8 @@ export default function CharacterView({ character, onClose, onLeaveCampaign, rea
 
       if (characterError) {
         console.error('Error updating character:', characterError);
-        throw characterError;
+        showAlert('Error', 'Failed to remove character from campaign.', [{ text: 'OK' }], 'error');
+        return;
       }
 
       console.log('Successfully removed character from campaign');
@@ -926,45 +921,53 @@ export default function CharacterView({ character, onClose, onLeaveCampaign, rea
       // Prepare campaign update
       const campaignUpdate: any = { players: updatedPlayers };
       
-      // If the owner is leaving, append "quit" to the owner field
+      // If the owner is leaving, set owner to null (campaign becomes ownerless)
       if (isOwner) {
-        campaignUpdate.owner = `${campaign.owner}quit`;
-        console.log('Owner leaving - updating owner field to:', campaignUpdate.owner);
+        campaignUpdate.owner = null;
+        console.log('Owner leaving - setting owner to null');
       }
 
       const { error: updatePlayersError } = await supabase
         .from('campaigns')
         .update(campaignUpdate)
-        .eq('uid', character.campaign_id);
+        .eq('id', character.campaign_id);
 
       if (updatePlayersError) {
         console.error('Error updating campaign:', updatePlayersError);
-        throw updatePlayersError;
+        showAlert('Error', 'Failed to update campaign. You may still be listed as a player.', [{ text: 'OK' }], 'error');
+        return;
       }
 
       console.log('Successfully updated campaign');
 
-      // Refresh campaigns data
-      console.log('Refreshing campaigns data...');
-      await fetchCampaigns();
-      
-      // Call the leave campaign callback to handle navigation
-      if (onLeaveCampaign) {
-        onLeaveCampaign();
+      // Close the character view modal first
+      if (onClose) {
+        onClose();
       }
 
-      // Route back to home screen
-      router.replace('/home');
-
-      showAlert(
-        'Left Campaign',
-        'You have successfully left the campaign.',
-        [{ text: 'OK' }],
-        'success'
-      );
+      // Small delay to ensure modal closes, then navigate
+      setTimeout(() => {
+        router.replace('/home');
+        
+        // Show success message after navigation
+        setTimeout(() => {
+          showAlert(
+            'Left Campaign',
+            'You have successfully left the campaign.',
+            [{ text: 'OK' }],
+            'success'
+          );
+        }, 100);
+      }, 300);
 
     } catch (error) {
       console.error('Error leaving campaign:', error);
+      
+      // Close modal on error too
+      if (onClose) {
+        onClose();
+      }
+      
       showAlert(
         'Error',
         'Failed to leave campaign. Please try again.',
@@ -976,6 +979,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign, rea
 
   const cancelLeaveCampaign = () => {
     setShowLeaveCampaignModal(false);
+    // Don't close the CharacterView modal - user just cancelled
   };
 
   return (

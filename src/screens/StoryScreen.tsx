@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, MessageSquare, Drama, Ear, CircleHelp as HelpCircle, RefreshCw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
-import { currentCampaignAtom } from '../atoms/campaignAtoms';
+import { currentCampaignAtom, fetchCampaignsAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import { charactersAtom, fetchCharactersAtom, type Character } from '../atoms/characterAtoms';
 import PartyDisplay from '../components/PartyDisplay';
@@ -68,6 +68,7 @@ export default function StoryScreen() {
   const [user] = useAtom(userAtom);
   const [characters] = useAtom(charactersAtom);
   const [, fetchCharacters] = useAtom(fetchCharactersAtom);
+  const [, fetchCampaigns] = useAtom(fetchCampaignsAtom);
   const [isCharacterSheetVisible, setIsCharacterSheetVisible] = useState(false);
   const [isPartyDisplayExpanded, setIsPartyDisplayExpanded] = useState(false);
   const [showChoices, setShowChoices] = useState(true);
@@ -1160,7 +1161,30 @@ export default function StoryScreen() {
 
   const closeCharacterView = () => {
     setIsCharacterSheetVisible(false);
-  }
+  };
+
+  const handleLeaveCampaign = async () => {
+    // CharacterView component handles modal closing after successful campaign leave
+    console.log('Leave campaign callback triggered');
+    
+    try {
+      // Refresh campaigns data to remove the left campaign from the list
+      await fetchCampaigns();
+      
+      // Refresh character data in case campaign_id was cleared
+      await fetchCharacters();
+      
+      // Navigate back to home screen after leaving
+      setTimeout(() => {
+        router.push('/');
+      }, 1000);
+      
+      console.log('✅ Campaign data refreshed after leaving');
+    } catch (error) {
+      console.error('❌ Error refreshing data after leaving campaign:', error);
+    }
+  };
+
   // Allowed to send now? Say/RP require turn; OoC/Ask/Whisper allowed anytime
   const allowedAnytime: InputType[] = ['whisper', 'ask', 'ooc'];
   const canSendNow = isPlayerTurn || allowedAnytime.includes(selectedInputType);
@@ -1439,7 +1463,11 @@ export default function StoryScreen() {
           <View style={styles.modalOverlay}>
             <View style={styles.bottomSheet}>
               {currentCharacter ? (
-                <CharacterView character={currentCharacter} onClose={closeCharacterView} />
+                <CharacterView 
+                  character={currentCharacter} 
+                  onClose={closeCharacterView}
+                  onLeaveCampaign={handleLeaveCampaign}
+                />
               ) : (
                 <View style={styles.noCharacterContainer}>
                   <Text style={styles.noCharacterText}>
