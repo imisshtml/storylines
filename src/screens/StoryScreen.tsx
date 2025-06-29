@@ -52,6 +52,7 @@ import { BannerAdSize } from 'react-native-google-mobile-ads';
 import { purchaseManager } from '../utils/purchaseManager';
 import { supabase } from '../config/supabase';
 import { performShortRest, performLongRest } from '../atoms/characterAtoms';
+import { enterStealth, breakStealth, isInStealth, handleStealthCheck, performStealAttempt } from '../utils/stealthUtils';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask' | 'action' | 'ooc';
 
@@ -84,9 +85,9 @@ export default function StoryScreen() {
   const [useItemNote, setUseItemNote] = useState('');
   const [restModalVisible, setRestModalVisible] = useState(false);
   const [stealModalVisible, setStealModalVisible] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<string>('');
-  const [itemUsageDescription, setItemUsageDescription] = useState('');
-  const [isSneaking, setIsSneaking] = useState(false);
+  const [selectedStealTarget, setSelectedStealTarget] = useState<string>('');
+  const [stealDescription, setStealDescription] = useState('');
+  // Removed isSneaking local state - now using character.stealth_roll from database
   // Rest voting
   const [pendingRest, setPendingRest] = useState<{
     restType: 'short' | 'long';
@@ -672,6 +673,45 @@ export default function StoryScreen() {
     return currentCampaign.players.filter(player => player.id !== user.id);
   };
 
+  const getStealTargets = (): {type: 'player' | 'npc', id: string, name: string, isOnline: boolean, character?: any}[] => {
+    const targets: {type: 'player' | 'npc', id: string, name: string, isOnline: boolean, character?: any}[] = [];
+    
+    // Add party members (excluding current player)
+    const otherPlayers = getOtherPlayers();
+    otherPlayers.forEach(player => {
+      const character = characters.find(c => c.user_id === player.id && c.campaign_id === currentCampaign?.id);
+      targets.push({
+        type: 'player',
+        id: player.id,
+        name: character?.name || player.name || 'Player',
+        isOnline: currentCampaign?.players_online?.[player.id] !== undefined,
+        character: character // Include character data for perception calculation
+      });
+    });
+    
+    // Add common NPC targets (these would typically come from the story context)
+    const commonNPCs = [
+      'Merchant',
+      'Guard',
+      'Innkeeper',
+      'Noble',
+      'Commoner',
+      'Bandit',
+      'Traveler'
+    ];
+    
+    commonNPCs.forEach(npc => {
+      targets.push({
+        type: 'npc',
+        id: npc.toLowerCase(),
+        name: npc,
+        isOnline: true // NPCs are always "available"
+      });
+    });
+    
+    return targets;
+  };
+
   // Get input options based on current state
   const getInputOptions = (): InputOption[] => {
     const baseOptions: InputOption[] = [
@@ -860,6 +900,21 @@ export default function StoryScreen() {
 
       // Get current character for this campaign
       const currentCharacter = getCurrentCharacter();
+
+      // Check if this action should break stealth
+      if (currentCharacter) {
+        try {
+          const stealthBroken = await handleStealthCheck(currentCharacter, action);
+          if (stealthBroken) {
+            console.log(`💥 Stealth broken for ${currentCharacter.name} due to action: ${action}`);
+            // Refresh character data to get updated stealth_roll (now 0)
+            await fetchCharacters();
+            console.log(`✅ Character stealth broken and data refreshed`);
+          }
+        } catch (error) {
+          console.error('Error checking stealth:', error);
+        }
+      }
 
       // Add player message to campaign history (without dice_roll for now)
       await atomRefs.current.addCampaignMessage({
@@ -1355,12 +1410,26 @@ export default function StoryScreen() {
       await refreshSupabaseConnection();
       await reconnectAllSubscriptions();
       
+      // Also refresh campaign and character data to ensure everything is in sync
+      console.log('🔄 Refreshing campaign and character data...');
+      const refreshPromises = [
+        fetchCampaigns(),
+        fetchCharacters()
+      ];
+      
+      if (currentCampaign?.id) {
+        refreshPromises.push(atomRefs.current.fetchCampaignHistory(currentCampaign.id));
+      }
+      
+      await Promise.all(refreshPromises);
+      
       // Wait a moment then check health
       setTimeout(() => {
         monitorSubscriptionHealth();
         setConnectionStatus('connected');
         setRetryCount(0);
         setError(null);
+        console.log('✅ Connection and data refresh completed');
       }, 3000);
       
     } catch (error) {
@@ -1430,10 +1499,27 @@ export default function StoryScreen() {
     sendPlayerAction('looks around the environment');
   };
 
-  const handleSneak = () => {
+  const handleSneak = async () => {
     setIsActionsPanelExpanded(false);
-    setIsSneaking(true);
-    sendPlayerAction('attempts to move silently and hide');
+    const currentCharacter = getCurrentCharacter();
+    if (!currentCharacter) return;
+    
+    try {
+      // Roll for stealth and update character
+      const stealthRoll = await enterStealth(currentCharacter);
+      console.log(`🎭 ${currentCharacter.name} entered stealth with roll: ${stealthRoll}`);
+      
+      // Refresh character data to get updated stealth_roll
+      await fetchCharacters();
+      
+      // Send action message with stealth roll
+      sendPlayerAction(`attempts to move silently and hide (Stealth: ${stealthRoll})`);
+      
+      console.log(`✅ Character stealth updated and refreshed`);
+    } catch (error) {
+      console.error('Failed to enter stealth:', error);
+      sendPlayerAction('attempts to move silently and hide');
+    }
   };
 
   const handleLockpick = () => {
@@ -1471,19 +1557,20 @@ export default function StoryScreen() {
 
   // COMPUTE BASE ACTIONS (insert right after currentCharacter const)
   const characterHasLockpicks = currentCharacter?.equipment?.some(eq => eq.name.toLowerCase().includes('lockpick')) ?? false;
+  const characterIsInStealth = currentCharacter ? isInStealth(currentCharacter) : false;
 
   const baseActions = [
     { key: 'search', label: 'Search', icon: <Search size={18} color="#fff" />, onPress: handleSearch },
     { key: 'useItem', label: 'Use Item', icon: <PackageIcon size={18} color="#fff" />, onPress: handleUseItem },
     { key: 'rest', label: 'Rest', icon: <BedDouble size={18} color="#fff" />, onPress: handleRest },
-    { key: 'sneak', label: 'Sneak', icon: <EyeOff size={18} color="#fff" />, onPress: handleSneak },
-    ...(isSneaking ? [{ key: 'steal', label: 'Steal', icon: <HandCoins size={18} color="#fff" />, onPress: handleSteal }] : []),
+    { key: 'sneak', label: characterIsInStealth ? 'Sneaking' : 'Sneak', icon: <EyeOff size={18} color="#fff" />, onPress: characterIsInStealth ? undefined : handleSneak },
+    ...(characterIsInStealth ? [{ key: 'steal', label: 'Steal', icon: <HandCoins size={18} color="#fff" />, onPress: handleSteal }] : []),
     ...(characterHasLockpicks ? [{ key: 'lockpick', label: 'Lockpick', icon: <Lock size={18} color="#fff" />, onPress: handleLockpick }] : []),
     { key: 'pause', label: currentCampaign?.paused ? 'Unpause' : 'Pause', icon: <PauseIcon size={18} color="#fff" />, onPress: handleTogglePause },
     { key: 'refresh', label: 'Refresh', icon: <RefreshCw size={18} color="#fff" />, onPress: handleRefreshConnection },
   ].map(action => ({
     ...action,
-    disabled: !(isPlayerTurn || action.key === 'refresh' || action.key === 'pause'),
+    disabled: !(isPlayerTurn || action.key === 'refresh' || action.key === 'pause') || (action.key === 'sneak' && characterIsInStealth),
   }));
 
   // ==== Helper for Use Item confirm ====
@@ -1499,10 +1586,46 @@ export default function StoryScreen() {
     setUseItemModalVisible(false);
   };
 
+  // ==== Helper for Steal confirm ====
+  const handleConfirmSteal = async () => {
+    if (!currentCharacter || !selectedStealTarget || !stealDescription.trim()) return;
+    
+    const description = stealDescription.trim();
+    
+    // Find the target object
+    const targets = getStealTargets();
+    const target = targets.find(t => t.name === selectedStealTarget);
+    if (!target) return;
+    
+    try {
+      // Perform D&D 5e steal attempt
+      const result = await performStealAttempt(currentCharacter, target, description);
+      
+      // Send the result message
+      sendPlayerAction(result.message);
+      
+      // If stealth was broken, refresh character data
+      if (result.stealthBroken) {
+        await fetchCharacters();
+        console.log(`💥 Stealth broken due to steal attempt`);
+      }
+      
+    } catch (error) {
+      console.error('Failed to perform steal attempt:', error);
+      // Fallback to basic message
+      sendPlayerAction(`${currentCharacter.name} attempts to stealthily steal from ${selectedStealTarget}: ${description}`);
+    }
+    
+    // reset
+    setSelectedStealTarget('');
+    setStealDescription('');
+    setStealModalVisible(false);
+  };
+
   // Broadcast helpers
   const requestRest = async (type: 'short' | 'long') => {
     if (!currentCampaign || !user) return;
-    const deadline = Date.now() + 5000; // 5 seconds - shorter timeout
+    const deadline = Date.now() + 10000; // 5 seconds - shorter timeout
     console.log('🛌 Requesting rest:', { type, playerId: user.id, playerName: currentCharacter?.name || user.username || 'Player' });
     setPendingRest({ restType: type, requesterId: user.id, requesterName: currentCharacter?.name || user.username || 'Player', deadline, votes: { [user.id]: true } });
     await broadcastRestRequest(currentCampaign.id, { playerId: user.id, playerName: currentCharacter?.name || user.username || 'Player', restType: type, deadline });
@@ -1621,14 +1744,22 @@ export default function StoryScreen() {
               // Limit rendered messages to prevent memory issues on Android
               campaignHistory
                 .slice(-30) // Only show last 30 messages to prevent memory overflow
-                .map((message, index) => (
-                  <StoryEventItem 
-                    key={`${message.id}-${index}`} 
-                    message={message} 
-                    campaignId={currentCampaign.id}
-                    onReport={handleReport}
-                  />
-                ))
+                .map((message, index) => {
+                  // Find the character for this message if it's a player message
+                  const messageCharacter = message.character_id 
+                    ? characters.find(c => c.id === message.character_id)
+                    : undefined;
+                  
+                  return (
+                    <StoryEventItem 
+                      key={`${message.id}-${index}`} 
+                      message={message} 
+                      campaignId={currentCampaign.id}
+                      character={messageCharacter}
+                      onReport={handleReport}
+                    />
+                  );
+                })
             )}
 
             {isLoading('initialStory') && (
@@ -1703,7 +1834,10 @@ export default function StoryScreen() {
             {!isPlayerTurn && Object.keys(otherPlayerActions).length === 0 && (
               <View style={styles.loadingEvent}>
                 <Text style={styles.loadingEventText}>
-                  {currentCampaign?.current_player_name || 'Another player'} is writing their verse...
+                  {currentCampaign?.paused 
+                    ? 'The story has been paused a moment...'
+                    : `${currentCampaign?.current_player_name || 'Another player'} is writing their verse...`
+                  }
                 </Text>
               </View>
             )}
@@ -1906,6 +2040,63 @@ export default function StoryScreen() {
                   <Text style={styles.simpleModalButtonText}>Long Rest</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.simpleModalCancel} onPress={() => setRestModalVisible(false)}>
+                  <Text style={styles.simpleModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Steal Modal */}
+        <Modal visible={stealModalVisible} transparent animationType="fade" onRequestClose={() => setStealModalVisible(false)}>
+          <View style={styles.centeredOverlay}>
+            <View style={styles.simpleModal}>
+              <Text style={styles.simpleModalTitle}>Choose Steal Target</Text>
+              
+              <ScrollView style={{ maxHeight: 200, alignSelf: 'stretch', marginVertical: 8 }}>
+                {getStealTargets().map((target) => (
+                  <TouchableOpacity
+                    key={target.id}
+                    style={[
+                      styles.itemRow, 
+                      selectedStealTarget === target.name && styles.itemRowSelected,
+                      target.type === 'player' && !target.isOnline && styles.itemRowOffline
+                    ]}
+                    onPress={() => setSelectedStealTarget(target.name)}
+                    disabled={target.type === 'player' && !target.isOnline}
+                  >
+                    <Text style={[
+                      styles.itemRowText,
+                      target.type === 'player' && !target.isOnline && styles.itemRowTextOffline
+                    ]}>
+                      {target.name} {target.type === 'player' ? '(Player)' : '(NPC)'}
+                      {target.type === 'player' && !target.isOnline && ' (Offline)'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <TextInput
+                style={styles.simpleTextInput}
+                placeholder="Describe what you're trying to steal..."
+                placeholderTextColor="#666"
+                multiline
+                value={stealDescription}
+                onChangeText={setStealDescription}
+              />
+
+              <View style={styles.simpleModalButtons}>
+                <TouchableOpacity
+                  style={[
+                    styles.simpleModalButton, 
+                    (!selectedStealTarget || !stealDescription.trim()) && styles.simpleModalButtonDisabled
+                  ]}
+                  disabled={!selectedStealTarget || !stealDescription.trim()}
+                  onPress={handleConfirmSteal}
+                >
+                  <Text style={styles.simpleModalButtonText}>Attempt Steal</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.simpleModalCancel} onPress={() => setStealModalVisible(false)}>
                   <Text style={styles.simpleModalCancelText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
@@ -2297,6 +2488,13 @@ const styles = StyleSheet.create({
   itemRowText: {
     color: '#fff',
     fontFamily: 'Inter-Regular',
+  },
+  itemRowOffline: {
+    opacity: 0.5,
+    backgroundColor: '#333',
+  },
+  itemRowTextOffline: {
+    color: '#999',
   },
   simpleTextInput: {
     backgroundColor: '#2a2a2a',

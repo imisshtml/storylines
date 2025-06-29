@@ -14,6 +14,8 @@ import { useAtom } from 'jotai';
 import { fetchCampaignCharactersAtom } from '../atoms/characterAtoms';
 import { Campaign } from '../atoms/campaignAtoms';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
+import { isInStealth } from '../utils/stealthUtils';
+import { VenetianMask } from 'lucide-react-native';
 import CharacterView from './CharacterView';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -149,6 +151,13 @@ export default function PartyDisplay({ campaign, currentUserId, isExpanded = fal
                     ]}
                   />
                   
+                  {/* Stealth mask overlay */}
+                  {member.character && isInStealth(member.character) && (
+                    <View style={styles.stealthMaskOverlay}>
+                      <VenetianMask size={20} color="#fff" />
+                    </View>
+                  )}
+                  
                   {/* Current player indicator */}
                   {false && member.isCurrentPlayer && (
                     <View style={styles.currentPlayerIndicator}>
@@ -227,6 +236,15 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     borderWidth: 2,
     borderColor: '#ddd',
+  },
+  stealthMaskOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   offlineAvatar: {
     opacity: 0.6,

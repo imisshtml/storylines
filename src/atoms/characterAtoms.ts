@@ -137,6 +137,7 @@ export type Character = {
   long_rest_recharge?: AbilityUses;
   last_short_rest?: string;
   last_long_rest?: string;
+  stealth_roll?: number; // 0 means not in stealth, >0 is the stealth roll value
   retired?: boolean;
   created_at?: string;
   updated_at?: string;

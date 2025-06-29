@@ -1,16 +1,19 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { User, Crown, Info, Flag } from 'lucide-react-native';
+import { User, Crown, Info, Flag, VenetianMask } from 'lucide-react-native';
+import { isInStealth } from '../utils/stealthUtils';
 import { CampaignMessage } from '../atoms/campaignHistoryAtoms';
+import { Character } from '../atoms/characterAtoms';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 
 interface StoryEventItemProps {
   message: CampaignMessage;
   campaignId: string;
+  character?: Character; // Add character data to check stealth status
   onReport?: (message: CampaignMessage) => void;
 }
 
-const StoryEventItem = memo(({ message, campaignId, onReport }: StoryEventItemProps) => {
+const StoryEventItem = memo(({ message, campaignId, character, onReport }: StoryEventItemProps) => {
   // Dice roll logic temporarily disabled to prevent ExoPlayer crashes on Android
 
   const getEventIcon = () => {
@@ -18,6 +21,9 @@ const StoryEventItem = memo(({ message, campaignId, onReport }: StoryEventItemPr
       case 'gm':
         return <Crown size={24} color="#FFD700" />;
       case 'player':
+        // Check if the character is actually in stealth based on stealth_roll
+        const playerIsInStealth = character && isInStealth(character);
+    
         // Show character avatar if available, otherwise default user icon
         if (message.character_avatar && message.character_avatar.trim() !== '') {
           // Create a mock character object to use with getCharacterAvatarUrl
@@ -40,6 +46,11 @@ const StoryEventItem = memo(({ message, campaignId, onReport }: StoryEventItemPr
                 resizeMode="cover"
                 // Remove excessive logging that can cause performance issues
               />
+              {playerIsInStealth && (
+                <View style={styles.stealthIconContainer}>
+                  <VenetianMask size={20} color="#fff" />
+                </View>
+              )}
             </View>
           );
         }
@@ -156,6 +167,15 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
+  },
+  stealthIconContainer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerText: {
     fontSize: 14,
