@@ -15,7 +15,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, MessageSquare, Drama, Ear, CircleHelp as HelpCircle, RefreshCw } from 'lucide-react-native';
+import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, ChevronUp, MessageSquare, Drama, Ear, CircleHelp as HelpCircle, RefreshCw, Search, Package as PackageIcon, BedDouble, EyeOff, HandCoins, Lock, Pause as PauseIcon } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom, fetchCampaignsAtom } from '../atoms/campaignAtoms';
@@ -45,11 +45,13 @@ import ContentReportModal from '../components/ContentReportModal';
 import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
-import { initializeCampaignBroadcast, broadcastActionStarted, broadcastActionCompleted, createRealtimeSubscription } from '../utils/connectionUtils';
+import { initializeCampaignBroadcast, broadcastActionStarted, broadcastActionCompleted, createRealtimeSubscription, broadcastRestRequest, broadcastRestResponse } from '../utils/connectionUtils';
 import BannerAd from '../components/BannerAd';
 import LottieView from 'lottie-react-native';
 import { BannerAdSize } from 'react-native-google-mobile-ads';
 import { purchaseManager } from '../utils/purchaseManager';
+import { supabase } from '../config/supabase';
+import { performShortRest, performLongRest } from '../atoms/characterAtoms';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask' | 'action' | 'ooc';
 
@@ -75,7 +77,25 @@ export default function StoryScreen() {
   const [error, setError] = useState<string | null>(null);
   const { isLoading, startLoading, stopLoading, withLoading } = useLoading();
   const [shouldHideAds, setShouldHideAds] = useState(false);
-
+  // ▶ Base-Actions Panel state (must be before any conditional returns)
+  const [isActionsPanelExpanded, setIsActionsPanelExpanded] = useState(false);
+  const [useItemModalVisible, setUseItemModalVisible] = useState(false);
+  const [selectedUseItemId, setSelectedUseItemId] = useState<string>('');
+  const [useItemNote, setUseItemNote] = useState('');
+  const [restModalVisible, setRestModalVisible] = useState(false);
+  const [stealModalVisible, setStealModalVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<string>('');
+  const [itemUsageDescription, setItemUsageDescription] = useState('');
+  const [isSneaking, setIsSneaking] = useState(false);
+  // Rest voting
+  const [pendingRest, setPendingRest] = useState<{
+    restType: 'short' | 'long';
+    requesterId: string;
+    requesterName: string;
+    deadline: number;
+    votes: { [playerId: string]: boolean };
+  } | null>(null);
+  const [showRestPrompt, setShowRestPrompt] = useState(false);
   // Input type selection
   const [selectedInputType, setSelectedInputType] = useState<InputType>('say');
   const [showInputTypeDropdown, setShowInputTypeDropdown] = useState(false);
@@ -304,6 +324,29 @@ export default function StoryScreen() {
           } else {
             console.log('📢 Action completed with failure');
           }
+        },
+        onRestRequest: (data) => {
+          console.log('🛌 Rest request received:', { 
+            ...data, 
+            isMyRequest: data.playerId === user?.id,
+            currentUserId: user?.id 
+          });
+          if (data.playerId !== user?.id) {
+            setPendingRest({ restType: data.restType, requesterId: data.playerId, requesterName: data.playerName, deadline: data.deadline, votes: { [data.playerId]: true } });
+            setShowRestPrompt(true);
+            console.log('🛌 Showing rest prompt to user');
+          } else {
+            console.log('🛌 Ignoring own rest request');
+          }
+        },
+        onRestResponse: (data) => {
+          console.log('Rest response received:', data);
+          setPendingRest(prev => {
+            if (!prev) return prev;
+            const newVotes = { ...prev.votes, [data.playerId]: data.accepted };
+            console.log('Updated votes:', newVotes);
+            return { ...prev, votes: newVotes };
+          });
         }
       });
       
@@ -516,7 +559,6 @@ export default function StoryScreen() {
 
           // Update campaign status directly using Supabase
           // The real-time subscription will update our state
-          const { supabase } = await import('../config/supabase');
           await supabase
             .from('campaigns')
             .update({ status: 'waiting' })
@@ -1070,63 +1112,144 @@ export default function StoryScreen() {
     outputRange: ['0deg', '180deg'],
   });
 
-  const renderLoading = !currentCampaign;
-
-  // Use dynamic choices from AI, database actions, or fallback to defaults
-  const getDatabaseActionChoices = () => {
-    if (!playerActions || playerActions.length === 0) {
-      console.log('🎬 No player actions available');
-      return [];
+  // Helper to execute rest immediately for now (short / long)
+  const restExecutionRef = useRef<string | null>(null); // Store the rest type being executed
+  const executeRest = useCallback(async (type: 'short' | 'long') => {
+    if (!currentCampaign || !pendingRest) return;
+    
+    // Create a unique execution key for this rest request
+    const executionKey = `${pendingRest.requesterId}-${pendingRest.restType}-${pendingRest.deadline}`;
+    
+    // Prevent duplicate executions of the same rest request
+    if (restExecutionRef.current === executionKey) {
+      console.log('🚫 Rest execution already in progress for:', executionKey);
+      return;
+    }
+    
+    restExecutionRef.current = executionKey;
+    console.log('🛌 Executing rest for party...', { type, executionKey });
+    
+    const partyChars = characters.filter(c => c.campaign_id === currentCampaign.id);
+    
+    // Perform rest for all party characters
+    for (const pc of partyChars) {
+      try {
+        if (type === 'short') await performShortRest(pc.id);
+        else await performLongRest(pc.id);
+      } catch (e) {
+        console.error('Rest error for', pc.name, e);
+      }
     }
 
-    // Filter for current game mode (exploration by default)
-    const currentGameMode = 'exploration';
-    const modeActions = playerActions.filter(action => action.game_mode === currentGameMode);
-
-    // Convert action data to choice strings
-    return modeActions.map(action => action.action_data.title);
-  };
-  const databaseChoices = getDatabaseActionChoices();
-  const aiChoices = currentCampaign ? atomRefs.current.getAiChoices(currentCampaign.id) : [];
-  const choicesToShow = aiChoices.length > 0
-    ? aiChoices // Use AI-generated choices first
-    : databaseChoices.length > 0
-      ? databaseChoices // Use database actions second
-      : [
-        'Explore deeper into the forest',
-        'Search for signs of civilization',
-        'Set up camp for the night',
-        'Listen carefully for any sounds',
-      ]; // Fallback to defaults last
-
-  const currentInputOption = getCurrentInputOption();
-  // Add manual refresh connection function
-  const handleRefreshConnection = async () => {
-    setConnectionStatus('connecting');
+    // Send ONE system message for the entire party
+    const restMessage = `The party takes a ${type} rest and recovers.`;
+    console.log('📝 Adding rest system message for execution:', executionKey, 'Message:', restMessage);
+    
     try {
-      const { refreshSupabaseConnection, reconnectAllSubscriptions, monitorSubscriptionHealth } = await import('../utils/connectionUtils');
-      
-      console.log('🔄 Manual connection refresh initiated...');
-      await refreshSupabaseConnection();
-      await reconnectAllSubscriptions();
-      
-      // Wait a moment then check health
-      setTimeout(() => {
-        monitorSubscriptionHealth();
-        setConnectionStatus('connected');
-        setRetryCount(0);
-        setError(null);
-      }, 3000);
-      
+      await atomRefs.current.addCampaignMessage({
+        campaign_id: currentCampaign.id,
+        message: restMessage,
+        author: 'System',
+        message_type: 'system'
+      });
+      console.log('✅ Rest system message added successfully for execution:', executionKey);
     } catch (error) {
-      console.error('Manual refresh failed:', error);
-      setConnectionStatus('disconnected');
-      setError('Failed to refresh connection. Please try again.');
+      console.error('❌ Failed to add rest system message:', error);
+      throw error; // Re-throw to prevent further execution
     }
-  };
 
-  // Determine if it is the current player's turn
-  const isPlayerTurn = currentCharacter?.id && currentCampaign?.current_player === currentCharacter.id && !currentCampaign?.paused;
+    // Broadcast completion so turn can continue
+    await broadcastActionCompleted(currentCampaign.id, { playerId: pendingRest.requesterId, success: true });
+    
+    console.log('✅ Rest execution completed for:', executionKey);
+    
+    // Reset the execution flag after a delay
+    setTimeout(() => {
+      if (restExecutionRef.current === executionKey) {
+        restExecutionRef.current = null;
+      }
+    }, 3000);
+  }, [currentCampaign, characters, pendingRest]);
+
+  // Handle rest resolution
+  useEffect(() => {
+    if (!pendingRest || !currentCampaign) return;
+    
+    let isResolved = false; // Prevent multiple executions
+    
+    const interval = setInterval(() => {
+      if (isResolved) return; // Already resolved, don't execute again
+      
+      const onlinePlayerIds = Object.keys(currentCampaign.players_online || {});
+      const idsToWaitFor = onlinePlayerIds.length > 0 ? onlinePlayerIds : currentCampaign.players.map(p => p.id);
+      const allResponded = idsToWaitFor.every(id => pendingRest.votes[id] !== undefined);
+      const timedOut = Date.now() > pendingRest.deadline;
+      
+      console.log('Rest resolution check:', {
+        onlinePlayerIds,
+        idsToWaitFor,
+        votes: pendingRest.votes,
+        allResponded,
+        timedOut,
+        playersOnlineData: currentCampaign.players_online,
+        playersData: currentCampaign.players.map(p => ({ id: p.id, name: p.name, isOnline: currentCampaign.players_online?.[p.id] !== undefined }))
+      });
+      
+      if (allResponded || timedOut) {
+        isResolved = true; // Mark as resolved to prevent multiple executions
+        clearInterval(interval); // Stop the interval immediately
+        
+        // Only explicit "No" votes count as denial - missing votes are treated as approval
+        const explicitDenials = Object.values(pendingRest.votes).filter(v => v === false);
+        const denied = explicitDenials.length > 0;
+        const denierName = currentCampaign.players.find(p => pendingRest.votes[p.id] === false)?.name;
+        
+        if (!denied) {
+          console.log('Rest approved, executing...', { 
+            reason: allResponded ? 'all responded' : 'timeout with implicit approval',
+            votes: pendingRest.votes,
+            isRequester: user?.id === pendingRest.requesterId
+          });
+          
+          // Only the requester should execute the rest to prevent duplicates
+          if (user?.id === pendingRest.requesterId) {
+            console.log('🎯 This user is the requester, executing rest...');
+            executeRest(pendingRest.restType);
+          } else {
+            console.log('👀 This user is not the requester, skipping rest execution');
+          }
+        } else {
+          console.log('Rest denied by:', denierName, { 
+            votes: pendingRest.votes,
+            isRequester: user?.id === pendingRest.requesterId 
+          });
+          
+          // Only the requester should send the denial message to prevent duplicates
+          if (user?.id === pendingRest.requesterId) {
+            console.log('🎯 This user is the requester, sending denial message...');
+            // Notify all players that rest was denied
+            atomRefs.current.addCampaignMessage({
+              campaign_id: currentCampaign.id,
+              message: `Rest request was declined by ${denierName || 'a party member'}.`,
+              author: 'System',
+              message_type: 'system'
+            });
+            
+            // Broadcast completion to the requester
+            broadcastActionCompleted(currentCampaign.id, { playerId: pendingRest.requesterId, success: false });
+          } else {
+            console.log('👀 This user is not the requester, skipping denial message');
+          }
+        }
+        
+        setPendingRest(null);
+        setShowRestPrompt(false);
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [pendingRest, currentCampaign, executeRest]);
+
   // Subscribe to campaign row updates to track current_player / paused changes
   const campaignSubscriptionRef = useRef<(() => void) | null>(null);
   useEffect(() => {
@@ -1167,6 +1290,88 @@ export default function StoryScreen() {
       }
     };
   }, [currentCampaign?.id]);
+
+  const renderLoading = !currentCampaign;
+
+  // Use dynamic choices from AI, database actions, or fallback to defaults
+  const getDatabaseActionChoices = () => {
+    if (!playerActions || playerActions.length === 0) {
+      console.log('🎬 No player actions available');
+      return [];
+    }
+
+    // Filter for current game mode (exploration by default)
+    const currentGameMode = 'exploration';
+    const modeActions = playerActions.filter(action => action.game_mode === currentGameMode);
+
+    // Convert action data to choice strings
+    return modeActions.map(action => action.action_data.title);
+  };
+  const databaseChoices = getDatabaseActionChoices();
+  const aiChoices = currentCampaign ? atomRefs.current.getAiChoices(currentCampaign.id) : [];
+
+  // Filter out base panel actions from AI / database suggestions
+  const BASE_ACTION_KEYWORDS = [
+    'search',
+    'look around',
+    'use item',
+    'rest',
+    'sneak',
+    'hide',
+    'steal',
+    'lockpick',
+    'pick lock',
+    'pause',
+    'unpause',
+    'refresh',
+    'reconnect',
+  ];
+
+  const filterBaseActions = (choices: string[]) =>
+    choices.filter(choice => !BASE_ACTION_KEYWORDS.some(keyword => choice.toLowerCase().includes(keyword)));
+
+  const filteredAiChoices = filterBaseActions(aiChoices);
+  const filteredDbChoices = filterBaseActions(databaseChoices);
+
+  const choicesToShow = filteredAiChoices.length > 0
+    ? filteredAiChoices // Use AI-generated choices first
+    : filteredDbChoices.length > 0
+      ? filteredDbChoices // Use database actions second
+      : [
+        'Explore deeper into the forest',
+        'Investigate any strange noises',
+        'Set up camp for the night',
+        'Plan your next move together',
+      ]; // Fallback to defaults last
+
+  const currentInputOption = getCurrentInputOption();
+  // Add manual refresh connection function
+  const handleRefreshConnection = async () => {
+    setConnectionStatus('connecting');
+    try {
+      const { refreshSupabaseConnection, reconnectAllSubscriptions, monitorSubscriptionHealth } = await import('../utils/connectionUtils');
+      
+      console.log('🔄 Manual connection refresh initiated...');
+      await refreshSupabaseConnection();
+      await reconnectAllSubscriptions();
+      
+      // Wait a moment then check health
+      setTimeout(() => {
+        monitorSubscriptionHealth();
+        setConnectionStatus('connected');
+        setRetryCount(0);
+        setError(null);
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Manual refresh failed:', error);
+      setConnectionStatus('disconnected');
+      setError('Failed to refresh connection. Please try again.');
+    }
+  };
+
+  // Determine if it is the current player's turn
+  const isPlayerTurn = currentCharacter?.id && currentCampaign?.current_player === currentCharacter.id && !currentCampaign?.paused;
 
   const closeCharacterView = () => {
     setIsCharacterSheetVisible(false);
@@ -1215,6 +1420,112 @@ export default function StoryScreen() {
   const handleCloseReport = () => {
     setShowReportModal(false);
     setReportingMessage(null);
+  };
+
+  // ─── Base-Actions Panel ────────────────────────────────────────────────
+  const toggleActionsPanel = () => setIsActionsPanelExpanded(prev => !prev);
+
+  const handleSearch = () => {
+    setIsActionsPanelExpanded(false);
+    sendPlayerAction('looks around the environment');
+  };
+
+  const handleSneak = () => {
+    setIsActionsPanelExpanded(false);
+    setIsSneaking(true);
+    sendPlayerAction('attempts to move silently and hide');
+  };
+
+  const handleLockpick = () => {
+    setIsActionsPanelExpanded(false);
+    sendPlayerAction('attempts to pick the lock using their lockpicks');
+  };
+
+  const handleUseItem = () => {
+    setIsActionsPanelExpanded(false);
+    setUseItemModalVisible(true);
+  };
+
+  const handleRest = () => {
+    setIsActionsPanelExpanded(false);
+    setRestModalVisible(true);
+  };
+
+  const handleSteal = () => {
+    setIsActionsPanelExpanded(false);
+    setStealModalVisible(true);
+  };
+
+  const handleTogglePause = async () => {
+    if (!currentCampaign) return;
+    try {
+      await supabase
+        .from('campaigns')
+        .update({ paused: !currentCampaign.paused })
+        .eq('id', currentCampaign.id);
+      setCurrentCampaign({ ...currentCampaign, paused: !currentCampaign.paused });
+    } catch (error) {
+      console.error('Failed toggling pause:', error);
+    }
+  };
+
+  // COMPUTE BASE ACTIONS (insert right after currentCharacter const)
+  const characterHasLockpicks = currentCharacter?.equipment?.some(eq => eq.name.toLowerCase().includes('lockpick')) ?? false;
+
+  const baseActions = [
+    { key: 'search', label: 'Search', icon: <Search size={18} color="#fff" />, onPress: handleSearch },
+    { key: 'useItem', label: 'Use Item', icon: <PackageIcon size={18} color="#fff" />, onPress: handleUseItem },
+    { key: 'rest', label: 'Rest', icon: <BedDouble size={18} color="#fff" />, onPress: handleRest },
+    { key: 'sneak', label: 'Sneak', icon: <EyeOff size={18} color="#fff" />, onPress: handleSneak },
+    ...(isSneaking ? [{ key: 'steal', label: 'Steal', icon: <HandCoins size={18} color="#fff" />, onPress: handleSteal }] : []),
+    ...(characterHasLockpicks ? [{ key: 'lockpick', label: 'Lockpick', icon: <Lock size={18} color="#fff" />, onPress: handleLockpick }] : []),
+    { key: 'pause', label: currentCampaign?.paused ? 'Unpause' : 'Pause', icon: <PauseIcon size={18} color="#fff" />, onPress: handleTogglePause },
+    { key: 'refresh', label: 'Refresh', icon: <RefreshCw size={18} color="#fff" />, onPress: handleRefreshConnection },
+  ].map(action => ({
+    ...action,
+    disabled: !(isPlayerTurn || action.key === 'refresh' || action.key === 'pause'),
+  }));
+
+  // ==== Helper for Use Item confirm ====
+  const handleConfirmUseItem = () => {
+    if (!currentCharacter) return;
+    const item = currentCharacter.equipment.find(eq => eq.id === selectedUseItemId);
+    if (!item) return;
+    const note = useItemNote.trim().length > 0 ? `: ${useItemNote.trim()}` : '';
+    sendPlayerAction(`${currentCharacter.name} uses ${item.name}${note}`);
+    // reset
+    setSelectedUseItemId('');
+    setUseItemNote('');
+    setUseItemModalVisible(false);
+  };
+
+  // Broadcast helpers
+  const requestRest = async (type: 'short' | 'long') => {
+    if (!currentCampaign || !user) return;
+    const deadline = Date.now() + 5000; // 5 seconds - shorter timeout
+    console.log('🛌 Requesting rest:', { type, playerId: user.id, playerName: currentCharacter?.name || user.username || 'Player' });
+    setPendingRest({ restType: type, requesterId: user.id, requesterName: currentCharacter?.name || user.username || 'Player', deadline, votes: { [user.id]: true } });
+    await broadcastRestRequest(currentCampaign.id, { playerId: user.id, playerName: currentCharacter?.name || user.username || 'Player', restType: type, deadline });
+  };
+
+  const respondToRest = async (accepted: boolean) => {
+    if (!currentCampaign || !user || !pendingRest) return;
+    console.log('🛌 Responding to rest with:', { 
+      accepted, 
+      playerId: user.id, 
+      campaignId: currentCampaign.id,
+      pendingRestId: pendingRest.requesterId 
+    });
+    
+    try {
+      await broadcastRestResponse(currentCampaign.id, { playerId: user.id, accepted });
+      console.log('✅ Rest response broadcast sent successfully');
+    } catch (error) {
+      console.error('❌ Failed to send rest response:', error);
+    }
+    
+    // Don't update local state here - let the broadcast callback handle it
+    setShowRestPrompt(false);
   };
 
   return (
@@ -1407,6 +1718,30 @@ export default function StoryScreen() {
             )}
           </ScrollView>
 
+          {/* ─── Base Actions Panel ─────────────────────────────── */}
+          <View style={styles.actionsPanelWrapper}>
+            <TouchableOpacity style={styles.actionsTab} onPress={toggleActionsPanel} activeOpacity={0.7}>
+              <ChevronUp size={16} color="#ccc" style={{ transform: [{ rotate: isActionsPanelExpanded ? '180deg' : '0deg' }] }} />
+            </TouchableOpacity>
+
+            {isActionsPanelExpanded && (
+              <ScrollView style={styles.actionsPanel} horizontal>
+                {baseActions.map(action => (
+                  <TouchableOpacity
+                    key={action.key}
+                    style={[styles.actionButton, action.disabled && styles.actionButtonDisabled]}
+                    onPress={action.onPress}
+                    activeOpacity={0.7}
+                    disabled={action.disabled}
+                  >
+                    {action.icon}
+                    <Text style={styles.actionButtonLabel}>{action.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+
           <View style={[styles.inputContainer, Platform.OS === 'android' && {marginBottom: insets.bottom}]}>
             {/* Input Type Selector */}
             <View style={styles.inputTypeContainer}>
@@ -1504,6 +1839,97 @@ export default function StoryScreen() {
           message={reportingMessage}
           campaignId={currentCampaign?.id || ''}
         />
+
+        {/* Use Item Modal */}
+        <Modal visible={useItemModalVisible} transparent animationType="fade" onRequestClose={() => setUseItemModalVisible(false)}>
+          <View style={styles.centeredOverlay}>
+            <View style={styles.simpleModal}>
+              <Text style={styles.simpleModalTitle}>Use an Item</Text>
+
+              <ScrollView style={{ maxHeight: 250, alignSelf: 'stretch', marginVertical: 8 }}>
+                {currentCharacter?.equipment?.filter(eq => {
+                  if (!currentCharacter.equipped_items) return true;
+                  const isEquipped = Object.values(currentCharacter.equipped_items).some(eqi => {
+                    if (!eqi) return false;
+                    if (Array.isArray(eqi)) {
+                      return eqi.some(item => item && item.id === eq.id);
+                    }
+                    return eqi.id === eq.id;
+                  });
+                  return !isEquipped;
+                }).map((eq, idx) => (
+                  <TouchableOpacity
+                    key={`${eq.id}-${idx}`}
+                    style={[styles.itemRow, selectedUseItemId === eq.id && styles.itemRowSelected]}
+                    onPress={() => setSelectedUseItemId(eq.id)}
+                  >
+                    <Text style={styles.itemRowText}>{eq.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <TextInput
+                style={styles.simpleTextInput}
+                placeholder="Describe how you use the item (optional)"
+                placeholderTextColor="#666"
+                multiline
+                value={useItemNote}
+                onChangeText={setUseItemNote}
+              />
+
+              <View style={styles.simpleModalButtons}>
+                <TouchableOpacity
+                  style={[styles.simpleModalButton, !selectedUseItemId && styles.simpleModalButtonDisabled]}
+                  disabled={!selectedUseItemId}
+                  onPress={handleConfirmUseItem}
+                >
+                  <Text style={styles.simpleModalButtonText}>Confirm</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.simpleModalCancel} onPress={() => setUseItemModalVisible(false)}>
+                  <Text style={styles.simpleModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Rest Modal */}
+        <Modal visible={restModalVisible} transparent animationType="fade" onRequestClose={() => setRestModalVisible(false)}>
+          <View style={styles.centeredOverlay}>
+            <View style={styles.simpleModal}>
+              <Text style={styles.simpleModalTitle}>Choose Rest Type</Text>
+              <View style={styles.simpleModalButtons}>
+                <TouchableOpacity style={styles.simpleModalButton} onPress={() => { requestRest('short'); setRestModalVisible(false); }}>
+                  <Text style={styles.simpleModalButtonText}>Short Rest</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.simpleModalButton} onPress={() => { requestRest('long'); setRestModalVisible(false); }}>
+                  <Text style={styles.simpleModalButtonText}>Long Rest</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.simpleModalCancel} onPress={() => setRestModalVisible(false)}>
+                  <Text style={styles.simpleModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Rest Vote Prompt */}
+        <Modal visible={showRestPrompt && !!pendingRest} transparent animationType="fade" onRequestClose={() => {}}>
+          <View style={styles.centeredOverlay}>
+            <View style={styles.simpleModal}>
+              <Text style={styles.simpleModalTitle}>{pendingRest?.requesterName} has requested a {pendingRest?.restType} rest.</Text>
+              <Text style={{ color: '#ccc', marginBottom: 12 }}>Do you agree?</Text>
+              <View style={styles.simpleModalButtons}>
+                <TouchableOpacity style={styles.simpleModalButton} onPress={() => respondToRest(true)}>
+                  <Text style={styles.simpleModalButtonText}>Yes</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.simpleModalCancel} onPress={() => respondToRest(false)}>
+                  <Text style={styles.simpleModalCancelText}>No</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
       </ActivityIndicator>
     </ImageBackground>
@@ -1774,13 +2200,121 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Bold',
   },
-  playerActionsPanel: {
-    marginVertical: 16,
-  },
   bannerAd: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     paddingVertical: 4,
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
+  },
+  // ─── Base Actions Panel Styles ──────────────────────────────
+  actionsPanelWrapper: {
+    backgroundColor: 'rgba(26,26,26,0.9)',
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+  },
+  actionsTab: {
+    alignSelf: 'center',
+    width: 40,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#666',
+    marginVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionsPanel: {
+    flexDirection: 'row',
+    paddingBottom: 6,
+  },
+  actionButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 8,
+    margin: 4,
+    width: 80,
+  },
+  actionButtonDisabled: {
+    opacity: 0.4,
+  },
+  actionButtonLabel: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  // Simple modal
+  simpleModal: {
+    backgroundColor: '#1a1a1a',
+    marginHorizontal: 32,
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+  },
+  simpleModalTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 12,
+  },
+  simpleModalButtons: {
+    width: '100%',
+    gap: 12,
+  },
+  simpleModalButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  simpleModalButtonText: {
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+  },
+  simpleModalCancel: {
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  simpleModalCancelText: {
+    color: '#f44336',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  // Item row styles
+  itemRow: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  itemRowSelected: {
+    backgroundColor: '#4CAF50',
+  },
+  itemRowText: {
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+  },
+  simpleTextInput: {
+    backgroundColor: '#2a2a2a',
+    color: '#fff',
+    borderRadius: 6,
+    padding: 8,
+    minHeight: 60,
+    alignSelf: 'stretch',
+    marginVertical: 8,
+    fontFamily: 'Inter-Regular',
+  },
+  simpleModalButtonDisabled: {
+    backgroundColor: '#555',
+  },
+  centeredOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

@@ -512,6 +512,8 @@ let campaignBroadcastChannel: any = null;
 export const initializeCampaignBroadcast = (campaignId: string, callbacks: {
   onActionStarted: (data: { playerId: string, playerName: string, action: string }) => void;
   onActionCompleted: (data: { playerId: string, success: boolean }) => void;
+  onRestRequest?: (data: { playerId: string; playerName: string; restType: 'short'|'long'; deadline: number; }) => void;
+  onRestResponse?: (data: { playerId: string; accepted: boolean; }) => void;
 }) => {
   console.log('📡 Initializing campaign broadcast for:', campaignId);
   
@@ -524,7 +526,11 @@ export const initializeCampaignBroadcast = (campaignId: string, callbacks: {
   const channelName = `campaign_actions_${campaignId}`;
   console.log('📡 Creating broadcast channel:', channelName);
   
-  campaignBroadcastChannel = supabase.channel(channelName)
+  campaignBroadcastChannel = supabase.channel(channelName, {
+    config: {
+      broadcast: { self: true } // Enable receiving own broadcasts
+    }
+  })
     .on('broadcast', { event: 'action_started' }, (payload) => {
       console.log('📢 Received action_started broadcast:', payload);
       console.log('📢 action_started payload keys:', Object.keys(payload));
@@ -536,6 +542,14 @@ export const initializeCampaignBroadcast = (campaignId: string, callbacks: {
       console.log('📢 action_completed payload keys:', Object.keys(payload));
       console.log('📢 action_completed payload.payload:', payload.payload);
       callbacks.onActionCompleted(payload.payload);
+    })
+    .on('broadcast', { event: 'rest_request' }, (payload) => {
+      console.log('📢 Received rest_request broadcast:', payload);
+      callbacks.onRestRequest?.(payload.payload);
+    })
+    .on('broadcast', { event: 'rest_response' }, (payload) => {
+      console.log('📢 Received rest_response broadcast:', payload);
+      callbacks.onRestResponse?.(payload.payload);
     })
     .subscribe((status) => {
       console.log('📡 Campaign broadcast status:', status, 'for channel:', channelName);
@@ -609,5 +623,55 @@ export const broadcastActionCompleted = async (campaignId: string, data: {
     console.error('❌ Broadcast error type:', typeof error);
     console.error('❌ Broadcast error message:', error instanceof Error ? error.message : String(error));
     // Don't throw - just log the error like broadcastActionStarted
+  }
+};
+
+export const broadcastRestRequest = async (campaignId: string, data: {
+  playerId: string;
+  playerName: string;
+  restType: 'short'|'long';
+  deadline: number;
+}) => {
+  if (!campaignBroadcastChannel) {
+    console.warn('⚠️ No broadcast channel for rest_request');
+    return;
+  }
+  
+  console.log('📢 Broadcasting rest_request:', data);
+  console.log('📢 Channel status:', campaignBroadcastChannel.state);
+  
+  try {
+    const result = await campaignBroadcastChannel.send({ 
+      type: 'broadcast', 
+      event: 'rest_request', 
+      payload: data 
+    });
+    console.log('📢 rest_request send result:', result);
+  } catch (error) {
+    console.error('❌ rest_request broadcast failed:', error);
+  }
+};
+
+export const broadcastRestResponse = async (campaignId: string, data: {
+  playerId: string;
+  accepted: boolean;
+}) => {
+  if (!campaignBroadcastChannel) {
+    console.warn('⚠️ No broadcast channel for rest_response');
+    return;
+  }
+  
+  console.log('📢 Broadcasting rest_response:', data);
+  console.log('📢 Channel status:', campaignBroadcastChannel.state);
+  
+  try {
+    const result = await campaignBroadcastChannel.send({ 
+      type: 'broadcast', 
+      event: 'rest_response', 
+      payload: data 
+    });
+    console.log('📢 rest_response send result:', result);
+  } catch (error) {
+    console.error('❌ rest_response broadcast failed:', error);
   }
 }; 
