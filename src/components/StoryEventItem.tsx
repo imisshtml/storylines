@@ -10,10 +10,22 @@ interface StoryEventItemProps {
   message: CampaignMessage;
   campaignId: string;
   character?: Character; // Add character data to check stealth status
+  currentUserId?: string; // Current user ID to check whisper visibility
   onReport?: (message: CampaignMessage) => void;
 }
 
-const StoryEventItem = memo(({ message, campaignId, character, onReport }: StoryEventItemProps) => {
+const StoryEventItem = memo(({ message, campaignId, character, currentUserId, onReport }: StoryEventItemProps) => {
+  // Check if this is a whisper and if the current user should see it
+  if (message.message_type === 'whisper' && currentUserId) {
+    const isAuthor = message.author === currentUserId;
+    const isTarget = message.whisper_target_id === currentUserId;
+    
+    // Only show whisper to sender and target
+    if (!isAuthor && !isTarget) {
+      return null;
+    }
+  }
+  
   // Dice roll logic temporarily disabled to prevent ExoPlayer crashes on Android
 
   const getEventIcon = () => {
@@ -55,6 +67,8 @@ const StoryEventItem = memo(({ message, campaignId, character, onReport }: Story
           );
         }
         return <User size={24} color="#4CAF50" />;
+      case 'whisper':
+        return <User size={24} color="#FF9800" />;
       case 'system':
         return <Info size={24} color="#2196F3" />;
       default:
@@ -75,6 +89,12 @@ const StoryEventItem = memo(({ message, campaignId, character, onReport }: Story
           container: styles.playerContainer,
           text: styles.playerText,
           header: styles.playerHeader,
+        };
+      case 'whisper':
+        return {
+          container: styles.whisperContainer,
+          text: styles.whisperText,
+          header: styles.whisperHeader,
         };
       case 'system':
         return {
@@ -100,6 +120,7 @@ const StoryEventItem = memo(({ message, campaignId, character, onReport }: Story
         <Text style={styles.headerText}>
           {message.message_type === 'gm' ? 'Storyteller' :
             message.message_type === 'player' ? (message.character_name || message.author) :
+            message.message_type === 'whisper' ? (message.character_name || message.author) :
               'System'}
         </Text>
         <View style={styles.rightHeader}>
@@ -241,6 +262,20 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(33, 150, 243, 0.3)',
   },
   systemText: {
+    color: '#1a1a1a',
+    fontStyle: 'italic',
+  },
+  // Whisper styles
+  whisperContainer: {
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9800',
+    borderStyle: 'dashed',
+  },
+  whisperHeader: {
+    borderBottomColor: 'rgba(255, 152, 0, 0.3)',
+  },
+  whisperText: {
     color: '#1a1a1a',
     fontStyle: 'italic',
   },

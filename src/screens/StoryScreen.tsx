@@ -110,6 +110,7 @@ export default function StoryScreen() {
   const [retryCount, setRetryCount] = useState(0);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connected');
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [hasTriedInitialStory, setHasTriedInitialStory] = useState(false);
   const [otherPlayerActions, setOtherPlayerActions] = useState<{[playerId: string]: {playerName: string, action: string}}>({});
   const [reportingMessage, setReportingMessage] = useState<typeof campaignHistory[0] | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -532,18 +533,46 @@ export default function StoryScreen() {
     const generateInitialStory = async () => {
       console.log('🔍 generateInitialStory called with:', {
         currentCampaign: currentCampaign?.name,
+        campaignId: currentCampaign?.id,
         user: user?.username,
         campaignHistoryLength: campaignHistory.length,
         isLoading: isLoading('initialStory'),
-        campaignStatus: currentCampaign?.status
+        isInitialLoading: isInitialLoading,
+        hasTriedInitialStory: hasTriedInitialStory,
+        campaignStatus: currentCampaign?.status,
+        hasGMMessages: campaignHistory.some(m => m.message_type === 'gm' || m.author === 'GM')
       });
 
-      if (!currentCampaign || !user || campaignHistory.length > 0 || isLoading('initialStory')) {
+      if (!currentCampaign || !user || isLoading('initialStory') || isInitialLoading || hasTriedInitialStory) {
         console.log('🚫 Early return from generateInitialStory:', {
           hasCurrentCampaign: !!currentCampaign,
           hasUser: !!user,
+          isLoading: isLoading('initialStory'),
+          isInitialLoading: isInitialLoading,
+          hasTriedInitialStory: hasTriedInitialStory
+        });
+        return;
+      }
+
+      // Check if story has already started by looking for GM messages
+      const hasGMMessages = campaignHistory.some(message => 
+        message.message_type === 'gm' || message.author === 'GM'
+      );
+
+      if (hasGMMessages) {
+        console.log('🚫 Story already started - found GM messages:', {
           campaignHistoryLength: campaignHistory.length,
-          isLoading: isLoading('initialStory')
+          gmMessageCount: campaignHistory.filter(m => m.message_type === 'gm' || m.author === 'GM').length
+        });
+        return;
+      }
+
+      // If we have any messages at all but no GM messages, still don't generate
+      // This prevents regeneration when players have already started chatting
+      if (campaignHistory.length > 0) {
+        console.log('🚫 Campaign has messages but no GM story yet - waiting for manual story start:', {
+          campaignHistoryLength: campaignHistory.length,
+          messageTypes: campaignHistory.map(m => m.message_type).join(', ')
         });
         return;
       }
@@ -555,6 +584,9 @@ export default function StoryScreen() {
       }
 
       console.log('🎭 Generating initial story for campaign:', currentCampaign.name);
+
+      // Mark that we've tried to generate initial story for this session
+      setHasTriedInitialStory(true);
 
       try {
         startLoading('initialStory');
@@ -664,7 +696,12 @@ export default function StoryScreen() {
     const timeoutId = setTimeout(generateInitialStory, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [currentCampaign, user, campaignHistory.length]);
+  }, [currentCampaign, user, campaignHistory, isInitialLoading]);
+
+  // Reset hasTriedInitialStory when campaign changes
+  useEffect(() => {
+    setHasTriedInitialStory(false);
+  }, [currentCampaign?.id]);
   // Get current user's character for this campaign
   const getCurrentCharacter = (): Character | null => {
     if (!user || !currentCampaign) return null;
@@ -749,13 +786,16 @@ export default function StoryScreen() {
 
     const otherPlayers = getOtherPlayers();
     if (otherPlayers.length > 0) {
-      // Add whisper options for each other player
+      // Add whisper options for each other player (show character name, not profile name)
       otherPlayers.forEach(player => {
+        const character = characters.find(c => c.user_id === player.id && c.campaign_id === currentCampaign?.id);
+        const displayName = character?.name || player.name || 'Player';
+        
         baseOptions.push({
           type: 'whisper',
-          label: `Whisper ${player.name}`,
+          label: `Whisper ${displayName}`,
           icon: <Ear size={16} color="#FF9800" />,
-          placeholder: `Whisper to ${player.name}...`,
+          placeholder: `Whisper to ${displayName}...`,
           target: player.id
         });
       });
@@ -874,7 +914,7 @@ export default function StoryScreen() {
 
     try {
       // Determine message type based on input type
-      let messageType: 'player' | 'gm' | 'system' = 'player';
+      let messageType: 'player' | 'gm' | 'system' | 'whisper' = 'player';
       let formattedMessage = action;
       let messageAuthor = playerName;
 
@@ -890,11 +930,18 @@ export default function StoryScreen() {
         case 'whisper':
           if (whisperTarget) {
             const targetPlayer = currentCampaign.players.find(p => p.id === whisperTarget);
-            formattedMessage = `[Whispers to ${targetPlayer?.name}] ${action}`;
+            const targetCharacter = characters.find(c => c.user_id === whisperTarget && c.campaign_id === currentCampaign?.id);
+            const targetDisplayName = targetCharacter?.name || targetPlayer?.name || 'Player';
+            const senderCharacter = getCurrentCharacter();
+            const senderDisplayName = senderCharacter?.name || playerName;
+            
+            formattedMessage = `${senderDisplayName} whispers to you, "${action}"`;
+            messageType = 'whisper';
           }
           break;
         case 'ask':
           formattedMessage = `[Asks GM] ${action}`;
+          messageType = 'system'; // Ask messages are system messages
           break;
         case 'ooc':
           formattedMessage = `[OOC] ${action}`;
@@ -963,6 +1010,7 @@ export default function StoryScreen() {
         character_name: currentCharacter?.name,
         character_avatar: currentCharacter?.avatar,
         difficulty: 10, // Default difficulty class
+        whisper_target_id: messageType === 'whisper' ? whisperTarget : undefined,
       });
 
       // Determine if GM should respond and if message should contribute to story
@@ -1052,12 +1100,13 @@ export default function StoryScreen() {
         }
 
         console.log('🎭 Adding GM response to campaign history');
-        // Add GM response to campaign history
+        // Add GM response to campaign history (system message for ask responses)
+        const responseMessageType = typeToUse === 'ask' ? 'system' : 'gm';
         const insertedMessage = await atomRefs.current.addCampaignMessage({
           campaign_id: currentCampaign.id,
           message: data.response,
-          author: 'GM',
-          message_type: 'gm',
+          author: typeToUse === 'ask' ? 'System' : 'GM',
+          message_type: responseMessageType,
         });
 
         // Immediately refresh local history in case realtime not yet connected
@@ -1929,6 +1978,7 @@ export default function StoryScreen() {
                       message={message} 
                       campaignId={currentCampaign.id}
                       character={messageCharacter}
+                      currentUserId={user?.id}
                       onReport={handleReport}
                     />
                   );
