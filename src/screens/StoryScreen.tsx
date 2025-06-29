@@ -583,12 +583,17 @@ export default function StoryScreen() {
         console.log('✅ Successfully generated initial story, adding message to campaign');
 
         // Add the initial story as a GM message
-        await atomRefs.current.addCampaignMessage({
+        const insertedMessage = await atomRefs.current.addCampaignMessage({
           campaign_id: currentCampaign.id,
           message: data.response,
           author: 'GM',
           message_type: 'gm',
         });
+
+        // Immediately refresh local history in case realtime not yet connected
+        if (insertedMessage?.id) {
+          await atomRefs.current.fetchCampaignHistory(currentCampaign.id);
+        }
 
         // Set the choices from the initial story
         if (currentCampaign) {
@@ -914,14 +919,19 @@ export default function StoryScreen() {
 
         console.log('🎭 Adding GM response to campaign history');
         // Add GM response to campaign history
-        await atomRefs.current.addCampaignMessage({
+        const insertedMessage = await atomRefs.current.addCampaignMessage({
           campaign_id: currentCampaign.id,
           message: data.response,
           author: 'GM',
           message_type: 'gm',
         });
 
-                // Use choices from AI response (only for story-contributing messages)
+        // Immediately refresh local history in case realtime not yet connected
+        if (insertedMessage?.id) {
+          await atomRefs.current.fetchCampaignHistory(currentCampaign.id);
+        }
+
+        // Use choices from AI response (only for story-contributing messages)
         if (currentCampaign && shouldContributeToStory) {
           console.log('🎭 Setting AI choices:', data.choices?.length || 0, 'choices');
           atomRefs.current.setAiChoices({ campaignId: currentCampaign.id, choices: data.choices || [] });
@@ -1117,7 +1127,6 @@ export default function StoryScreen() {
 
   // Determine if it is the current player's turn
   const isPlayerTurn = currentCharacter?.id && currentCampaign?.current_player === currentCharacter.id && !currentCampaign?.paused;
-
   // Subscribe to campaign row updates to track current_player / paused changes
   const campaignSubscriptionRef = useRef<(() => void) | null>(null);
   useEffect(() => {
