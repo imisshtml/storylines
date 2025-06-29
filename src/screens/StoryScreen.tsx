@@ -53,6 +53,12 @@ import { purchaseManager } from '../utils/purchaseManager';
 import { supabase } from '../config/supabase';
 import { performShortRest, performLongRest } from '../atoms/characterAtoms';
 import { enterStealth, breakStealth, isInStealth, handleStealthCheck, performStealAttempt } from '../utils/stealthUtils';
+import { 
+  validateInventoryAction, 
+  parseInventoryOperations, 
+  applyInventoryOperations,
+  generateInventoryContext 
+} from '../utils/inventoryManager';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask' | 'action' | 'ooc';
 
@@ -916,6 +922,37 @@ export default function StoryScreen() {
         }
       }
 
+      // Validate inventory for action-type messages
+      if (currentCharacter && (typeToUse === 'action' || typeToUse === 'say' || typeToUse === 'rp')) {
+        try {
+          const inventoryValidation = validateInventoryAction(currentCharacter, action);
+          console.log('🎒 Inventory validation result:', inventoryValidation);
+          
+          if (!inventoryValidation.valid) {
+            console.log('❌ Inventory validation failed:', inventoryValidation.message);
+            setError(inventoryValidation.message);
+            return; // Stop execution if validation fails
+          }
+          
+          // Parse and apply inventory operations if validation passes
+          const inventoryOperations = parseInventoryOperations(action, currentCharacter.name);
+          console.log('🎒 Parsed inventory operations:', inventoryOperations);
+          
+          if (inventoryOperations.length > 0) {
+            console.log(`🎒 Applying ${inventoryOperations.length} inventory operations...`);
+            await applyInventoryOperations(currentCharacter.id, inventoryOperations);
+            
+            // Refresh character data to get updated inventory
+            await fetchCharacters();
+            console.log('✅ Character inventory updated and data refreshed');
+          }
+        } catch (error) {
+          console.error('Error managing inventory:', error);
+          setError('Failed to update inventory. Please try again.');
+          return;
+        }
+      }
+
       // Add player message to campaign history (without dice_roll for now)
       await atomRefs.current.addCampaignMessage({
         campaign_id: currentCampaign.id,
@@ -1142,9 +1179,27 @@ export default function StoryScreen() {
     setShowChoices(false);
     const currentCharacter = getCurrentCharacter();
     const characterName = currentCharacter?.name || user?.username || user?.email || 'Player';
+    const actionText = `${characterName} chooses to: ${choice}`;
+
+    // Validate inventory for choice actions as well
+    if (currentCharacter) {
+      try {
+        const inventoryValidation = validateInventoryAction(currentCharacter, choice);
+        console.log('🎒 Choice inventory validation result:', inventoryValidation);
+        
+        if (!inventoryValidation.valid) {
+          console.log('❌ Choice inventory validation failed:', inventoryValidation.message);
+          setError(`Cannot perform that action: ${inventoryValidation.message}`);
+          setTimeout(() => setShowChoices(true), 1000); // Show choices again
+          return;
+        }
+      } catch (error) {
+        console.error('Error validating choice inventory:', error);
+      }
+    }
 
     await sendPlayerAction(
-      `${characterName} chooses to: ${choice}`,
+      actionText,
       user?.id || 'player1',
       characterName,
       'action'
