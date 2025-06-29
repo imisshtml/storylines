@@ -51,7 +51,7 @@ import {
 import { campaignsAtom, fetchCampaignsAtom } from '../atoms/campaignAtoms';
 import { userAtom } from '../atoms/authAtoms';
 import { supabase } from '../config/supabase';
-import { withConnectionHandling } from '../utils/connectionUtils';
+// import { withConnectionHandling } from '../utils/connectionUtils';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 import AvatarSelector from '../components/AvatarSelector';
 import { useCustomAlert } from '../components/CustomAlert';
@@ -90,6 +90,10 @@ export default function CharacterViewScreen() {
   const [activeTab, setActiveTab] = useState<'stats' | 'traits' | 'spells' | 'equipment'>('stats');
   const [charactersToLevelUp] = useAtom(charactersToLevelUpAtom);
   const [, startLevelUpProcess] = useAtom(startLevelUpProcessAtom);
+  const [isEditingFlourish, setIsEditingFlourish] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedFlourish, setEditedFlourish] = useState('');
+  const [editedDescription, setEditedDescription] = useState('');
 
   useEffect(() => {
     if (characters.length > 0 && characterId) {
@@ -97,6 +101,8 @@ export default function CharacterViewScreen() {
       if (selectedCharacter) {
         setCharacter(selectedCharacter);
         setSelectedSpells(selectedCharacter.spells || []);
+        setEditedFlourish(selectedCharacter.flourish || '');
+        setEditedDescription(selectedCharacter.description || '');
       }
     }
   }, [characters, characterId]);
@@ -256,21 +262,15 @@ export default function CharacterViewScreen() {
 
     setIsLoading(true);
     try {
-      // Use enhanced connection handling for the database operation
-      await withConnectionHandling(
-        async () => {
-          const { error } = await supabase
-            .from('characters')
-            .update({
-              spells: selectedSpells
-            })
-            .eq('id', character.id);
+      // Update spells in database
+      const { error } = await supabase
+        .from('characters')
+        .update({
+          spells: selectedSpells
+        })
+        .eq('id', character.id);
 
-          if (error) throw error;
-        },
-        'update_spells',
-        'updating spells'
-      );
+      if (error) throw error;
 
       // Update local state
       setCharacter({
@@ -619,22 +619,16 @@ export default function CharacterViewScreen() {
         newAC = calculateArmorClass(newEquipped, character.abilities.dexterity);
       }
 
-      // Use enhanced connection handling for the database operation
-      await withConnectionHandling(
-        async () => {
-          const { error } = await supabase
-            .from('characters')
-            .update({
-              equipped_items: newEquipped,
-              armor_class: newAC
-            })
-            .eq('id', character.id);
+      // Update equipped items in database
+      const { error } = await supabase
+        .from('characters')
+        .update({
+          equipped_items: newEquipped,
+          armor_class: newAC
+        })
+        .eq('id', character.id);
 
-          if (error) throw error;
-        },
-        'equip_item',
-        'equipping item'
-      );
+      if (error) throw error;
 
       // Update local state
       setCharacter({
@@ -676,22 +670,16 @@ export default function CharacterViewScreen() {
         newAC = calculateArmorClass(newEquipped, character.abilities.dexterity);
       }
 
-      // Use enhanced connection handling for the database operation
-      await withConnectionHandling(
-        async () => {
-          const { error } = await supabase
-            .from('characters')
-            .update({
-              equipped_items: newEquipped,
-              armor_class: newAC
-            })
-            .eq('id', character.id);
+      // Update equipped items in database
+      const { error } = await supabase
+        .from('characters')
+        .update({
+          equipped_items: newEquipped,
+          armor_class: newAC
+        })
+        .eq('id', character.id);
 
-          if (error) throw error;
-        },
-        'unequip_item',
-        'unequipping item'
-      );
+      if (error) throw error;
 
       // Update local state
       setCharacter({
@@ -992,6 +980,62 @@ export default function CharacterViewScreen() {
     return Math.floor((level - 1) / 4) + 2;
   };
 
+  const handleSaveFlourish = async () => {
+    if (!character) return;
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('characters')
+        .update({ flourish: editedFlourish })
+        .eq('id', character.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setCharacter({
+        ...character,
+        flourish: editedFlourish,
+      });
+
+      await fetchCharacters();
+      setIsEditingFlourish(false);
+    } catch (error) {
+      console.error('Error updating flourish:', error);
+      showAlert('Error', 'Failed to update flourish. Please try again.', undefined, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveDescription = async () => {
+    if (!character) return;
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('characters')
+        .update({ description: editedDescription })
+        .eq('id', character.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setCharacter({
+        ...character,
+        description: editedDescription,
+      });
+
+      await fetchCharacters();
+      setIsEditingDescription(false);
+    } catch (error) {
+      console.error('Error updating description:', error);
+      showAlert('Error', 'Failed to update description. Please try again.', undefined, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const canLevelUp = character && charactersToLevelUp.some(c => c.id === character.id);
 
   if (!character) {
@@ -1188,6 +1232,44 @@ export default function CharacterViewScreen() {
                   </View>
                 </View>
               )}
+
+              {/* Flourish */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Flourish</Text>
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => setIsEditingFlourish(true)}
+                  >
+                    <Edit3 size={16} color="#4CAF50" />
+                    <Text style={styles.editButtonText}>Edit</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.characterDetailContainer}>
+                  <Text style={styles.characterDetailText}>
+                    {character.flourish || 'No flourish set. Add one to enhance your character\'s actions in the story!'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Description */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Description</Text>
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => setIsEditingDescription(true)}
+                  >
+                    <Edit3 size={16} color="#4CAF50" />
+                    <Text style={styles.editButtonText}>Edit</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.characterDetailContainer}>
+                  <Text style={styles.characterDetailText}>
+                    {character.description || 'No description set. Add one so the Storyteller and companions know how you look!'}
+                  </Text>
+                </View>
+              </View>
             </View>
           )}
 
@@ -1922,6 +2004,94 @@ export default function CharacterViewScreen() {
                   </View>
                 )}
               </ScrollView>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Flourish Edit Modal */}
+      <Modal
+        visible={isEditingFlourish}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsEditingFlourish(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Flourish</Text>
+              <TouchableOpacity onPress={() => setIsEditingFlourish(false)}>
+                <X size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              <Text style={styles.modalSubtitle}>
+                                 Describe how you would like your character actions to be enhanced in the story
+              </Text>
+              <TextInput
+                style={styles.characterDetailInput}
+                value={editedFlourish}
+                onChangeText={setEditedFlourish}
+                placeholder="Ex: I always talk like a pirate"
+                placeholderTextColor="#666"
+                multiline
+                numberOfLines={4}
+              />
+            </View>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.saveSpellsButton}
+                onPress={handleSaveFlourish}
+                disabled={isLoading}
+              >
+                <Text style={styles.saveSpellsButtonText}>
+                  {isLoading ? 'Saving...' : 'Save Changes'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Description Edit Modal */}
+      <Modal
+        visible={isEditingDescription}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsEditingDescription(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Description</Text>
+              <TouchableOpacity onPress={() => setIsEditingDescription(false)}>
+                <X size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              <Text style={styles.modalSubtitle}>
+                Describe how your character looks so the Storyteller and companions know
+              </Text>
+              <TextInput
+                style={styles.characterDetailInput}
+                value={editedDescription}
+                onChangeText={setEditedDescription}
+                placeholder="Describe your character's appearance..."
+                placeholderTextColor="#666"
+                multiline
+                numberOfLines={6}
+              />
+            </View>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.saveSpellsButton}
+                onPress={handleSaveDescription}
+                disabled={isLoading}
+              >
+                <Text style={styles.saveSpellsButtonText}>
+                  {isLoading ? 'Saving...' : 'Save Changes'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -2969,5 +3139,29 @@ const styles = StyleSheet.create({
   },
   tabContent: {
     flex: 1,
+  },
+  characterDetailContainer: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+  },
+  characterDetailText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
+  characterDetailInput: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 16,
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    minHeight: 100,
+    textAlignVertical: 'top',
   },
 });

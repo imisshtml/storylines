@@ -19,6 +19,8 @@ import { useAtom } from 'jotai';
 import {
   characterCreationStepAtom,
   characterNameAtom,
+  characterFlourishAtom,
+  characterDescriptionAtom,
   selectedRaceAtom,
   selectedClassAtom,
   characterAbilitiesAtom,
@@ -94,6 +96,8 @@ export default function CreationScreen() {
   const { showAlert, hideAlert } = useCustomAlert();
   const [currentStep, setCurrentStep] = useAtom(characterCreationStepAtom);
   const [characterName, setCharacterName] = useAtom(characterNameAtom);
+  const [characterFlourish, setCharacterFlourish] = useAtom(characterFlourishAtom);
+  const [characterDescription, setCharacterDescription] = useAtom(characterDescriptionAtom);
   const [selectedRace, setSelectedRace] = useAtom(selectedRaceAtom);
   const [selectedClass, setSelectedClass] = useAtom(selectedClassAtom);
   const [abilities, setAbilities] = useAtom(characterAbilitiesAtom);
@@ -164,7 +168,7 @@ export default function CreationScreen() {
   // Check character limit before allowing creation
   useEffect(() => {
     const checkLimit = async () => {
-      if (user && characters.length > 0) {
+      if (user && characters.length > 0 && currentStep < 2) {
         const activeCharacters = characters.filter(character => !character.retired);
         const canCreate = await checkUserLimit('character', activeCharacters.length);
         if (!canCreate) {
@@ -193,7 +197,7 @@ export default function CreationScreen() {
     };
 
     checkLimit();
-  }, [user, characters.length, userCapabilities.characterLimit, checkUserLimit, showAlert]);
+  }, [user, characters.length, userCapabilities.characterLimit, checkUserLimit, showAlert, currentStep]);
 
   // Set starting wealth when class is selected
   useEffect(() => {
@@ -635,6 +639,8 @@ export default function CreationScreen() {
         copper: characterCopper,
         // New separated columns
         avatar: getCurrentAvatarReference(),
+        flourish: characterFlourish,
+        description: characterDescription,
         traits: selectedRace.traits || [],
         saving_throws: selectedClass.saving_throws || [],
         proficiency: selectedClass.proficiencies || [],
@@ -708,10 +714,7 @@ export default function CreationScreen() {
 
   const renderBasicInfo = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Character Details</Text>
-
       <View style={styles.avatarSection}>
-        <Text style={styles.avatarLabel}>Character Portrait</Text>
         <TouchableOpacity
           style={styles.avatarContainer}
           onPress={() => setShowAvatarSelector(true)}
@@ -754,6 +757,32 @@ export default function CreationScreen() {
         placeholder="Enter character name"
         placeholderTextColor="#666"
       />
+
+      <Text style={styles.inputLabel}>Flourish (Optional)</Text>
+      <TextInput
+        style={styles.input}
+        value={characterFlourish}
+        onChangeText={setCharacterFlourish}
+        placeholder="Ex: I always talk like a pirate"
+        placeholderTextColor="#666"
+        multiline
+      />
+      <Text style={styles.inputHelpText}>
+        If you would like your character actions to be enhanced within the story, provide a brief detail how you would like.
+      </Text>
+
+      <Text style={styles.inputLabel}>Description (Optional)</Text>
+      <TextInput
+        style={styles.input}
+        value={characterDescription}
+        onChangeText={setCharacterDescription}
+        placeholder="Describe how your character looks"
+        placeholderTextColor="#666"
+        multiline
+      />
+      <Text style={styles.inputHelpText}>
+        Provide a description so the Storyteller and your companions know how you look!
+      </Text>
     </View>
   );
 
@@ -2088,6 +2117,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     marginBottom: 20,
+  },
+  inputHelpText: {
+    color: '#888',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    marginTop: -15,
+    marginBottom: 20,
+    lineHeight: 16,
   },
   optionsList: {
     marginBottom: 40,

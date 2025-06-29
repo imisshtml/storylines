@@ -8,7 +8,6 @@ import {
   Modal,
 } from 'react-native';
 import {
-  ChevronRight,
   Sword,
   MessageCircle,
   Package,
@@ -16,7 +15,6 @@ import {
   Search,
   Bed,
   Target,
-  Sparkles,
   X,
 } from 'lucide-react-native';
 
@@ -240,11 +238,13 @@ export default function EnhancedStoryChoices({
                       </View>
                       <View style={styles.modalActionContent}>
                         <Text style={styles.modalActionTitle}>{action.title}</Text>
-                        <Text style={styles.modalActionDescription}>
-                          {action.description}
-                        </Text>
+                        {false && (
+                          <Text style={styles.modalActionDescription}>
+                            {action.description}
+                          </Text>
+                        )}
                       </View>
-                      {action.difficulty && (
+                      {false && action.difficulty && (
                         <View
                           style={[
                             styles.modalDifficultyBadge,
@@ -258,7 +258,7 @@ export default function EnhancedStoryChoices({
                       )}
                     </View>
 
-                    {action.requirements && action.requirements.length > 0 && (
+                    {false && action.requirements && action.requirements.length > 0 && (
                       <View style={styles.modalRequirementsContainer}>
                         <Text style={styles.modalRequirementsLabel}>Requires:</Text>
                         <Text style={styles.modalRequirementsText}>
@@ -604,9 +604,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalActionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#fff',
-    fontFamily: 'Inter-Bold',
+    fontFamily: 'Inter-Regular',
     marginBottom: 4,
   },
   modalActionDescription: {

@@ -995,6 +995,11 @@ export default function CharacterView({ character, onClose, onLeaveCampaign, rea
           <Text style={styles.characterDetails}>
             Level {character.level} {character.race} {character.class}
           </Text>
+          {character.description && (
+            <Text style={styles.characterDescription}>
+              {character.description}
+            </Text>
+          )}
         </View>
         <TouchableOpacity
           onPress={() => onClose && onClose()}
@@ -1153,6 +1158,14 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontFamily: 'Inter-Regular',
     marginTop: 2,
+  },
+  characterDescription: {
+    fontSize: 13,
+    color: '#ccc',
+    fontFamily: 'Inter-Regular',
+    marginTop: 4,
+    fontStyle: 'italic',
+    lineHeight: 18,
   },
   noCharacterContainer: {
     flex: 1,

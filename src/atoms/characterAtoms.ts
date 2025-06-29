@@ -122,6 +122,8 @@ export type Character = {
   copper: number;
   // New separated columns
   avatar?: string;
+  flourish?: string;
+  description?: string;
   traits?: any[];
   features?: any[];
   saving_throws?: any[];
@@ -206,6 +208,8 @@ export const STARTING_WEALTH_BY_CLASS: { [key: string]: { dice: string; multipli
 // Character creation state atoms
 export const characterCreationStepAtom = atom(0);
 export const characterNameAtom = atom('');
+export const characterFlourishAtom = atom('');
+export const characterDescriptionAtom = atom('');
 export const selectedRaceAtom = atom<Race | null>(null);
 export const selectedClassAtom = atom<Class | null>(null);
 export const characterAbilitiesAtom = atom<DnDAbilities>({
@@ -484,6 +488,8 @@ export const resetCharacterCreationAtom = atom(
   (get, set) => {
     set(characterCreationStepAtom, 0);
     set(characterNameAtom, '');
+    set(characterFlourishAtom, '');
+    set(characterDescriptionAtom, '');
     set(selectedRaceAtom, null);
     set(selectedClassAtom, null);
     set(characterAbilitiesAtom, {
