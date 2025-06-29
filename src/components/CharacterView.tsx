@@ -11,6 +11,7 @@ import AbilityUsageTracker from './AbilityUsageTracker';
 import { useCustomAlert } from './CustomAlert';
 import { useAds } from '../hooks/useAds';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
+import { getProficiencyBonus } from '../utils/stealthUtils';
 
 type CoreStat = {
   name: string;
@@ -211,7 +212,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign, rea
     const equipped = character.equipped_items;
     const strModifier = getAbilityModifier(getFinalAbilityScore('strength'));
     const dexModifier = getAbilityModifier(getFinalAbilityScore('dexterity'));
-    const proficiencyBonus = Math.ceil(character.level / 4) + 1;
+    const proficiencyBonus = getProficiencyBonus(character?.level);
     
     // Check for two-handed weapon first
     if (equipped.rightHand && equipped.rightHand.weapon_category && isTwoHandedWeapon(equipped.rightHand)) {
@@ -286,7 +287,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign, rea
   ] as const).map(ability => {
     const finalScore = getFinalAbilityScore(ability);
     const modifier = getAbilityModifier(finalScore);
-    const proficiencyBonus = Math.ceil(character.level / 4) + 1;
+    const proficiencyBonus = getProficiencyBonus(character?.level);
     
     // Check if this is a saving throw proficiency (simplified - would need class data for accuracy)
     const isProficient = false; // This would need to be determined from class data

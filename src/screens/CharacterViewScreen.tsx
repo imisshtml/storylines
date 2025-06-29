@@ -56,6 +56,7 @@ import { getCharacterAvatarUrl } from '../utils/avatarStorage';
 import AvatarSelector from '../components/AvatarSelector';
 import { useCustomAlert } from '../components/CustomAlert';
 import { startLevelUpProcessAtom, charactersToLevelUpAtom } from '../atoms/levelUpAtoms';
+import { getProficiencyBonus } from '../utils/stealthUtils';
 
 export default function CharacterViewScreen() {
   const { characterId } = useLocalSearchParams<{ characterId: string }>();
@@ -976,10 +977,6 @@ export default function CharacterViewScreen() {
     return spellcastingInfo;
   };
 
-  const calculateProficiencyBonus = (level: number): number => {
-    return Math.floor((level - 1) / 4) + 2;
-  };
-
   const handleSaveFlourish = async () => {
     if (!character) return;
 
@@ -1166,7 +1163,7 @@ export default function CharacterViewScreen() {
                   </View>
                   <View style={styles.combatStatCard}>
                     <Text style={styles.combatStatLabel}>Proficiency</Text>
-                    <Text style={styles.combatStatValue}>{calculateProficiencyBonus(character.level)}</Text>
+                    <Text style={styles.combatStatValue}>{getProficiencyBonus(character.level)}</Text>
                   </View>
                 </View>
               </View>
