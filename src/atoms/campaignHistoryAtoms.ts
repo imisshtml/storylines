@@ -7,7 +7,7 @@ export type CampaignMessage = {
   campaign_id: string;
   message: string;
   author: string;
-  message_type: 'player' | 'gm' | 'system';
+  message_type: 'player' | 'gm' | 'system' | 'whisper';
   timestamp: string;
   created_at: string;
   dice_roll?: number; // Optional dice roll result
@@ -15,6 +15,7 @@ export type CampaignMessage = {
   character_id?: string; // Character ID for player messages
   character_name?: string; // Character name for display
   character_avatar?: string; // Character avatar URL
+  whisper_target_id?: string; // User ID of whisper target (for private messages)
 };
 
 // Campaign history state
@@ -56,12 +57,13 @@ export const addCampaignMessageAtom = atom(
     campaign_id: string;
     message: string;
     author: string;
-    message_type: 'player' | 'gm' | 'system';
+    message_type: 'player' | 'gm' | 'system' | 'whisper';
     dice_roll?: number;
     difficulty?: number;
     character_id?: string;
     character_name?: string;
     character_avatar?: string;
+    whisper_target_id?: string;
   }) => {
     try {
       // Check connection first
