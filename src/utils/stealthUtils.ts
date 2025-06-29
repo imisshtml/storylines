@@ -79,7 +79,11 @@ export const doesActionBreakStealth = (actionDescription: string): boolean => {
     'break', 'smash', 'destroy', 'fight', 'combat',
     'loud', 'noise', 'bang', 'crash', 'slam', 'speak',
     'talk', 'say', 'call', 'throw', 'strike', 'hit',
-    'swing', 'shoot', 'fire', 'launch', 'dash', 'rush'
+    'swing', 'shoot', 'fire', 'launch', 'dash', 'rush',
+    'enter', 'go into', 'walk into', 'approach', 'recruit',
+    'hire', 'ask for', 'request', 'demand', 'order',
+    'interact', 'converse', 'discuss', 'negotiate',
+    'tavern', 'inn', 'shop', 'market', 'public'
   ];
   
   const stealthMaintainingKeywords = [
