@@ -288,7 +288,18 @@ function organizeChoicesIntoActions(choices: string[]): Record<ActionCategory, A
     rest: [],
   };
 
-  choices.forEach((choice, index) => {
+  // Deduplicate choices first
+  const seenTitles = new Set<string>();
+  const uniqueChoices = choices.filter(choice => {
+    const normalizedTitle = choice.toLowerCase().trim();
+    if (seenTitles.has(normalizedTitle)) {
+      return false;
+    }
+    seenTitles.add(normalizedTitle);
+    return true;
+  });
+
+  uniqueChoices.forEach((choice, index) => {
     const action = categorizeChoice(choice, index);
     organized[action.category].push(action);
   });

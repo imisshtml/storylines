@@ -1440,8 +1440,57 @@ export default function StoryScreen() {
   const filterBaseActions = (choices: string[]) =>
     choices.filter(choice => !BASE_ACTION_KEYWORDS.some(keyword => choice.toLowerCase().includes(keyword)));
 
-  const filteredAiChoices = filterBaseActions(aiChoices);
-  const filteredDbChoices = filterBaseActions(databaseChoices);
+  // Deduplicate choices by removing exact duplicates and very similar choices
+  const deduplicateChoices = (choices: string[]): string[] => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    
+    for (const choice of choices) {
+      const normalizedChoice = choice.toLowerCase().trim();
+      
+      // Skip if we've seen this exact choice
+      if (seen.has(normalizedChoice)) {
+        continue;
+      }
+      
+      // Check for very similar choices (80% similarity)
+      const isSimilar = Array.from(seen).some(seenChoice => {
+        const similarity = calculateSimilarity(normalizedChoice, seenChoice);
+        return similarity > 0.8;
+      });
+      
+      if (!isSimilar) {
+        seen.add(normalizedChoice);
+        result.push(choice);
+      }
+    }
+    
+    return result;
+  };
+
+  // Simple string similarity calculation (Jaccard similarity)
+  const calculateSimilarity = (str1: string, str2: string): number => {
+    const words1 = new Set(str1.split(' '));
+    const words2 = new Set(str2.split(' '));
+    
+    const intersection = new Set([...words1].filter(word => words2.has(word)));
+    const union = new Set([...words1, ...words2]);
+    
+    return intersection.size / union.size;
+  };
+
+  const filteredAiChoices = deduplicateChoices(filterBaseActions(aiChoices));
+  const filteredDbChoices = deduplicateChoices(filterBaseActions(databaseChoices));
+
+  // Debug logging for choice sources
+  if (aiChoices.length > 0) {
+    console.log('🎯 Raw AI choices:', aiChoices.length, aiChoices);
+    console.log('🎯 Filtered AI choices:', filteredAiChoices.length, filteredAiChoices);
+  }
+  if (databaseChoices.length > 0) {
+    console.log('🎯 Raw DB choices:', databaseChoices.length, databaseChoices);
+    console.log('🎯 Filtered DB choices:', filteredDbChoices.length, filteredDbChoices);
+  }
 
   const choicesToShow = filteredAiChoices.length > 0
     ? filteredAiChoices // Use AI-generated choices first
@@ -1453,6 +1502,8 @@ export default function StoryScreen() {
         'Set up camp for the night',
         'Plan your next move together',
       ]; // Fallback to defaults last
+
+  console.log('🎯 Final choices to show:', choicesToShow.length, choicesToShow);
 
   const currentInputOption = getCurrentInputOption();
   // Add manual refresh connection function
