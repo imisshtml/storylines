@@ -17,6 +17,7 @@ import { adManager } from '../src/utils/adManager';
 import LevelUpModal from '../src/components/LevelUpModal';
 import { initializeCharacterLevelRealtimeAtom } from '../src/atoms/levelUpAtoms';
 import UpdateManager from '../src/components/UpdateManager';
+import { useEquipmentReference } from '../src/hooks/useEquipmentReference';
 import { 
   cleanupConnectionMonitoring,
   monitorSubscriptionHealth,
@@ -38,6 +39,9 @@ export default function RootLayout() {
   const [, initializeReadStatusRealtime] = useAtom(initializeCampaignReadStatusRealtimeAtom);
   const [, initializeFriendshipsRealtime] = useAtom(initializeFriendshipsRealtimeAtom);
   const [, initializeCharacterLevelRealtime] = useAtom(initializeCharacterLevelRealtimeAtom);
+  
+  // Initialize equipment reference
+  const { loadEquipmentReference } = useEquipmentReference();
 
   // Enhanced connection monitoring with manual recovery options
   useConnectionMonitor({
@@ -70,6 +74,10 @@ export default function RootLayout() {
         console.log('🚀 Starting app initialization...');
         isInitialized = true;
         await initializeAuth();
+        
+        // Load equipment reference early in the initialization process
+        console.log('🛡️ Loading equipment reference...');
+        await loadEquipmentReference();
 
         // Initialize realtime subscriptions with staggered timing to prevent overload
         console.log('📡 Initializing realtime subscriptions...');

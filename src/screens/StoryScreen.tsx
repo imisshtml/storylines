@@ -935,7 +935,7 @@ export default function StoryScreen() {
           }
           
           // Parse and apply inventory operations if validation passes
-          const inventoryOperations = parseInventoryOperations(action, currentCharacter.name);
+          const inventoryOperations = parseInventoryOperations(action, currentCharacter.name, currentCharacter);
           console.log('🎒 Parsed inventory operations:', inventoryOperations);
           
           if (inventoryOperations.length > 0) {
@@ -1861,7 +1861,7 @@ export default function StoryScreen() {
                 <AlertCircle size={20} color="#f44336" />
                 <View style={styles.errorTextContainer}>
                   <Text style={styles.errorText}>
-                    Failed to connect to Storyteller. Please try again.
+                    {error}
                   </Text>
                   {(connectionStatus === 'disconnected' || connectionStatus === 'connecting') && (
                     <TouchableOpacity 
