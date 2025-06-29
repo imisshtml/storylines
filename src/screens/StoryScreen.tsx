@@ -1468,8 +1468,75 @@ export default function StoryScreen() {
     return result;
   };
 
-  // Simple string similarity calculation (Jaccard similarity)
+  // Enhanced similarity calculation that focuses on key action words
   const calculateSimilarity = (str1: string, str2: string): number => {
+    // Extract key action and target words
+    const extractKeyWords = (text: string): Set<string> => {
+      const movementActions = ['head', 'go', 'move', 'walk', 'run', 'approach', 'enter', 'visit'];
+      const investigationActions = ['investigate', 'examine', 'search', 'explore', 'study'];
+      const socialActions = ['question', 'ask', 'talk', 'speak', 'converse', 'discuss'];
+      const combatActions = ['attack', 'cast', 'fight', 'strike'];
+      const stealthActions = ['hide', 'sneak', 'skulk', 'lurk'];
+      const itemActions = ['use', 'take', 'grab', 'steal'];
+      
+      const locationWords = ['moor', 'tavern', 'inn', 'village', 'house', 'shop', 'market', 'forest', 'cave', 'castle', 'whispers', 'curse'];
+      const targetWords = ['barkeep', 'innkeeper', 'merchant', 'guard', 'villager', 'stranger', 'woman', 'man', 'person', 'wisewoman'];
+      
+      const words = text.toLowerCase().split(/\s+/);
+      const keyWords = new Set<string>();
+      
+      // Categorize actions for better semantic matching
+      words.forEach(word => {
+        const cleanWord = word.replace(/[^\w]/g, '');
+        if (movementActions.includes(cleanWord)) {
+          keyWords.add('movement');
+        } else if (investigationActions.includes(cleanWord)) {
+          keyWords.add('investigation');
+        } else if (socialActions.includes(cleanWord)) {
+          keyWords.add('social');
+        } else if (combatActions.includes(cleanWord)) {
+          keyWords.add('combat');
+        } else if (stealthActions.includes(cleanWord)) {
+          keyWords.add('stealth');
+        } else if (itemActions.includes(cleanWord)) {
+          keyWords.add('item');
+        }
+        
+        if (locationWords.includes(cleanWord) || targetWords.includes(cleanWord)) {
+          keyWords.add(cleanWord);
+        }
+      });
+      
+      return keyWords;
+    };
+    
+    // Get key words from both strings
+    const keys1 = extractKeyWords(str1);
+    const keys2 = extractKeyWords(str2);
+    
+    // If both have key words, prioritize key word similarity
+    if (keys1.size > 0 && keys2.size > 0) {
+      const keyIntersection = new Set([...keys1].filter(word => keys2.has(word)));
+      const keyUnion = new Set([...keys1, ...keys2]);
+      const keySimilarity = keyIntersection.size / keyUnion.size;
+      
+      // Special case: if both are movement actions to the same location, they're duplicates
+      const bothMovement = keys1.has('movement') && keys2.has('movement');
+      const sharedLocation = [...keyIntersection].some(key => 
+        ['moor', 'tavern', 'inn', 'village', 'house', 'shop', 'market', 'forest', 'cave', 'castle'].includes(key)
+      );
+      
+      if (bothMovement && sharedLocation) {
+        return 1.0; // Perfect match for movement to same location
+      }
+      
+      // If key words are very similar, consider them duplicates
+      if (keySimilarity >= 0.6) { // Lowered threshold from 0.7 to 0.6
+        return keySimilarity;
+      }
+    }
+    
+    // Fallback to general word similarity
     const words1 = new Set(str1.split(' '));
     const words2 = new Set(str2.split(' '));
     
