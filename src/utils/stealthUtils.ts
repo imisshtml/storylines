@@ -77,13 +77,16 @@ export const doesActionBreakStealth = (actionDescription: string): boolean => {
     'attack', 'cast', 'spell', 'shout', 'yell', 'scream',
     'run', 'charge', 'jump', 'climb loudly', 'knock',
     'break', 'smash', 'destroy', 'fight', 'combat',
-    'loud', 'noise', 'bang', 'crash', 'slam'
+    'loud', 'noise', 'bang', 'crash', 'slam', 'speak',
+    'talk', 'say', 'call', 'throw', 'strike', 'hit',
+    'swing', 'shoot', 'fire', 'launch', 'dash', 'rush'
   ];
   
   const stealthMaintainingKeywords = [
     'sneak', 'stealth', 'hide', 'quietly', 'silently',
     'carefully', 'stealthily', 'whisper', 'tiptoe',
-    'creep', 'lurk', 'slink', 'skulk'
+    'creep', 'lurk', 'slink', 'skulk', 'remain hidden',
+    'stay hidden', 'continue hiding'
   ];
   
   const description = actionDescription.toLowerCase();
