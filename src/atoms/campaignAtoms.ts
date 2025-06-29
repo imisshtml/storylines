@@ -215,6 +215,8 @@ export const upsertCampaignAtom = atom(
         owner: campaign.owner,
         content_level: campaign.content_level,
         rp_focus: campaign.rp_focus,
+        campaign_length: campaign.campaign_length,
+        verbosity: campaign.verbosity,
         limit: campaign.limit,
       };
 

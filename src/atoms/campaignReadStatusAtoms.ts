@@ -57,45 +57,19 @@ export const updateCampaignReadStatusAtom = atom(
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // First, check if a record already exists
-      const { data: existingRecord } = await supabase
+      // Upsert atomically to avoid race conditions
+      const { data, error } = await supabase
         .from('campaign_read_status')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('campaign_id', campaignId)
-        .single();
-
-      let data, error;
-
-      if (existingRecord) {
-        // Update existing record
-        const result = await supabase
-          .from('campaign_read_status')
-          .update({
-            last_read_message_id: messageId,
-          })
-          .eq('user_id', user.id)
-          .eq('campaign_id', campaignId)
-          .select()
-          .single();
-
-        data = result.data;
-        error = result.error;
-      } else {
-        // Insert new record
-        const result = await supabase
-          .from('campaign_read_status')
-          .insert({
+        .upsert(
+          {
             user_id: user.id,
             campaign_id: campaignId,
             last_read_message_id: messageId,
-          })
-          .select()
-          .single();
-
-        data = result.data;
-        error = result.error;
-      }
+          },
+          { onConflict: 'user_id,campaign_id' }   // composite unique key
+        )
+        .select()
+        .single();
 
       if (error) throw error;
 
