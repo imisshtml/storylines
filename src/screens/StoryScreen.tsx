@@ -1781,6 +1781,22 @@ export default function StoryScreen() {
   const characterHasLockpicks = currentCharacter?.equipment?.some(eq => eq.name.toLowerCase().includes('lockpick')) ?? false;
   const characterIsInStealth = currentCharacter ? isInStealth(currentCharacter) : false;
 
+  const refreshHistory = async () => {
+    if (!currentCampaign?.id) {
+      console.log('❌ No current campaign to refresh history for');
+      return;
+    }
+    
+    console.log('🔄 Manually refreshing campaign history...');
+    try {
+      await atomRefs.current.fetchCampaignHistory(currentCampaign.id);
+      console.log('✅ Campaign history refreshed successfully');
+    } catch (error) {
+      console.error('❌ Failed to refresh campaign history:', error);
+      setError('Failed to refresh history. Please try again.');
+    }
+  };
+
   const baseActions = [
     { key: 'search', label: 'Search', icon: <Search size={18} color="#fff" />, onPress: handleSearch },
     { key: 'useItem', label: 'Use Item', icon: <PackageIcon size={18} color="#fff" />, onPress: handleUseItem },
@@ -1789,7 +1805,7 @@ export default function StoryScreen() {
     ...(characterIsInStealth ? [{ key: 'steal', label: 'Steal', icon: <HandCoins size={18} color="#fff" />, onPress: handleSteal }] : []),
     ...(characterHasLockpicks ? [{ key: 'lockpick', label: 'Lockpick', icon: <Lock size={18} color="#fff" />, onPress: handleLockpick }] : []),
     { key: 'pause', label: currentCampaign?.paused ? 'Unpause' : 'Pause', icon: <PauseIcon size={18} color="#fff" />, onPress: handleTogglePause },
-    { key: 'refresh', label: 'Refresh', icon: <RefreshCw size={18} color="#fff" />, onPress: handleRefreshConnection },
+    { key: 'refresh', label: 'Refresh', icon: <RefreshCw size={18} color="#fff" />, onPress: refreshHistory },
   ].map(action => ({
     ...action,
     disabled: !(isPlayerTurn || action.key === 'refresh' || action.key === 'pause') || (action.key === 'sneak' && characterIsInStealth),
@@ -1906,16 +1922,6 @@ export default function StoryScreen() {
                   <ChevronDown size={18} color="#666" />
                 </Animated.View>
               </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              onPress={() => {
-                console.log('🔄 Manual refresh triggered');
-                atomRefs.current.fetchCampaignHistory(currentCampaign.id);
-              }} 
-              style={styles.headerButton}
-            >
-              <RefreshCw size={20} color="#2a2a2a" />
             </TouchableOpacity>
             
             {/* Debug button to clear other player actions */}
