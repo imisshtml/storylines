@@ -59,6 +59,7 @@ import {
   applyInventoryOperations,
   generateInventoryContext 
 } from '../utils/inventoryManager';
+import useStoryNarrator from '@/hooks/useStoryNarrator';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask' | 'action' | 'ooc';
 
@@ -72,6 +73,8 @@ interface InputOption {
 
 export default function StoryScreen() {
   const insets = useSafeAreaInsets();
+  // Automatically narrate storyteller messages
+  useStoryNarrator();
   const [userInput, setUserInput] = useState('');
   const [currentCampaign, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [user] = useAtom(userAtom);
@@ -1200,8 +1203,12 @@ export default function StoryScreen() {
   
   const alwaysAllowedTypes: InputType[] = ['whisper', 'ask', 'ooc'];
   const currentCharacter = getCurrentCharacter();
-  const isTurn = currentCharacter?.id && currentCampaign?.current_player === currentCharacter.id && !currentCampaign?.paused;
-  const canSend = isTurn || alwaysAllowedTypes.includes(selectedInputType);
+  const otherPlayers = getOtherPlayers();
+  const isSinglePlayer = otherPlayers.length === 0;
+  const isPlayerTurn = currentCharacter?.id && 
+    (isSinglePlayer || currentCampaign?.current_player === currentCharacter.id) && 
+    !currentCampaign?.paused;
+  const canSend = isPlayerTurn || alwaysAllowedTypes.includes(selectedInputType);
   //if (!userInput.trim() || isLoading('sendAction') || !canSend) return;
   const handleSend = async () => {
     if (!userInput.trim() || isLoading('sendAction') || !canSend) return;
@@ -1767,8 +1774,6 @@ export default function StoryScreen() {
   };
 
   // Determine if it is the current player's turn
-  const isPlayerTurn = currentCharacter?.id && currentCampaign?.current_player === currentCharacter.id && !currentCampaign?.paused;
-
   const closeCharacterView = () => {
     setIsCharacterSheetVisible(false);
   };
