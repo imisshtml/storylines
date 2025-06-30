@@ -1222,12 +1222,117 @@ export default function StoryScreen() {
       setTimeout(() => setShowChoices(true), 1000);
     }
   };
+
+  const handleMarketAction = async (choice: string, character: any) => {
+    if (!currentCampaign || !character) return;
+
+    startLoading('sendAction');
+
+    try {
+      // Determine market type from choice
+      let marketType = 'general';
+      if (choice.toLowerCase().includes('blacksmith')) marketType = 'blacksmith';
+      else if (choice.toLowerCase().includes('tavern')) marketType = 'tavern';
+      else if (choice.toLowerCase().includes('potions') || choice.toLowerCase().includes('remedies')) marketType = 'apothecary';
+      else if (choice.toLowerCase().includes('market')) marketType = 'market';
+
+      // Determine location size based on current scene or default to medium
+      const locationSize = 'medium'; // Could be enhanced to detect from scene context
+      
+      const middlewareUrl = process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL || 'http://localhost:3001';
+      const fullUrl = `${middlewareUrl}/api/market/view-inventory`;
+
+      const response = await fetch(fullUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          marketType,
+          locationSize,
+          quality: 'average',
+          location: `${marketType.charAt(0).toUpperCase() + marketType.slice(1)}`
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch market inventory: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to get market inventory');
+      }
+
+      // Format inventory display message
+      let inventoryMessage = `**${data.location} Inventory**\n\n${data.message}\n\n`;
+      
+      data.inventory.forEach((item: any) => {
+        inventoryMessage += `• **${item.name}** - ${item.price}`;
+        if (item.condition && item.condition !== 'new') {
+          inventoryMessage += ` (${item.condition})`;
+        }
+        if (item.craftable) {
+          inventoryMessage += ` *[Can be crafted]*`;
+        }
+        inventoryMessage += '\n';
+      });
+
+      // Add the market inventory as a system message
+      await atomRefs.current.addCampaignMessage({
+        campaign_id: currentCampaign.id,
+        message: inventoryMessage,
+        author: 'System',
+        message_type: 'system',
+      });
+
+      // Broadcast completion
+      await broadcastActionCompleted(currentCampaign.id, {
+        playerId: user.id,
+        success: true
+      });
+
+    } catch (error) {
+      console.error('❌ Market action error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to view market inventory';
+      setError(errorMessage);
+      
+      await broadcastActionCompleted(currentCampaign.id, {
+        playerId: user.id,
+        success: false
+      });
+    } finally {
+      stopLoading('sendAction');
+    }
+  };
+
   const handleChoiceSelect = async (choice: string) => {
     if (isLoading('sendAction')) return;
 
     setShowChoices(false);
     const currentCharacter = getCurrentCharacter();
     const characterName = currentCharacter?.name || user?.username || user?.email || 'Player';
+
+    // Check if this is a market action
+    const marketKeywords = [
+      'view blacksmith wares', 'view shop wares', 'view tavern menu', 
+      'view potions & remedies', 'browse market stalls', 'view available goods',
+      'commission custom item'
+    ];
+    
+    const isMarketAction = marketKeywords.some(keyword => 
+      choice.toLowerCase().includes(keyword.toLowerCase())
+    );
+
+    if (isMarketAction) {
+      console.log('🏪 Market action detected:', choice);
+      await handleMarketAction(choice, currentCharacter);
+      // Show choices again after market action
+      setTimeout(() => setShowChoices(true), 1000);
+      return;
+    }
+
     const actionText = `${characterName} chooses to: ${choice}`;
 
     // Validate inventory for choice actions as well

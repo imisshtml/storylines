@@ -16,6 +16,7 @@ import {
   Bed,
   Target,
   X,
+  ShoppingCart,
 } from 'lucide-react-native';
 
 interface ActionChoice {
@@ -28,7 +29,7 @@ interface ActionChoice {
   icon?: React.ReactNode;
 }
 
-type ActionCategory = 'combat' | 'magic' | 'social' | 'exploration' | 'utility' | 'rest';
+type ActionCategory = 'combat' | 'magic' | 'social' | 'exploration' | 'utility' | 'rest' | 'market';
 type CompactCategory = 'combat' | 'social' | 'misc';
 
 interface CategoryConfig {
@@ -74,6 +75,12 @@ const CATEGORY_CONFIG: Record<ActionCategory, CategoryConfig> = {
     icon: <Bed size={20} color="#fff" />,
     color: '#95a5a6',
     description: 'Take breaks and recover resources',
+  },
+  market: {
+    title: 'Market',
+    icon: <Package size={20} color="#fff" />,
+    color: '#3498db',
+    description: 'Buy, sell, or trade items',
   },
 };
 
@@ -252,17 +259,17 @@ export default function EnhancedStoryChoices({
                           ]}
                         >
                           <Text style={styles.modalDifficultyText}>
-                            {action.difficulty.toUpperCase()}
+                            {action.difficulty?.toUpperCase()}
                           </Text>
                         </View>
                       )}
                     </View>
 
-                    {false && action.requirements && action.requirements.length > 0 && (
+                    {false && action.requirements?.length && action.requirements?.length > 0 && (
                       <View style={styles.modalRequirementsContainer}>
                         <Text style={styles.modalRequirementsLabel}>Requires:</Text>
                         <Text style={styles.modalRequirementsText}>
-                          {action.requirements.join(', ')}
+                          {action.requirements?.join(', ')}
                         </Text>
                       </View>
                     )}
@@ -286,6 +293,7 @@ function organizeChoicesIntoActions(choices: string[]): Record<ActionCategory, A
     exploration: [],
     utility: [],
     rest: [],
+    market: [],
   };
 
   // Deduplicate choices first
@@ -375,6 +383,36 @@ function categorizeChoice(choice: string, index: number): ActionChoice {
     };
   }
 
+  // Market actions
+  if (
+    lowerChoice.includes('view') && (
+      lowerChoice.includes('wares') ||
+      lowerChoice.includes('inventory') ||
+      lowerChoice.includes('goods') ||
+      lowerChoice.includes('shop') ||
+      lowerChoice.includes('blacksmith') ||
+      lowerChoice.includes('tavern') ||
+      lowerChoice.includes('market') ||
+      lowerChoice.includes('potions') ||
+      lowerChoice.includes('remedies')
+    ) ||
+    lowerChoice.includes('browse') ||
+    lowerChoice.includes('commission') ||
+    lowerChoice.includes('buy') ||
+    lowerChoice.includes('sell') ||
+    lowerChoice.includes('trade') ||
+    lowerChoice.includes('purchase')
+  ) {
+    return {
+      id: `market-${index}`,
+      title: choice,
+      description: getActionDescription(choice, 'market'),
+      category: 'market',
+      icon: <ShoppingCart size={16} color="#3498db" />,
+      difficulty: getDifficultyFromChoice(choice),
+    };
+  }
+
   // Utility/Items actions
   if (
     lowerChoice.includes('use') ||
@@ -435,6 +473,7 @@ function getActionDescription(choice: string, category: ActionCategory): string 
     exploration: 'Investigate and explore your surroundings',
     utility: 'Use items and tools from your inventory',
     rest: 'Take time to rest and recover',
+    market: 'Buy, sell, or trade items',
   };
 
   return descriptions[category];
