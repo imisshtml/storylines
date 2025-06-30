@@ -246,14 +246,17 @@ export default function StoryScreen() {
     console.log('📖 Current campaign:', currentCampaign ? currentCampaign.name : 'NONE');
     console.log('📖 Campaign status:', currentCampaign?.status);
     
-    if (!currentCampaign && !isLoading('sendAction')) {
-      console.log('📖 No current campaign, redirecting to home');
-      router.replace('/home');
+    // If user is logged out, don't redirect to home – let global/login guards handle navigation
+    if (!user) {
       return;
     }
     
+    // If no current campaign, either we are loading (wait) or navigate home
     if (!currentCampaign) {
-      // Campaign is null but we're loading, so just return early
+      if (!isLoading('sendAction')) {
+        console.log('📖 No current campaign, redirecting to home');
+        router.replace('/home');
+      }
       return;
     }
     
