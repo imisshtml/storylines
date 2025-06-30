@@ -1203,7 +1203,14 @@ export default function StoryScreen() {
   
   const alwaysAllowedTypes: InputType[] = ['whisper', 'ask', 'ooc'];
   const currentCharacter = getCurrentCharacter();
-  const isTurn = currentCharacter?.id && currentCampaign?.current_player === currentCharacter.id && !currentCampaign?.paused;
+  // Determine if it's the player's turn.
+  // In single-player campaigns, always allow actions unless campaign is paused.
+  const isSinglePlayerCampaign = currentCampaign?.players?.length === 1;
+  const isTurn = !currentCampaign?.paused && (
+    // If campaign hasn't set a current player yet, allow anyone (solo games)
+    currentCampaign?.current_player == null ||
+    (currentCharacter?.id && currentCampaign?.current_player === currentCharacter.id)
+  );
   const canSend = isTurn || alwaysAllowedTypes.includes(selectedInputType);
   //if (!userInput.trim() || isLoading('sendAction') || !canSend) return;
   const handleSend = async () => {
@@ -1382,10 +1389,10 @@ export default function StoryScreen() {
   // Helper to execute rest immediately for now (short / long)
   const restExecutionRef = useRef<string | null>(null); // Store the rest type being executed
   const executeRest = useCallback(async (type: 'short' | 'long') => {
-    if (!currentCampaign || !pendingRest) return;
+    if (!currentCampaign || (!pendingRest && !isSinglePlayerCampaign)) return;
     
     // Create a unique execution key for this rest request
-    const executionKey = `${pendingRest.requesterId}-${pendingRest.restType}-${pendingRest.deadline}`;
+    const executionKey = `${pendingRest?.requesterId}-${pendingRest?.restType}-${pendingRest?.deadline}`;
     
     // Prevent duplicate executions of the same rest request
     if (restExecutionRef.current === executionKey) {
@@ -1436,7 +1443,7 @@ export default function StoryScreen() {
         restExecutionRef.current = null;
       }
     }, 3000);
-  }, [currentCampaign, characters, pendingRest]);
+  }, [currentCampaign, characters, pendingRest, isSinglePlayerCampaign]);
 
   // Handle rest resolution
   useEffect(() => {
@@ -1770,7 +1777,8 @@ export default function StoryScreen() {
   };
 
   // Determine if it is the current player's turn
-  const isPlayerTurn = currentCharacter?.id && currentCampaign?.current_player === currentCharacter.id && !currentCampaign?.paused;
+  const isSinglePlayerGame = currentCampaign?.players.length === 1;
+  const isPlayerTurn = isSinglePlayerGame || currentCharacter?.id && currentCampaign?.current_player === currentCharacter.id && !currentCampaign?.paused;
 
   const closeCharacterView = () => {
     setIsCharacterSheetVisible(false);
@@ -1971,10 +1979,14 @@ export default function StoryScreen() {
   // Broadcast helpers
   const requestRest = async (type: 'short' | 'long') => {
     if (!currentCampaign || !user) return;
-    const deadline = Date.now() + 10000; // 5 seconds - shorter timeout
-    console.log('🛌 Requesting rest:', { type, playerId: user.id, playerName: currentCharacter?.name || user.username || 'Player' });
-    setPendingRest({ restType: type, requesterId: user.id, requesterName: currentCharacter?.name || user.username || 'Player', deadline, votes: { [user.id]: true } });
-    await broadcastRestRequest(currentCampaign.id, { playerId: user.id, playerName: currentCharacter?.name || user.username || 'Player', restType: type, deadline });
+    if (isSinglePlayerCampaign) {
+      executeRest(type);
+    } else {
+      const deadline = Date.now() + 10000;
+      console.log('🛌 Requesting rest:', { type, playerId: user.id, playerName: currentCharacter?.name || user.username || 'Player' });
+      setPendingRest({ restType: type, requesterId: user.id, requesterName: currentCharacter?.name || user.username || 'Player', deadline, votes: { [user.id]: true } });
+      await broadcastRestRequest(currentCampaign.id, { playerId: user.id, playerName: currentCharacter?.name || user.username || 'Player', restType: type, deadline });
+    }
   };
 
   const respondToRest = async (accepted: boolean) => {
@@ -1996,13 +2008,6 @@ export default function StoryScreen() {
     // Don't update local state here - let the broadcast callback handle it
     setShowRestPrompt(false);
   };
-
-  // Redirect to login if auth lost
-  useEffect(() => {
-    if (user === null) {
-      router.replace('/login');
-    }
-  }, [user]);
 
   return (
     <ImageBackground
