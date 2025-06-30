@@ -94,6 +94,28 @@ const clearCampaigns = async (set: any) => {
   }
 };
 
+// Safely sign out with timeout fallback in case Supabase call hangs (observed on some RN builds)
+async function safeSupabaseSignOut(timeoutMs = 5000): Promise<Error | null> {
+  try {
+    const signOutPromise = supabase.auth.signOut();
+
+    const result = await Promise.race([
+      signOutPromise,
+      new Promise<{ error: null }>(resolve =>
+        setTimeout(() => resolve({ error: null }), timeoutMs)
+      ),
+    ]);
+
+    // signOut() returns void in newer SDK versions; older returns { error }
+    if ((result as any)?.error) {
+      return (result as any).error as Error;
+    }
+    return null;
+  } catch (err) {
+    return err as Error;
+  }
+}
+
 // Atom to handle sign in
 export const signInAtom = atom(
   null,
@@ -204,15 +226,14 @@ export const signOutAtom = atom(
       set(authErrorAtom, null);
 
       const user = get(userAtom);
-      
       // Remove user from online status before signing out
       if (user?.id) {
         await removeUserFromOnlineStatus(user.id);
       }
-
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-
+      // Trigger Supabase sign-out in background; don't block UI in case it hangs
+      safeSupabaseSignOut().then(err => {
+        if (err) console.warn('[Auth] Supabase signOut error (background):', err);
+      });
       // Clear AsyncStorage
       await clearUserSession();
 
@@ -221,7 +242,6 @@ export const signOutAtom = atom(
 
       // Clear campaigns when signing out
       await clearCampaigns(set);
-
       // Clear current campaign atom
       try {
         const { currentCampaignAtom } = await import('./campaignAtoms');
@@ -229,7 +249,6 @@ export const signOutAtom = atom(
       } catch (err) {
         console.warn('Could not clear currentCampaignAtom (auth state):', err);
       }
-
       // Navigate to login screen to ensure UI resets
       try {
         router.replace('/login');

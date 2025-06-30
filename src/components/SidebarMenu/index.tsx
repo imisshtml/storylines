@@ -63,9 +63,8 @@ const SidebarMenu = ({ isVisible, onClose }: SidebarMenuProps) => {
 
   const handleLogout = async () => {
     try {
-      await signOut();
       onClose();
-      router.replace('/login');
+      await signOut();
     } catch (error) {
       console.error('Logout error:', error);
     }
