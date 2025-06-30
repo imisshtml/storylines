@@ -1,9 +1,9 @@
 import { Inter_400Regular, Inter_700Bold, useFonts } from '@expo-google-fonts/inter';
-import { SplashScreen, Stack } from 'expo-router';
+import { SplashScreen, Stack , useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
-import { useAtom } from 'jotai';
-import { initializeAuthAtom } from '../src/atoms/authAtoms'
+import { useAtom, useAtomValue } from 'jotai';
+import { initializeAuthAtom, userAtom, authLoadingAtom } from '../src/atoms/authAtoms'
 import { initializeRealtimeAtom } from '../src/atoms/campaignAtoms';
 import { initializeCampaignReadStatusRealtimeAtom } from '../src/atoms/campaignReadStatusAtoms';
 import { initializeFriendshipsRealtimeAtom } from '../src/atoms/friendsAtoms';
@@ -42,6 +42,22 @@ export default function RootLayout() {
   
   // Initialize equipment reference
   const { loadEquipmentReference } = useEquipmentReference();
+
+  // Global auth state for navigation guard
+  const user = useAtomValue(userAtom);
+  const authLoading = useAtomValue(authLoadingAtom);
+
+  // Redirect to login whenever user becomes null (and loading done)
+  const router = useRouter();
+  useEffect(() => {
+    if (!authLoading && !user) {
+      try {
+        router.replace('/login');
+      } catch (navErr) {
+        console.warn('[RootLayout] Navigation guard error:', navErr);
+      }
+    }
+  }, [user, authLoading]);
 
   // Enhanced connection monitoring with manual recovery options
   useConnectionMonitor({
