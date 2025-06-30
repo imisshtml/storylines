@@ -1994,6 +1994,13 @@ export default function StoryScreen() {
     setShowRestPrompt(false);
   };
 
+  // Redirect to login if auth lost
+  useEffect(() => {
+    if (user === null) {
+      router.replace('/login');
+    }
+  }, [user]);
+
   return (
     <ImageBackground
       source={require('../../assets/images/paper_background.jpg')}
