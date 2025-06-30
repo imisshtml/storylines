@@ -370,6 +370,13 @@ export const initializeAuthAtom = atom(
 
           // Clear campaigns when signing out
           await clearCampaigns(set);
+
+          // Ensure navigation to login screen in case signOutAtom wasn't used
+          try {
+            router.replace('/login');
+          } catch (navErr) {
+            console.warn('[Auth] Navigation error on auth state change:', navErr);
+          }
         }
       });
     } catch (error) {
