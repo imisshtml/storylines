@@ -207,6 +207,8 @@ export default function LoginScreen() {
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    returnKeyType="go"
+                    onSubmitEditing={handleAuth}
                   />
                   <TouchableOpacity
                     style={styles.eyeButton}
