@@ -59,6 +59,7 @@ import {
   applyInventoryOperations,
   generateInventoryContext 
 } from '../utils/inventoryManager';
+import { useStoryNarrator } from '../hooks/useStoryNarrator';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask' | 'action' | 'ooc';
 
@@ -115,6 +116,9 @@ export default function StoryScreen() {
   const [reportingMessage, setReportingMessage] = useState<typeof campaignHistory[0] | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showCharacterModal, setShowCharacterModal] = useState(false);
+
+  // Voice narration
+  useStoryNarrator();
 
   // Campaign history atoms
   const [campaignHistory] = useAtom(campaignHistoryAtom);
