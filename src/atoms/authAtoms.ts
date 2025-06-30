@@ -3,6 +3,7 @@ import { supabase } from '../config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { User, Session } from '@supabase/supabase-js';
 import { addUserToOnlineStatus, removeUserFromOnlineStatus } from '../utils/onlineStatusManager';
+import { router } from 'expo-router';
 
 export type AuthUser = {
   id: string;
@@ -220,6 +221,13 @@ export const signOutAtom = atom(
 
       // Clear campaigns when signing out
       await clearCampaigns(set);
+
+      // Navigate to login screen to ensure UI resets
+      try {
+        router.replace('/login');
+      } catch (navErr) {
+        console.warn('[Auth] Navigation error on sign out:', navErr);
+      }
     } catch (error) {
       set(authErrorAtom, (error as Error).message);
       throw error;
