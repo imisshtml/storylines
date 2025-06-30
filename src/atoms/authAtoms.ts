@@ -222,6 +222,14 @@ export const signOutAtom = atom(
       // Clear campaigns when signing out
       await clearCampaigns(set);
 
+      // Clear current campaign atom
+      try {
+        const { currentCampaignAtom } = await import('./campaignAtoms');
+        set(currentCampaignAtom, null);
+      } catch (err) {
+        console.warn('Could not clear currentCampaignAtom (auth state):', err);
+      }
+
       // Navigate to login screen to ensure UI resets
       try {
         router.replace('/login');
@@ -370,6 +378,14 @@ export const initializeAuthAtom = atom(
 
           // Clear campaigns when signing out
           await clearCampaigns(set);
+
+          // Clear current campaign atom
+          try {
+            const { currentCampaignAtom } = await import('./campaignAtoms');
+            set(currentCampaignAtom, null);
+          } catch (err) {
+            console.warn('Could not clear currentCampaignAtom (auth state):', err);
+          }
 
           // Ensure navigation to login screen in case signOutAtom wasn't used
           try {

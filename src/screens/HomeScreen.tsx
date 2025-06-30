@@ -57,6 +57,13 @@ export default function HomeScreen() {
     charactersToLevelUp
   } = useLevelUpNotification();
 
+  // Redirect to login if user is not authenticated
+  useEffect(() => {
+    if (user === null) {
+      router.replace('/login');
+    }
+  }, [user]);
+
   // Fetch characters and read status when component mounts or user changes
   useEffect(() => {
     if (user) {
