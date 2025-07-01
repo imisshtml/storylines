@@ -36,7 +36,8 @@ import {
   initializePlayerActionsRealtimeAtom,
   getAiChoicesAtom,
   setAiChoicesAtom,
-  clearAiChoicesAtom
+  clearAiChoicesAtom,
+  clearPlayerActionsAtom
 } from '../atoms/playerActionsAtoms';
 import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
@@ -129,6 +130,7 @@ export default function StoryScreen() {
   const [playerActions] = useAtom(sortedPlayerActionsAtom);
   const [, fetchPlayerActions] = useAtom(fetchPlayerActionsAtom);
   const [, initializePlayerActionsRealtime] = useAtom(initializePlayerActionsRealtimeAtom);
+  const [, clearPlayerActions] = useAtom(clearPlayerActionsAtom);
 
   // AI choices persistence atoms
   const [getAiChoices] = useAtom(getAiChoicesAtom);
@@ -682,6 +684,7 @@ export default function StoryScreen() {
           message: data.response,
           author: 'GM',
           message_type: 'gm',
+          display_type: 'initial',
         });
 
         // Immediately refresh local history in case realtime not yet connected
@@ -692,6 +695,17 @@ export default function StoryScreen() {
         // Set the choices from the initial story
         if (currentCampaign) {
           atomRefs.current.setAiChoices({ campaignId: currentCampaign.id, choices: data.choices || [] });
+        }
+
+        // Immediately mark campaign as in_progress so initial story isn't regenerated
+        try {
+          await supabase
+            .from('campaigns')
+            .update({ status: 'in_progress' })
+            .eq('uid', currentCampaign.id);
+          console.log('🚀 Campaign status set to in_progress');
+        } catch (err) {
+          console.warn('⚠️ Failed to set campaign to in_progress:', err);
         }
 
         console.log('✅ Initial story generation completed successfully');
@@ -1593,9 +1607,11 @@ export default function StoryScreen() {
       return [];
     }
 
-    // Filter for current game mode (exploration by default)
+    // Filter to actions intended for this user and current game mode
     const currentGameMode = 'exploration';
-    const modeActions = playerActions.filter(action => action.game_mode === currentGameMode);
+    const modeActions = playerActions.filter(action => 
+      action.user_id === user?.id && action.game_mode === currentGameMode
+    );
 
     // Convert action data to choice strings
     return modeActions.map(action => action.action_data.title);
@@ -2028,6 +2044,13 @@ export default function StoryScreen() {
     setShowRestPrompt(false);
   };
 
+  // Clear stale actions when the turn passes to another player
+  useEffect(() => {
+    if (currentCampaign) {
+      clearPlayerActions();
+    }
+  }, [currentCampaign?.current_player]);
+
   return (
     <ImageBackground
       source={require('../../assets/images/paper_background.jpg')}
@@ -2112,6 +2135,9 @@ export default function StoryScreen() {
               campaignHistory
                 .slice(-30) // Only show last 30 messages to prevent memory overflow
                 .map((message, index) => {
+                  if (index > 0 && message.display_type === 'initial') {
+                    return null;
+                  }
                   // Find the character for this message if it's a player message
                   const messageCharacter = message.character_id 
                     ? characters.find(c => c.id === message.character_id)

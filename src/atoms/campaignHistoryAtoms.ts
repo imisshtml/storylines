@@ -16,6 +16,7 @@ export type CampaignMessage = {
   character_name?: string; // Character name for display
   character_avatar?: string; // Character avatar URL
   whisper_target_id?: string; // User ID of whisper target (for private messages)
+  display_type?: string; // For special rendering (e.g., 'initial')
 };
 
 // Campaign history state
@@ -64,6 +65,7 @@ export const addCampaignMessageAtom = atom(
     character_name?: string;
     character_avatar?: string;
     whisper_target_id?: string;
+    display_type?: string;
   }) => {
     try {
       // Check connection first
