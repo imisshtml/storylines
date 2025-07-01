@@ -117,7 +117,12 @@ export const fetchUserCapabilitiesAtom = atom(
       }
 
       const capabilities: UserCapabilities = {
-        adsRemoved: profile?.ads_removed || false,
+        // Ads removed if any of these flags are true
+        adsRemoved: Boolean(
+          profile?.ads_removed ||
+          profile?.dm_subscription_active ||
+          profile?.adventurers_pack_active
+        ),
         characterLimit,
         campaignLimit,
         groupSizeLimit,
