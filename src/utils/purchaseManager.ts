@@ -92,7 +92,7 @@ export class PurchaseManager {
       console.log('🔧 Trimmed User ID:', userId.trim());
       
       await Purchases.configure({ 
-        apiKey: 'appl_cYcpLzydnEgWmanyfsJYAFySCyk', // Replace with actual key
+        apiKey: Platform.OS === 'ios' ? 'appl_cYcpLzydnEgWmanyfsJYAFySCyk' : 'goog_riGomCpzGYPIrJoqNMtmbbapnLL',
         appUserID: userId.trim() 
       });
 
@@ -507,6 +507,14 @@ export class PurchaseManager {
       case PRODUCT_IDS.DM_SUBSCRIPTION:
         updates.dm_subscription_active = true;
         updates.dm_subscription_expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
+        
+        // DM/Ultimate Host subscription perks
+        // Ensure the user immediately enjoys all perks without waiting for another client calculation.
+        // These mirror what the selectors in userCapabilitiesAtoms.ts expect.
+        updates.ads_removed = true;            // No ads
+        updates.character_limit = 10;          // 10 characters
+        updates.campaign_limit = 10;           // 10 campaigns
+        updates.group_size = 7;                // 7 players per campaign
         break;
       
       case PRODUCT_IDS.ADVENTURERS_PACK:
