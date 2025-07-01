@@ -570,6 +570,15 @@ export default function StoryScreen() {
         return;
       }
 
+      // If campaign is in 'in_progress' status, it already has a story - don't regenerate
+      if (currentCampaign.status === 'in_progress') {
+        console.log('🚫 Campaign already in progress - story exists:', {
+          campaignStatus: currentCampaign.status,
+          campaignHistoryLength: campaignHistory.length
+        });
+        return;
+      }
+
       // If we have any messages at all but no GM messages, still don't generate
       // This prevents regeneration when players have already started chatting
       if (campaignHistory.length > 0) {
@@ -581,7 +590,7 @@ export default function StoryScreen() {
       }
 
       // Generate initial story for campaigns in 'creation', 'waiting' or 'in_progress' status
-      if (currentCampaign.status !== 'creation' && currentCampaign.status !== 'waiting' && currentCampaign.status !== 'in_progress') {
+      if (currentCampaign.status !== 'creation' && currentCampaign.status !== 'waiting') {
         console.log('🚫 Campaign status not eligible for initial story:', currentCampaign.status);
         return;
       }
@@ -2181,13 +2190,18 @@ export default function StoryScreen() {
 
             {/* Waiting for turn notification */}
             {!isPlayerTurn && Object.keys(otherPlayerActions).length === 0 && (
-              <View style={styles.loadingEvent}>
+              <View style={styles.waitingEvent}>
                 <Text style={styles.loadingEventText}>
                   {currentCampaign?.paused 
                     ? 'The story has been paused a moment...'
                     : `${currentCampaign?.current_player_name || 'Another player'} is writing their verse...`
                   }
                 </Text>
+                {!currentCampaign?.paused && (
+                  <Text style={styles.waitingEventText}>
+                    Say, RP, and other actions will be available on your turn...
+                </Text>
+                )}
               </View>
             )}
 
@@ -2551,7 +2565,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 215, 0, 0.1)',
     borderRadius: 12,
     marginVertical: 8,
-    //marginBottom: 15,
+  },
+  waitingEvent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderRadius: 12,
+    marginVertical: 8,
   },
   writingAnimation: {
     width: 60,
@@ -2562,6 +2583,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     marginLeft: 2,
+    fontStyle: 'italic',
+  },
+  waitingEventText: {
+    color: '#1a1a1a',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
     fontStyle: 'italic',
   },
   errorContainer: {
