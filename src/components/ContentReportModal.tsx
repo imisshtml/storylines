@@ -121,7 +121,7 @@ export default function ContentReportModal({
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             {/* Message Preview */}
             <View style={styles.messagePreview}>
-              <Text style={styles.sectionTitle}>Reported Content</Text>
+              <Text style={styles.sectionTitle}>Reported Content {`(${message?.id})`}</Text>
               <View style={styles.messageContainer}>
                 <Text style={styles.messageAuthor}>
                   {message?.message_type === 'gm' ? 'Storyteller' : 
