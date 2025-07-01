@@ -59,6 +59,7 @@ import {
   applyInventoryOperations,
   generateInventoryContext 
 } from '../utils/inventoryManager';
+import { useCustomAlert } from '@/components/CustomAlert';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask' | 'action' | 'ooc';
 
@@ -1221,8 +1222,17 @@ export default function StoryScreen() {
     (currentCharacter?.id && currentCampaign?.current_player === currentCharacter.id)
   );
   const canSend = isTurn || alwaysAllowedTypes.includes(selectedInputType);
+  const { showAlert } = useCustomAlert();
   //if (!userInput.trim() || isLoading('sendAction') || !canSend) return;
   const handleSend = async () => {
+    if (!canSend) {
+      showAlert(
+        'Just a moment...',
+        'The actions Say, RP, Search, Rest, Use Item, and Sneak can only be used on your turn.',
+        [{ text: 'OK' }],
+        'warning'
+      );
+    }
     if (!userInput.trim() || isLoading('sendAction') || !canSend) return;
 
     const action = userInput.trim();
@@ -2046,7 +2056,7 @@ export default function StoryScreen() {
             >
               <Text style={styles.title}>{currentCampaign.name}</Text>
               <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                <Text style={styles.subTitle}>Turn Tracker</Text>
+                <Text style={styles.subTitle}>{!!currentCampaign?.current_player_name ? currentCampaign?.current_player_name + '\'s Turn' : 'Turn Tracker'}</Text>
                 <Animated.View style={{marginLeft: 5, transform: [{ rotate: arrowRotation }] }}>
                   <ChevronDown size={18} color="#666" />
                 </Animated.View>
@@ -2197,11 +2207,6 @@ export default function StoryScreen() {
                     : `${currentCampaign?.current_player_name || 'Another player'} is writing their verse...`
                   }
                 </Text>
-                {!currentCampaign?.paused && (
-                  <Text style={styles.waitingEventText}>
-                    Say, RP, and other actions will be available on your turn...
-                </Text>
-                )}
               </View>
             )}
 
@@ -2287,7 +2292,7 @@ export default function StoryScreen() {
                 (userInput.trim().length === 0 || isLoading('sendAction') || !canSendNow) && styles.sendButtonDisabled
               ]}
               onPress={handleSend}
-              disabled={userInput.trim().length === 0 || isLoading('sendAction') || !canSendNow}
+              disabled={userInput.trim().length === 0 || isLoading('sendAction')}
             >
 
               <Forward size={18} color={userInput.trim() ? '#fff' : '#666'} />
