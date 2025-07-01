@@ -215,7 +215,7 @@ const SidebarMenu = ({ isVisible, onClose }: SidebarMenuProps) => {
         </ScrollView>
         {/* App Version */}
         <View style={styles.versionContainer}>
-          <Text style={styles.menuSubtitle}>{`Version ${appVersion} (${buildNumber})`}</Text>
+          <Text style={styles.menuSubtitle}>{`Version ${appVersion}`}</Text>
         </View>
         {/* Logout Button */}
         <View style={styles.footer}>
