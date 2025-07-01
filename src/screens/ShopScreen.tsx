@@ -50,6 +50,11 @@ export default function ShopScreen() {
   const [userCapabilities] = useAtom(userCapabilitiesAtom);
   const { isPaywallVisible, showPaywall, hidePaywall, currentOffering } = usePaywall();
 
+  // Default capability baselines (must match DEFAULT_CAPABILITIES in userCapabilitiesAtoms)
+  const DEFAULT_CHARACTER_LIMIT = 2;
+  const DEFAULT_CAMPAIGN_LIMIT = 2;
+  const DEFAULT_GROUP_SIZE = 3;
+
   // Load capabilities when component mounts
   useEffect(() => {
     const loadCapabilities = async () => {
@@ -186,24 +191,22 @@ export default function ShopScreen() {
 
   // Check if an item is purchased
   const isItemPurchased = (itemId: string): boolean => {
-    console.log(`ShopScreen: Checking if ${itemId} is purchased. adsRemoved:`, userCapabilities.adsRemoved);
-    
     switch (itemId) {
       case 'remove_ads':
         return userCapabilities.adsRemoved;
       case 'all_adventures':
         return userCapabilities.allAdventuresUnlocked;
       case 'group_size':
-        // Group size can be purchased twice, so check if at max (7 players)
-        return userCapabilities.groupSizeLimit >= 5;
+        // Purchased at least once if limit has grown beyond default
+        return userCapabilities.groupSizeLimit > DEFAULT_GROUP_SIZE;
       case 'character_limit':
-        // Character limit purchases are stackable, so we don't mark as "purchased"
-        return false;
+        // Disable if user already bought at least one upgrade
+        return userCapabilities.characterLimit > DEFAULT_CHARACTER_LIMIT;
       case 'campaign_limit':
-        // Campaign limit purchases are stackable, so we don't mark as "purchased"
-        return false;
+        // Disable if user already bought at least one upgrade
+        return userCapabilities.campaignLimit > DEFAULT_CAMPAIGN_LIMIT;
       case 'scroll_rebirth':
-        // Scrolls are consumable, so never mark as "purchased"
+        // Scrolls are consumable, always allow purchase
         return false;
       default:
         return false;
