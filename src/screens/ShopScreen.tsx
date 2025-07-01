@@ -49,6 +49,7 @@ export default function ShopScreen() {
   const [, fetchCapabilities] = useAtom(fetchUserCapabilitiesAtom);
   const [userCapabilities] = useAtom(userCapabilitiesAtom);
   const { isPaywallVisible, showPaywall, hidePaywall, currentOffering } = usePaywall();
+  const [hasShownAndroidAlert, setHasShownAndroidAlert] = useState(false);
 
   // Default capability baselines (must match DEFAULT_CAPABILITIES in userCapabilitiesAtoms)
   const DEFAULT_CHARACTER_LIMIT = 2;
@@ -127,6 +128,19 @@ export default function ShopScreen() {
   useEffect(() => {
     console.log('ShopScreen: User capabilities updated:', userCapabilities);
   }, [userCapabilities]);
+
+  // Show one-time info alert on Android that purchases aren't ready yet
+  useEffect(() => {
+    if (Platform.OS === 'android' && !hasShownAndroidAlert) {
+      showAlert(
+        'Purchases coming soon',
+        'Android in-app purchases are not yet available in this version. You can browse the Goblin\'s Market, but buying items will be enabled in a future update.',
+        [{ text: 'OK' }],
+        'info'
+      );
+      setHasShownAndroidAlert(true);
+    }
+  }, [hasShownAndroidAlert, showAlert]);
 
   const shopItems: ShopItem[] = [
     {
@@ -226,6 +240,17 @@ export default function ShopScreen() {
   };
 
   const handlePurchase = async (productId: string) => {
+    // Temporarily block purchases on Android
+    if (Platform.OS === 'android') {
+      showAlert(
+        'Purchases coming soon',
+        'Hold tight! Android purchases will be enabled in an upcoming update.',
+        [{ text: 'OK' }],
+        'info'
+      );
+      return;
+    }
+
     console.log('🛍️ SHOP PURCHASE INITIATED');
     console.log('🛍️ Product ID:', productId);
     console.log('🛍️ User ID:', user?.id);
@@ -466,6 +491,20 @@ export default function ShopScreen() {
   const displayAdventurersPack = false;
   const displayScroll = false;
 
+  // === Handlers ===
+  const handleUltimateHostPress = () => {
+    if (Platform.OS === 'android') {
+      showAlert(
+        'Purchases coming soon',
+        'Android in-app purchases are not yet available in this version. You can browse features, but buying the Ultimate Host subscription will be enabled in a future update.',
+        [{ text: 'OK' }],
+        'info'
+      );
+      return;
+    }
+    showPaywall();
+  };
+
   // Show loading while capabilities are being fetched
   if (!capabilitiesLoaded) {
     return (
@@ -499,7 +538,7 @@ export default function ShopScreen() {
           {/* GM Subscription */}
           <TouchableOpacity
             style={styles.premiumCard}
-            onPress={() => showPaywall()}
+            onPress={handleUltimateHostPress}
             activeOpacity={0.8}
           >
             <View style={styles.premiumContent}>
