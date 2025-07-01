@@ -10,14 +10,14 @@ import { Platform } from 'react-native';
 
 // RevenueCat Product IDs - Update these with your actual product IDs from RevenueCat
 export const PRODUCT_IDS = {
-  REMOVE_ADS: 'prod2355afb536',
-  INCREASE_CHARACTERS: 'proded7232c986', // THIS IS THE ONE WE'RE TESTING
-  INCREASE_CAMPAIGNS: 'prod99b2b546bd',
-  ACCESS_ALL_ADVENTURES: 'prod100afcaa33',
+  REMOVE_ADS: 'remove_ads',
+  INCREASE_CHARACTERS: 'character_limit', // THIS IS THE ONE WE'RE TESTING
+  INCREASE_CAMPAIGNS: 'campaign_limit',
+  ACCESS_ALL_ADVENTURES: 'all_adventures',
   GROUP_SIZE: 'group_size',
-  SCROLL_OF_REBIRTH: 'prod35985e127b',
-  DM_SUBSCRIPTION: 'prod340862bac9',
-  ADVENTURERS_PACK: 'prod8b4bd9634c'
+  SCROLL_OF_REBIRTH: 'scroll_rebirth',
+  DM_SUBSCRIPTION: 'dm_subscription',
+  ADVENTURERS_PACK: 'adventurer_subscription'
 };
 
 export class PurchaseManager {
