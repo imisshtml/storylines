@@ -158,20 +158,6 @@ export default function HomeScreen() {
     setIsSidebarVisible(!isSidebarVisible);
   };
 
-  const handleBoltPress = async () => {
-    try {
-      const url = 'https://bolt.new/';
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        console.log('Cannot open URL:', url);
-      }
-    } catch (error) {
-      console.error('Error opening URL:', error);
-    }
-  };
-
   const handleJoinCampaign = () => {
     router.push('/join')
   };
@@ -647,18 +633,6 @@ export default function HomeScreen() {
         </View>
       </ActivityIndicator>
 
-      <TouchableOpacity
-        style={styles.boltLogo}
-        onPress={handleBoltPress}
-        activeOpacity={0.7}
-      >
-        <Image
-          source={require('../../assets/images/logotext_poweredby_360w.png')}
-          style={styles.boltLogoImage}
-          resizeMode="contain"
-        />
-      </TouchableOpacity>
-
       <SidebarMenu
         isVisible={isSidebarVisible}
         onClose={() => setIsSidebarVisible(false)}
@@ -860,20 +834,6 @@ const styles = StyleSheet.create({
   charactersSection: {
     marginBottom: 20,
   },
-  charactersContainer: {
-    flex: 0.30,
-    paddingBottom: 5,
-    marginBottom: 5,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontFamily: 'Inter-Bold',
-    color: '#fff',
-    marginBottom: 16,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
   noCampaignsContainer: {
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     borderRadius: 12,
@@ -964,9 +924,6 @@ const styles = StyleSheet.create({
     top: -5,
     right: -5,
   },
-  settingsButton: {
-    padding: 4,
-  },
   campaignDetails: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
@@ -1041,10 +998,6 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     //flexDirection: 'row'
   },
-  charactersGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
   divider: {
     borderBottomWidth: 1,
     borderBottomColor: '#e2e2e2',
@@ -1109,58 +1062,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 2,
   },
-  characterClass: {
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    color: '#888',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  characterCampaign: {
-    fontSize: 10,
-    fontFamily: 'Inter-Regular',
-    color: '#4CAF50',
-    textAlign: 'center',
-  },
-  noCharactersContainer: {
-    backgroundColor: 'rgba(42, 42, 42, 0.8)',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  noCharacters: {
-    color: '#fff',
-    fontSize: 18,
-    fontFamily: 'Inter-Bold',
-    textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 8,
-  },
-  noCharactersSubtext: {
-    color: '#888',
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  createCharacterButton: {
-    backgroundColor: 'rgba(76, 175, 80, 0.9)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  createCharacterButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontFamily: 'Inter-Bold',
-  },
   createButton: {
     backgroundColor: 'rgba(76, 175, 80, 0.9)',
     padding: 15,
@@ -1202,9 +1103,6 @@ const styles = StyleSheet.create({
   campaignsScrollContent: {
     paddingBottom: 50,
   },
-  charactersScrollView: {
-    flex: 1,
-  },
   charactersScrollContent: {
     paddingHorizontal: 10,
   },
@@ -1212,38 +1110,7 @@ const styles = StyleSheet.create({
     width: 300,
     height: 70,
   },
-  roleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginLeft: 8,
-  },
-  roleText: {
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-  },
-  ownerText: {
-    color: '#FFD700',
-  },
-  playerText: {
-    color: '#4CAF50',
-  },
   gap: {
     marginRight: 10
-  },
-  boltLogo: {
-    position: 'absolute',
-    bottom: 25,
-    right: 20,
-    width: 90,
-    height: 90,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1, // Low z-index so other interactive elements can be higher
-    pointerEvents: 'box-none', // Allow touches to pass through to content behind
-  },
-  boltLogoImage: {
-    width: '100%',
-    height: '100%',
   },
 });

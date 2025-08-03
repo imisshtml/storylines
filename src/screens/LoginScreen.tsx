@@ -79,20 +79,6 @@ export default function LoginScreen() {
     setPhone('');
   };
 
-  const handleBoltPress = async () => {
-    try {
-      const url = 'https://bolt.new/';
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        console.log('Cannot open URL:', url);
-      }
-    } catch (error) {
-      console.error('Error opening URL:', error);
-    }
-  };
-
   return (
     <ImageBackground
       source={require('../../assets/images/storylines_splash.jpg')}
@@ -260,18 +246,6 @@ export default function LoginScreen() {
         </View>
         </KeyboardAvoidingView>
       </ActivityIndicator>
-
-      <TouchableOpacity 
-        style={styles.boltLogo}
-        onPress={handleBoltPress}
-        activeOpacity={0.7}
-      >
-        <Image 
-          source={require('../../assets/images/logotext_poweredby_360w.png')} 
-          style={styles.boltLogoImage}
-          resizeMode="contain"
-        />
-      </TouchableOpacity>
     </ImageBackground>
   );
 }
@@ -419,18 +393,5 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontSize: 14,
     fontFamily: 'Inter-Regular',
-  },
-  boltLogo: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 90,
-    height: 90,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  boltLogoImage: {
-    width: '100%',
-    height: '100%',
   },
 });
