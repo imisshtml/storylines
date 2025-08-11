@@ -137,12 +137,23 @@ export const signInAtom = atom(
       if (data.user && data.session) {
         set(sessionAtom, data.session);
         
-        // Fetch user profile
-        const { data: profile } = await supabase
+        // Fetch user profile and check if account is active
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('username, phone')
+          .select('username, phone, is_active')
           .eq('id', data.user.id)
           .single();
+
+        if (profileError) {
+          throw new Error('Failed to fetch profile');
+        }
+
+        // Check if account is deactivated
+        if (profile?.is_active === false) {
+          // Sign out immediately and throw error
+          await supabase.auth.signOut();
+          throw new Error('Account has been deactivated for that email. Please use a different one to signin.');
+        }
 
         const userData: AuthUser = {
           id: data.user.id,
@@ -209,7 +220,22 @@ export const signUpAtom = atom(
 
       return data;
     } catch (error) {
-      set(authErrorAtom, (error as Error).message);
+      // Handle specific Supabase errors with user-friendly messages
+      let errorMessage = 'An error occurred during signup';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('User already registered')) {
+          errorMessage = 'An account with this email already exists. If you previously deactivated your account, please contact support to reactivate it.';
+        } else if (error.message.includes('Invalid email')) {
+          errorMessage = 'Please enter a valid email address.';
+        } else if (error.message.includes('Password should be at least')) {
+          errorMessage = 'Password must be at least 6 characters long.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      set(authErrorAtom, errorMessage);
       throw error;
     } finally {
       set(authLoadingAtom, false);
@@ -301,12 +327,28 @@ export const initializeAuthAtom = atom(
           if (freshSession?.user) {
             set(sessionAtom, freshSession);
             
-            // Fetch user profile
-            const { data: profile } = await supabase
+            // Fetch user profile and check if account is active
+            const { data: profile, error: profileError } = await supabase
               .from('profiles')
-              .select('username, phone')
+              .select('username, phone, is_active')
               .eq('id', freshSession.user.id)
               .single();
+
+            if (profileError) {
+              console.error('Profile fetch error:', profileError);
+              await clearUserSession();
+              return;
+            }
+
+            // Check if account is deactivated
+            if (profile?.is_active === false) {
+              console.warn('Deactivated account detected, signing out');
+              await supabase.auth.signOut();
+              await clearUserSession();
+              set(userAtom, null);
+              set(sessionAtom, null);
+              return;
+            }
 
             const userData: AuthUser = {
               id: freshSession.user.id,
@@ -332,12 +374,28 @@ export const initializeAuthAtom = atom(
         if (session?.user) {
           set(sessionAtom, session);
           
-          // Fetch user profile
-          const { data: profile } = await supabase
+          // Fetch user profile and check if account is active
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('username, phone')
+            .select('username, phone, is_active')
             .eq('id', session.user.id)
             .single();
+
+          if (profileError) {
+            console.error('Profile fetch error:', profileError);
+            await clearUserSession();
+            return;
+          }
+
+          // Check if account is deactivated
+          if (profile?.is_active === false) {
+            console.warn('Deactivated account detected, signing out');
+            await supabase.auth.signOut();
+            await clearUserSession();
+            set(userAtom, null);
+            set(sessionAtom, null);
+            return;
+          }
 
           const userData: AuthUser = {
             id: session.user.id,
@@ -362,12 +420,28 @@ export const initializeAuthAtom = atom(
         if (session?.user) {
           set(sessionAtom, session);
           
-          // Fetch user profile
-          const { data: profile } = await supabase
+          // Fetch user profile and check if account is active
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('username, phone')
+            .select('username, phone, is_active')
             .eq('id', session.user.id)
             .single();
+
+          if (profileError) {
+            console.error('Profile fetch error:', profileError);
+            await clearUserSession();
+            return;
+          }
+
+          // Check if account is deactivated
+          if (profile?.is_active === false) {
+            console.warn('Deactivated account detected, signing out');
+            await supabase.auth.signOut();
+            await clearUserSession();
+            set(userAtom, null);
+            set(sessionAtom, null);
+            return;
+          }
 
           const userData: AuthUser = {
             id: session.user.id,

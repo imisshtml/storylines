@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
 import { LogIn, UserPlus, Eye, EyeOff, Phone, Zap } from 'lucide-react-native';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ImageBackground, TextInput, Image, Linking, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useAtom } from 'jotai';
 import { signInAtom, signUpAtom, authLoadingAtom, authErrorAtom } from '../atoms/authAtoms';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
+import { useCustomAlert } from '../components/CustomAlert';
 
 export default function LoginScreen() {
   const [emailOrUsername, setEmailOrUsername] = useState('');
@@ -14,11 +15,14 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // Add a local error to ensure visibility even if global atom is delayed
+  const [localError, setLocalError] = useState<string | null>(null);
+  const { showAlert } = useCustomAlert();
 
   const [, signIn] = useAtom(signInAtom);
   const [, signUp] = useAtom(signUpAtom);
   const [isAuthLoading] = useAtom(authLoadingAtom);
-  const [error] = useAtom(authErrorAtom);
+  const [error, setError] = useAtom(authErrorAtom);
   const { isLoading, withLoading } = useLoading();
 
   const isValidEmail = (email: string) => {
@@ -55,10 +59,10 @@ export default function LoginScreen() {
             username,
             phone: phone || undefined
           });
-          // After successful signup, switch to sign in mode
-          setIsSignUp(false);
-          setPassword('');
-          setPhone('');
+
+          // Auto-login after successful signup and navigate to home
+          await signIn({ emailOrUsername, password });
+          router.replace('/home');
         }, 'auth')();
       } else {
         await withLoading(async () => {
@@ -67,7 +71,10 @@ export default function LoginScreen() {
         }, 'auth')();
       }
     } catch (err) {
-      console.error('Authentication error:', err);
+      const message = err instanceof Error ? err.message : 'Failed to authenticate';
+      setError(message);
+      setLocalError(message);
+      showAlert('Login failed', message, [{ text: 'OK', style: 'default' }], 'error');
     }
   };
 
@@ -77,7 +84,17 @@ export default function LoginScreen() {
     setPassword('');
     setUsername('');
     setPhone('');
+    setError(null); // Clear error when switching modes
+    setLocalError(null);
   };
+
+  // Clear error when component unmounts or when switching between login/signup
+  useEffect(() => {
+    return () => {
+      setError(null); // Cleanup on unmount
+      setLocalError(null);
+    };
+  }, [setError]);
 
   return (
     <ImageBackground
@@ -103,9 +120,9 @@ export default function LoginScreen() {
             >
             <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
             <View style={styles.form}>
-              {error && (
+              {(localError || error) && (
                 <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>{error}</Text>
+                  <Text style={styles.errorText}>{localError || error}</Text>
                 </View>
               )}
 

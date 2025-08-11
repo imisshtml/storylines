@@ -130,12 +130,19 @@ export default function ProfileScreen() {
 
     setIsDeleting(true);
     try {
-      // Delete user account - this will cascade delete related data due to foreign key constraints
-      const { error } = await supabase.auth.admin.deleteUser(user.id);
+       // Call backend to properly delete account (hard delete auth user, fallback to soft delete)
+       const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/account`, {
+         method: 'DELETE',
+         headers: {
+           'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+           'Content-Type': 'application/json',
+         },
+       });
 
-      if (error) {
-        throw error;
-      }
+       if (!response.ok) {
+         const errorData = await response.json();
+         throw new Error(errorData.error || `HTTP ${response.status}`);
+       }
 
       // Sign out and redirect to login
       await signOut();
@@ -143,7 +150,7 @@ export default function ProfileScreen() {
       
       showAlert(
         'Account Deleted',
-        'Your account has been successfully deleted.',
+        'Your account has been successfully deactivated.',
         undefined,
         'success'
       );
