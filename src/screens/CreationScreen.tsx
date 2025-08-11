@@ -680,20 +680,68 @@ export default function CreationScreen() {
     }
   };
 
+  // Compute max unlocked step based on validations so users cannot click ahead
+  const getMaxUnlockedStep = () => {
+    let max = 0; // Step 0 (Info) is always accessible
+
+    // Step 0 complete -> unlock step 1
+    if (characterName.length > 0) max = 1; else return max;
+
+    // Step 1 (Class) complete -> unlock step 2
+    if (selectedClass) max = 2; else return max;
+
+    // Step 2 (Race) complete -> unlock step 3
+    if (selectedRace) max = 3; else return max;
+
+    // Step 3 (Stats) complete -> unlock step 4
+    if (getRemainingPoints() === 0) max = 4; else return max;
+
+    // Step 4 (Skills) complete -> unlock step 5
+    const skillChoices = selectedClass?.proficiency_choices?.[0];
+    const maxChoices = skillChoices?.choose || 0;
+    if (maxChoices === 0 || selectedSkills.length === maxChoices) {
+      max = 5;
+    } else {
+      return max;
+    }
+
+    // Step 5 (Spells) rules
+    const spellcastingInfo = getSpellcastingInfo();
+    const classHasSpellsAtLevel1 = !!(spellcastingInfo && (spellcastingInfo.cantripsKnown > 0 || spellcastingInfo.spellsKnown > 0));
+    if (!classHasSpellsAtLevel1) {
+      // No spells to pick at level 1 -> unlock step 6
+      max = 6;
+    } else {
+      const selectedCantrips = selectedSpells.filter(spell => spell.level === 0);
+      const selectedLevel1Spells = selectedSpells.filter(spell => spell.level === 1);
+      if (
+        selectedCantrips.length === (spellcastingInfo?.cantripsKnown || 0) &&
+        selectedLevel1Spells.length === (spellcastingInfo?.spellsKnown || 0)
+      ) {
+        max = 6;
+      } else {
+        return max;
+      }
+    }
+
+    // Step 6 (Equip) -> unlock step 7 (Review) always allowed
+    max = 7;
+
+    return max;
+  };
+
+  const maxUnlockedStep = getMaxUnlockedStep();
+
   const renderStepIndicator = () => (
     <View style={styles.stepIndicatorContainer}>
       <View
-        //horizontal
-        //scrollEnabled={false}
-        //showsHorizontalScrollIndicator={false}
         style={styles.stepIndicator}
-        //contentContainerStyle={styles.stepIndicatorContent}
       >
         {CREATION_STEPS.map((step, index) => {
           const Icon = step.icon;
           const isActive = index === currentStep;
           const isCompleted = index < currentStep;
-          const isClickable = index <= furthestStepVisited;
+          const isClickable = index <= Math.max(furthestStepVisited, maxUnlockedStep);
 
           return (
             <TouchableOpacity

@@ -593,7 +593,13 @@ export const removeEquipmentAtom = atom(
     const currentCopper = get(characterCopperAtom);
     const purchasedEquipment = get(purchasedEquipmentAtom);
 
-    // Calculate refund (full price back)
+    // Find ONE instance to remove
+    const idx = purchasedEquipment.findIndex(item => item.id === equipment.id);
+    if (idx === -1) {
+      return; // nothing to remove
+    }
+
+    // Calculate refund for a single unit (mirrors purchase cost)
     const totalPlayerCopper = convertToCopper(currentGold, currentSilver, currentCopper);
     const equipmentCost = getEquipmentCostInCopper(equipment);
     const newTotalCopper = totalPlayerCopper + equipmentCost;
@@ -604,8 +610,10 @@ export const removeEquipmentAtom = atom(
     set(characterSilverAtom, newCurrency.silver);
     set(characterCopperAtom, newCurrency.copper);
 
-    // Remove equipment from purchased list
-    set(purchasedEquipmentAtom, purchasedEquipment.filter(item => item.id !== equipment.id));
+    // Remove just one instance from purchased list
+    const updated = [...purchasedEquipment];
+    updated.splice(idx, 1);
+    set(purchasedEquipmentAtom, updated);
   }
 );
 
