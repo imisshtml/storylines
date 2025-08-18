@@ -1,5 +1,19 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+import { supabase } from '../config/supabase';
+
+// Android: ensure a default channel exists for high-priority alerts
+if (Platform.OS === 'android') {
+  Notifications.setNotificationChannelAsync('default', {
+    name: 'Default',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#FF231F7C',
+    sound: 'default',
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+  }).catch(() => {});
+}
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -18,6 +32,32 @@ export interface NotificationResult {
   success: boolean;
   error?: string;
   permissionStatus?: NotificationPermissionStatus;
+}
+
+/**
+ * Register device for push and persist Expo push token to Supabase `profiles.expo_push_token`.
+ */
+export async function registerDevicePushToken(userId?: string): Promise<{ success: boolean; token?: string; error?: string }>{
+  try {
+    const perm = await requestNotificationPermissions();
+    if (!perm.success) return { success: false, error: 'Permission not granted' };
+
+    // Get Expo push token
+    const projectId = (Constants?.expoConfig?.extra as any)?.eas?.projectId || Constants?.expoConfig?.owner || Constants?.easConfig?.projectId;
+    const tokenResp = await Notifications.getExpoPushTokenAsync({ projectId });
+    const token = tokenResp.data;
+
+    if (!token) return { success: false, error: 'Failed to get Expo push token' };
+
+    // Persist on profile if we have the user id
+    if (userId) {
+      await supabase.from('profiles').update({ expo_push_token: token }).eq('id', userId);
+    }
+
+    return { success: true, token };
+  } catch (e: any) {
+    return { success: false, error: e?.message || 'Failed to register push token' };
+  }
 }
 
 /**
@@ -212,7 +252,7 @@ export async function sendCampaignNotification(
 /**
  * Initialize notification listeners
  */
-export function initializeNotificationListeners() {
+export function initializeNotificationListeners(onNavigate?: (path: string) => void) {
   if (Platform.OS === 'web') {
     // Web notification click handling
     if ('serviceWorker' in navigator) {
@@ -234,8 +274,10 @@ export function initializeNotificationListeners() {
       // Handle notification tap
       const data = response.notification.request.content.data;
       if (data?.campaignId) {
-        // Navigate to campaign or handle campaign-specific action
-        console.log('Campaign notification tapped:', data.campaignId);
+        try {
+          const target = `/story?campaignId=${encodeURIComponent(String(data.campaignId))}`;
+          onNavigate && onNavigate(target);
+        } catch (__) {}
       }
     });
 
