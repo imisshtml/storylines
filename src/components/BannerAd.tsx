@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { BannerAd as GoogleBannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
 import { useAtom } from 'jotai';
 import { userCapabilitiesAtom } from '../atoms/userCapabilitiesAtoms';
@@ -29,6 +29,11 @@ export default function BannerAd({ size = BannerAdSize.BANNER, style }: BannerAd
 
     initializeAd();
   }, []);
+
+  // Hide ads on Android in dev to avoid OOMs with emulator / Play Services
+  if (__DEV__ && Platform.OS === 'android') {
+    return null;
+  }
 
   // Don't show ads if user has purchased ad removal
   if (!adManager.shouldShowAds(userCapabilities.adsRemoved)) {
