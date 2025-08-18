@@ -83,7 +83,6 @@ export default function CharactersScreen() {
     if (character.retired) {
       //return null;
     }
-    console.log('::: >>> ', character.campaign_id)
     if (character.campaign_id) {
       const campaign = campaigns.find(c => c.id === character.campaign_id);
     
