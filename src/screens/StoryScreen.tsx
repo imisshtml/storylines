@@ -1169,7 +1169,7 @@ export default function StoryScreen() {
         // Send request to our API route with user ID in the body, with client-side soft-timeout
         const response = await (async () => {
           const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 8000);
+          const timer = setTimeout(() => controller.abort(), 12000);
           try {
             const resp = await fetch(fullUrl, {
               method: 'POST',
