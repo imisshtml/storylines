@@ -108,3 +108,7 @@ CREATE TRIGGER update_campaign_summaries_updated_at
 
 -- Enable real-time for the table
 ALTER PUBLICATION supabase_realtime ADD TABLE campaign_summaries; 
+
+-- Add Expo push token storage for profiles (id = user id)
+ALTER TABLE IF EXISTS public.profiles
+ADD COLUMN IF NOT EXISTS expo_push_token text; 

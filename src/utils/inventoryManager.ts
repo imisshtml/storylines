@@ -27,6 +27,18 @@ export interface InventoryValidation {
   actualItemName?: string; // The actual item name from inventory (for loose matching)
 }
 
+// Bodily actions never require items
+const BODILY_ACTION_TERMS = [
+  'punch', 'kick', 'headbutt', 'unarmed', 'grapple', 'shove', 'tackle', 'slap', 'elbow', 'knee', 'fist'
+];
+
+// Environmental/improvised usage phrases that should never require inventory
+const ENVIRONMENTAL_ACTION_GUARDS = [
+  'improvised weapon',
+  'it as an improvised weapon',
+  'as an improvised weapon'
+];
+
 // Validate if an item exists in the equipment reference
 export const validateItemInEquipmentReference = (itemName: string): { isValid: boolean; matchedItem: any | null; suggestion: string | null } => {
   const store = getDefaultStore();
@@ -137,6 +149,24 @@ export const hasCurrency = (character: Character, gold: number = 0, silver: numb
 // Validate if an action can be performed with current inventory
 export const validateInventoryAction = (character: Character, actionDescription: string): InventoryValidation => {
   const action = actionDescription.toLowerCase();
+
+  // Allow bodily combat actions with no inventory
+  if (BODILY_ACTION_TERMS.some(term => action.includes(term))) {
+    return {
+      valid: true,
+      message: 'Bodily action - no inventory required.',
+      hasItem: true
+    };
+  }
+
+  // Allow environmental/improvised usage with no inventory
+  if (ENVIRONMENTAL_ACTION_GUARDS.some(term => action.includes(term))) {
+    return {
+      valid: true,
+      message: 'Environmental action (improvised) - no inventory required.',
+      hasItem: true
+    };
+  }
   
   // Check for item usage patterns - MUST match the parsing patterns exactly
   const itemPatterns = [
@@ -158,7 +188,7 @@ export const validateInventoryAction = (character: Character, actionDescription:
     { pattern: /(?:attack|attacks|strike|strikes|hit|hits)\s+(?:with\s+)?(?:a\s+|an\s+|my\s+|the\s+)?([a-zA-Z\s]+?)(?:\s|$)/, consumable: false },
   ];
   
-  // Check for currency patterns
+  // Check currency first
   const currencyPatterns = [
     /give(?:s?)\s+(\d+)\s+gold/,
     /pay(?:s?)\s+(\d+)\s+gold/,
@@ -197,10 +227,20 @@ export const validateInventoryAction = (character: Character, actionDescription:
   }
   
   // Check items
-  for (const { pattern, consumable } of itemPatterns) {
+  for (const { pattern } of itemPatterns) {
     const match = action.match(pattern);
     if (match) {
-      const searchTerm = match[1].trim();
+      const searchTerm = match[1].trim().toLowerCase();
+
+      // Bodily actions should never be blocked by inventory
+      if (BODILY_ACTION_TERMS.some(term => searchTerm.includes(term))) {
+        continue; // skip item enforcement for this match
+      }
+
+      // Environmental/improvised usage should not be blocked
+      if (ENVIRONMENTAL_ACTION_GUARDS.some(term => searchTerm.includes(term))) {
+        continue;
+      }
       
       // Skip very generic words
       if (['it', 'this', 'that', 'something', 'anything'].includes(searchTerm)) {
@@ -250,6 +290,14 @@ export const validateInventoryAction = (character: Character, actionDescription:
 export const parseInventoryOperations = (actionDescription: string, characterName: string, character?: Character): InventoryOperation[] => {
   const operations: InventoryOperation[] = [];
   const action = actionDescription.toLowerCase();
+
+  const isBodily = BODILY_ACTION_TERMS.some(term => action.includes(term));
+  const isEnvironmentalImprovised = ENVIRONMENTAL_ACTION_GUARDS.some(term => action.includes(term));
+
+  // If it's bodily or environmental/improvised, do not create any inventory ops
+  if (isBodily || isEnvironmentalImprovised) {
+    return operations;
+  }
   
   // Consumable item patterns (items that should be removed) - MUST match validation patterns
   const consumablePatterns = [
@@ -305,7 +353,13 @@ export const parseInventoryOperations = (actionDescription: string, characterNam
   for (const { pattern, reason } of consumablePatterns) {
     const match = action.match(pattern);
     if (match) {
-      const searchTerm = match[1].trim();
+      const searchTerm = match[1].trim().toLowerCase();
+      if (BODILY_ACTION_TERMS.some(term => searchTerm.includes(term))) {
+        continue; // skip bodily actions
+      }
+      if (ENVIRONMENTAL_ACTION_GUARDS.some(term => searchTerm.includes(term))) {
+        continue; // skip improvised/environmental
+      }
       if (!['it', 'this', 'that', 'something', 'anything'].includes(searchTerm)) {
         // If character is provided, try to find the actual item name
         let actualItemName = searchTerm;

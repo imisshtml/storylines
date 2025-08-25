@@ -15,7 +15,8 @@ import {
   StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, ChevronUp, MessageSquare, Drama, Ear, CircleHelp as HelpCircle, RefreshCw, Search, Package as PackageIcon, BedDouble, EyeOff, HandCoins, Lock, Pause as PauseIcon } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, ChevronUp, MessageSquare, Drama, Ear, CircleHelp as HelpCircle, RefreshCw, Search, Package as PackageIcon, BedDouble, EyeOff, HandCoins, Lock, Pause as PauseIcon, Swords, LogOut as LogOutIcon } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom, fetchCampaignsAtom } from '../atoms/campaignAtoms';
@@ -61,6 +62,7 @@ import {
   generateInventoryContext 
 } from '../utils/inventoryManager';
 import { useCustomAlert } from '@/components/CustomAlert';
+import CombatActionModal, { CombatAttackType, CombatTarget } from '../components/CombatActionModal';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask' | 'action' | 'ooc';
 
@@ -71,6 +73,14 @@ interface InputOption {
   placeholder: string;
   target?: string; // For whisper targets
 }
+
+// Resolve middleware base URL for emulator/device
+const getMiddlewareBaseUrl = (): string => {
+  const env = (process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL as unknown) as string | undefined;
+  if (env && env.trim().length > 0) return env.trim();
+  if (Platform.OS === 'android') return 'http://10.0.2.2:3001';
+  return 'http://localhost:3001';
+};
 
 export default function StoryScreen() {
   const insets = useSafeAreaInsets();
@@ -117,6 +127,12 @@ export default function StoryScreen() {
   const [reportingMessage, setReportingMessage] = useState<typeof campaignHistory[0] | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showCharacterModal, setShowCharacterModal] = useState(false);
+  // Combat selector state (kept near other top-level hooks)
+  const [combatModalVisible, setCombatModalVisible] = useState(false);
+  const [combatTargets, setCombatTargets] = useState<CombatTarget[]>([]);
+  const [combatTargetsLoading, setCombatTargetsLoading] = useState(false);
+  // Room data extracted by backend from LLM
+  const [sceneRoomData, setSceneRoomData] = useState<{ persons: string[]; items: string[] } | null>(null);
 
   // Campaign history atoms
   const [campaignHistory] = useAtom(campaignHistoryAtom);
@@ -180,6 +196,7 @@ export default function StoryScreen() {
   const scrollDebounceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderCount = useRef(0);
   const lastHistoryLength = useRef(0);
+  const [navigationBarHeight, setNavigationBarHeight] = useState(0);
   // Stabilize callback functions to prevent useConnectionMonitor from restarting
   const onConnectionLost = useCallback(() => {
     console.log('🔴 Story screen connection lost');
@@ -200,6 +217,47 @@ export default function StoryScreen() {
     onConnectionRestored,
     checkInterval: 30000 // More frequent checks for story screen (30 seconds)
   });
+
+  // Function to get Android navigation bar height
+  const getAndroidNavigationBarHeight = () => {
+    if (Platform.OS !== 'android') return 0;
+    
+    // Note: We're no longer using this for margin calculation
+    // Instead, we let KeyboardAvoidingView handle Android positioning naturally
+    // This eliminates the unnecessary gap above the navigation bar
+    return 0;
+  };
+
+  // Hide navigation bar on Android when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'android') {
+        // Get the actual navigation bar height for this device
+        const navBarHeight = getAndroidNavigationBarHeight();
+        setNavigationBarHeight(navBarHeight);
+        console.log(`[Android] Navigation bar height set to: ${navBarHeight}dp`);
+        
+        // OPTIONS FOR HIDING NAVIGATION BAR:
+        // 1. Use react-native-system-navigation-bar (recommended)
+        //    npm install react-native-system-navigation-bar
+        //    import { setNavigationBarColor, setNavigationBarVisibility } from 'react-native-system-navigation-bar';
+        //    setNavigationBarVisibility('hidden');
+        //
+        // 2. Use Android native APIs via react-native
+        //    StatusBar.setTranslucent(true);
+        //    StatusBar.setHidden(true);
+        //
+        // 3. Current approach: Account for navigation bar height in layout
+        //    This ensures the input bar is positioned correctly above the nav bar
+       }
+       return () => {
+         if (Platform.OS === 'android') {
+           // Clean up any navigation bar changes if needed
+           setNavigationBarHeight(0);
+         }
+       };
+     }, [])
+   );
 
   // Track render performance
   renderCount.current++;
@@ -335,6 +393,13 @@ export default function StoryScreen() {
           if (data.success) {
             console.log('📢 Action completed successfully, refreshing history');
             atomRefs.current.fetchCampaignHistory(currentCampaign.id);
+            // Retry a couple of times to avoid race with server insert/propagation
+            setTimeout(() => {
+              try { atomRefs.current.fetchCampaignHistory(currentCampaign.id); } catch {}
+            }, 400);
+            setTimeout(() => {
+              try { atomRefs.current.fetchCampaignHistory(currentCampaign.id); } catch {}
+            }, 1200);
           } else {
             console.log('📢 Action completed with failure');
           }
@@ -633,7 +698,7 @@ export default function StoryScreen() {
         });
 
         // Use production endpoint for API calls
-        const middlewareUrl = process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL || 'http://localhost:3001';
+        const middlewareUrl = getMiddlewareBaseUrl();
         const fullUrl = `${middlewareUrl}/api/game/action`;
         
         console.log('📡 Middleware URL from env:', process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL);
@@ -729,6 +794,28 @@ export default function StoryScreen() {
   useEffect(() => {
     setHasTriedInitialStory(false);
   }, [currentCampaign?.id]);
+
+  // Clear stale actions when the turn passes to another player
+  useEffect(() => {
+    if (currentCampaign) {
+      clearPlayerActions();
+      // Also refresh history so everyone sees the latest GM story on turn handoff
+      try { atomRefs.current.fetchCampaignHistory(currentCampaign.id); } catch (e) {}
+    }
+  }, [currentCampaign?.current_player]);
+
+  // Log room data whenever it updates so you can see it in FE logs
+  useEffect(() => {
+    try {
+      if (sceneRoomData) {
+        console.log('[RoomData][FE] persons:', sceneRoomData.persons);
+        console.log('[RoomData][FE] items:', sceneRoomData.items);
+      } else {
+        console.log('[RoomData][FE] (null)');
+      }
+    } catch (e) {}
+  }, [sceneRoomData]);
+
   // Get current user's character for this campaign
   const getCurrentCharacter = (): Character | null => {
     if (!user || !currentCampaign) return null;
@@ -736,6 +823,8 @@ export default function StoryScreen() {
       char.user_id === user.id && char.campaign_id === currentCampaign.id
     ) || null;
   };
+
+  const isContextReady = !!user && !!currentCampaign;
 
   // Get other players in the campaign (for whisper targets)
   const getOtherPlayers = () => {
@@ -759,7 +848,9 @@ export default function StoryScreen() {
       });
     });
     
-    // Add common NPC targets (these would typically come from the story context)
+    // Add NPCs from structured room data first
+    const structuredNPCs = (sceneRoomData?.persons || []).map(n => n.trim()).filter(Boolean);
+    // Fallback: common NPC targets if room data not available
     const commonNPCs = [
       'Merchant',
       'Guard',
@@ -770,11 +861,19 @@ export default function StoryScreen() {
       'Traveler'
     ];
     
-    commonNPCs.forEach(npc => {
+    const bySlug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const finalNPCs = (structuredNPCs.length > 0 ? structuredNPCs : commonNPCs);
+    // Deduplicate by lowercase name
+    const seenNames = new Set<string>();
+    finalNPCs.forEach(npc => {
+      const name = String(npc);
+      const key = name.toLowerCase();
+      if (seenNames.has(key)) return;
+      seenNames.add(key);
       targets.push({
         type: 'npc',
-        id: npc.toLowerCase(),
-        name: npc,
+        id: bySlug(name),
+        name,
         isOnline: true // NPCs are always "available"
       });
     });
@@ -1076,7 +1175,7 @@ export default function StoryScreen() {
         };
 
         // Use production endpoint for API calls
-        const middlewareUrl = process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL || 'http://localhost:3001';
+        const middlewareUrl = getMiddlewareBaseUrl();
         const fullUrl = `${middlewareUrl}/api/game/action`;
         
         console.log('🎭 Middleware URL from env:', process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL);
@@ -1084,17 +1183,39 @@ export default function StoryScreen() {
         console.log('🎭 Request body keys:', Object.keys(requestBody));
         console.log('🎭 Request body size:', JSON.stringify(requestBody).length, 'characters');
 
-        // Send request to our API route with user ID in the body
-        const response = await fetch(fullUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        });
+        // Send request to our API route with user ID in the body, with client-side soft-timeout
+        const response = await (async () => {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 12000);
+          try {
+            const resp = await fetch(fullUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(requestBody),
+              signal: controller.signal,
+            });
+            return resp;
+          } catch (err: any) {
+            if (err?.name === 'AbortError') {
+              console.warn('🕒 Game action soft-timeout on client; will continue in background');
+              // Show lightweight info and allow realtime/history to bring in result later
+              try { showAlert('Working…', 'Story is continuing in the background.', [{ text: 'OK' }], 'info'); } catch {}
+              // Stop loading visual, refresh history shortly to pull GM message when it arrives
+              stopLoading('sendAction');
+              setTimeout(() => {
+                if (currentCampaign?.id) atomRefs.current.fetchCampaignHistory(currentCampaign.id).catch(() => {});
+              }, 2000);
+              // Return a fake minimal Response-like object to short-circuit further handling
+              return new Response(JSON.stringify({ success: true, response: '', choices: [] }), { status: 200 });
+            }
+            throw err;
+          } finally {
+            clearTimeout(timer);
+          }
+        })();
 
         console.log('🎭 Fetch response received');
-        console.log('🎭 Response status:', response.status);
+        console.log('�� Response status:', response.status);
         console.log('🎭 Response ok:', response.ok);
         console.log('🎭 Response headers:', Object.fromEntries(response.headers.entries()));
 
@@ -1127,17 +1248,20 @@ export default function StoryScreen() {
         }
 
         console.log('🎭 Adding GM response to campaign history');
-        // Add GM response to campaign history (system message for ask responses)
+        // Add GM response to campaign history only if server did not insert it
         const responseMessageType = typeToUse === 'ask' ? 'system' : 'gm';
-        const insertedMessage = await atomRefs.current.addCampaignMessage({
-          campaign_id: currentCampaign.id,
-          message: data.response,
-          author: typeToUse === 'ask' ? 'System' : 'GM',
-          message_type: responseMessageType,
-        });
-
-        // Immediately refresh local history in case realtime not yet connected
-        if (insertedMessage?.id) {
+        if (!data.messageId) {
+          const insertedMessage = await atomRefs.current.addCampaignMessage({
+            campaign_id: currentCampaign.id,
+            message: data.response,
+            author: typeToUse === 'ask' ? 'System' : 'GM',
+            message_type: responseMessageType,
+          });
+          if (insertedMessage?.id) {
+            await atomRefs.current.fetchCampaignHistory(currentCampaign.id);
+          }
+        } else {
+          // If server inserted, just fetch to ensure everyone gets it
           await atomRefs.current.fetchCampaignHistory(currentCampaign.id);
         }
 
@@ -1148,11 +1272,10 @@ export default function StoryScreen() {
         }
 
         // Force refresh campaign history to ensure we have the latest data
-        // This works around potential real-time subscription issues
         console.log('🔄 Force refreshing campaign history after story action');
         setTimeout(() => {
           atomRefs.current.fetchCampaignHistory(currentCampaign.id);
-        }, 1000); // Wait 1 second for server to process
+        }, 1000);
 
         // Broadcast that this player's action completed successfully
         try {
@@ -1282,7 +1405,7 @@ export default function StoryScreen() {
       // Determine location size based on current scene or default to medium
       const locationSize = 'medium'; // Could be enhanced to detect from scene context
       
-      const middlewareUrl = process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL || 'http://localhost:3001';
+      const middlewareUrl = getMiddlewareBaseUrl();
       const fullUrl = `${middlewareUrl}/api/market/view-inventory`;
 
       const response = await fetch(fullUrl, {
@@ -1332,7 +1455,7 @@ export default function StoryScreen() {
 
       // Broadcast completion
       await broadcastActionCompleted(currentCampaign.id, {
-        playerId: user.id,
+        playerId: user?.id || '',
         success: true
       });
 
@@ -1342,7 +1465,7 @@ export default function StoryScreen() {
       setError(errorMessage);
       
       await broadcastActionCompleted(currentCampaign.id, {
-        playerId: user.id,
+        playerId: user?.id || '',
         success: false
       });
     } finally {
@@ -1466,7 +1589,9 @@ export default function StoryScreen() {
     }
 
     // Broadcast completion so turn can continue
-    await broadcastActionCompleted(currentCampaign.id, { playerId: pendingRest.requesterId, success: true });
+    if (pendingRest) {
+      await broadcastActionCompleted(currentCampaign.id, { playerId: pendingRest.requesterId, success: true });
+    }
     
     console.log('✅ Rest execution completed for:', executionKey);
     
@@ -1750,12 +1875,12 @@ export default function StoryScreen() {
 
   // Debug logging for choice sources
   if (aiChoices.length > 0) {
-    console.log('🎯 Raw AI choices:', aiChoices.length, aiChoices);
-    console.log('🎯 Filtered AI choices:', filteredAiChoices.length, filteredAiChoices);
+    //console.log('🎯 Raw AI choices:', aiChoices.length, aiChoices);
+    //console.log('🎯 Filtered AI choices:', filteredAiChoices.length, filteredAiChoices);
   }
   if (databaseChoices.length > 0) {
-    console.log('🎯 Raw DB choices:', databaseChoices.length, databaseChoices);
-    console.log('🎯 Filtered DB choices:', filteredDbChoices.length, filteredDbChoices);
+    //console.log('🎯 Raw DB choices:', databaseChoices.length, databaseChoices);
+    //console.log('🎯 Filtered DB choices:', filteredDbChoices.length, filteredDbChoices);
   }
 
   const choicesToShow = filteredAiChoices.length > 0
@@ -1769,7 +1894,7 @@ export default function StoryScreen() {
         'Plan your next move together',
       ]; // Fallback to defaults last
 
-  console.log('🎯 Final choices to show:', choicesToShow.length, choicesToShow);
+  //console.log('🎯 Final choices to show:', choicesToShow.length, choicesToShow);
 
   const currentInputOption = getCurrentInputOption();
   // Add manual refresh connection function
@@ -1948,18 +2073,160 @@ export default function StoryScreen() {
     }
   };
 
+  const handleForceCombat = async () => {
+    if (!currentCampaign || !user) return;
+    try {
+      console.log('[CombatUI] Combat button tapped');
+      setIsActionsPanelExpanded(false);
+      // Open selection instead of sending a hardcoded punch
+      await handleOpenCombat();
+    } catch (e) {
+      console.error('Failed to open combat selector:', e);
+    }
+  };
+
+  const handleFleeCombat = async () => {
+    if (!currentCampaign || !user) return;
+    try {
+      setIsActionsPanelExpanded(false);
+      // Basic flee intent (backend can later add disengage mechanics)
+      await sendPlayerAction('attempts to flee combat');
+    } catch (e) {
+      console.error('Failed to flee combat:', e);
+    }
+  };
+
+  const handleOpenCombat = async () => {
+    if (!currentCampaign) return;
+    console.log('[CombatUI] Open combat selector pressed');
+    try {
+      showAlert('Combat', 'Opening combat selector...', [{ text: 'OK' }], 'info');
+    } catch (_) {}
+    console.log('[RoomData][FE] at combat open:', sceneRoomData);
+    // Show the modal immediately
+    setCombatModalVisible(true);
+    setCombatTargetsLoading(true);
+    // Pre-populate targets from room data so list is not empty while fetching
+    try {
+      const bySlug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const initialNPCs: CombatTarget[] = (sceneRoomData?.persons || [])
+        .map(n => String(n).trim())
+        .filter(Boolean)
+        .map(name => ({ id: `npc_${bySlug(name)}`, kind: 'npc' as const, name }));
+      const pcTargets: CombatTarget[] = characters
+        .filter(c => c.campaign_id === currentCampaign.id && c.id !== currentCharacter?.id)
+        .map(c => ({ id: c.id, kind: 'pc' as const, name: c.name }));
+      const seen = new Set<string>();
+      const combined = [...initialNPCs, ...pcTargets].filter(t => {
+        const key = `${t.kind}:${t.name.toLowerCase()}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      if (combined.length > 0) {
+        console.log('[CombatUI] Initial targets from roomData:', combined.map(t => `${t.kind}:${t.name}`).join(', '));
+        setCombatTargets(combined);
+      }
+      // Stop showing spinner immediately; we'll refresh targets in the background
+      setCombatTargetsLoading(false);
+    } catch (e) {
+      console.warn('[CombatUI] Failed to pre-populate targets from roomData:', e);
+      setCombatTargetsLoading(false);
+    }
+    // Collapse panel after opening modal so it doesn't interfere with taps
+    setIsActionsPanelExpanded(false);
+
+    // Background fetch to update targets from server state without blocking UI
+    (async () => {
+      try {
+        const middlewareUrl = getMiddlewareBaseUrl();
+        const stateUrl = `${middlewareUrl}/api/game/state/${currentCampaign.id}`;
+        console.log('[CombatUI] (bg) Fetching targets from', stateUrl);
+        const res = await fetch(stateUrl, { method: 'GET' });
+        if (res.ok) {
+          const payload = await res.json();
+          const stateScene = payload?.data?.currentScene;
+          const npcs = Array.isArray(stateScene?.activeNPCs) ? stateScene.activeNPCs : [];
+          const activeTargets: CombatTarget[] = npcs.map((n: any, idx: number) => ({ id: n.id || `npc_${idx}`, kind: 'npc', name: n.name || 'Hostile' }));
+          const bySlug2 = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+          const roomPersons: CombatTarget[] = (Array.isArray(stateScene?.roomData?.persons) ? stateScene.roomData.persons : (sceneRoomData?.persons || []))
+            .map((p: string) => String(p).trim())
+            .filter(Boolean)
+            .map((name: string) => ({ id: `npc_${bySlug2(name)}`, kind: 'npc' as const, name }));
+          const pcs: CombatTarget[] = characters
+            .filter(c => c.campaign_id === currentCampaign.id && c.id !== currentCharacter?.id)
+            .map(c => ({ id: c.id, kind: 'pc' as const, name: c.name }));
+          const seenBg = new Set<string>();
+          const allTargets = [...activeTargets, ...roomPersons, ...pcs].filter(t => {
+            const key = `${t.kind}:${t.name.toLowerCase()}`;
+            if (seenBg.has(key)) return false;
+            seenBg.add(key);
+            return true;
+          });
+          console.log('[CombatUI] (bg) Targets ready:', allTargets.map(t => `${t.kind}:${t.name}`).join(', '));
+          setCombatTargets(allTargets);
+          if (stateScene?.roomData) {
+            setSceneRoomData({
+              persons: Array.isArray(stateScene.roomData.persons) ? stateScene.roomData.persons : [],
+              items: Array.isArray(stateScene.roomData.items) ? stateScene.roomData.items : [],
+            });
+          }
+        } else {
+          console.warn('[CombatUI] (bg) Failed to fetch game state:', res.status);
+        }
+      } catch (err) {
+        console.warn('[CombatUI] (bg) fetch error:', err);
+      }
+    })();
+  };
+
+  const handleConfirmCombat = async ({ attackType, target }: { attackType: CombatAttackType; target: CombatTarget | null }) => {
+    setCombatModalVisible(false);
+    const actorName = getCurrentCharacter()?.name || user?.username || 'Player';
+
+    let actionText = '';
+    switch (attackType) {
+      case 'Unarmed Strike':
+        actionText = `${actorName} throws a punch at ${target?.name || 'the nearest enemy'}`;
+        break;
+      case 'Grapple':
+        actionText = `${actorName} attempts to grapple ${target?.name || 'the nearest enemy'}`;
+        break;
+      case 'Shove':
+        actionText = `${actorName} tries to shove ${target?.name || 'the nearest enemy'}`;
+        break;
+      case 'Improvised Weapon':
+        actionText = `${actorName} grabs a nearby object and uses it as an improvised weapon against ${target?.name || 'the nearest enemy'}`;
+        break;
+      case 'Help':
+        actionText = `${actorName} uses the Help action to assist ${target?.name || 'an ally'}`;
+        break;
+      case 'Dodge':
+        actionText = `${actorName} takes the Dodge action`;
+        break;
+      case 'Disengage':
+        actionText = `${actorName} takes the Disengage action to withdraw carefully`;
+        break;
+    }
+
+    // Send action with optional structured metadata (backend currently ignores but safe to include)
+    await sendPlayerAction(actionText);
+  };
+
   const baseActions = [
     { key: 'search', label: 'Search', icon: <Search size={18} color="#fff" />, onPress: handleSearch },
     { key: 'useItem', label: 'Use Item', icon: <PackageIcon size={18} color="#fff" />, onPress: handleUseItem },
     { key: 'rest', label: 'Rest', icon: <BedDouble size={18} color="#fff" />, onPress: handleRest },
     { key: 'sneak', label: characterIsInStealth ? 'Sneaking' : 'Sneak', icon: <EyeOff size={18} color="#fff" />, onPress: characterIsInStealth ? undefined : handleSneak },
+    // New Combat/Flee button
+    ...(currentCampaign?.current_player ? [{ key: 'flee', label: 'Flee', icon: <LogOutIcon size={18} color="#fff" />, onPress: handleFleeCombat }] : [{ key: 'combat', label: 'Combat', icon: <Swords size={18} color="#fff" />, onPress: handleForceCombat }]),
     ...(characterIsInStealth ? [{ key: 'steal', label: 'Steal', icon: <HandCoins size={18} color="#fff" />, onPress: handleSteal }] : []),
     ...(characterHasLockpicks ? [{ key: 'lockpick', label: 'Lockpick', icon: <Lock size={18} color="#fff" />, onPress: handleLockpick }] : []),
     { key: 'pause', label: currentCampaign?.paused ? 'Unpause' : 'Pause', icon: <PauseIcon size={18} color="#fff" />, onPress: handleTogglePause },
     { key: 'refresh', label: 'Refresh', icon: <RefreshCw size={18} color="#fff" />, onPress: refreshHistory },
   ].map(action => ({
     ...action,
-    disabled: !(isPlayerTurn || action.key === 'refresh' || action.key === 'pause') || (action.key === 'sneak' && characterIsInStealth),
+    disabled: !(isPlayerTurn || action.key === 'refresh' || action.key === 'pause' || action.key === 'combat' || action.key === 'flee') || (action.key === 'sneak' && characterIsInStealth),
   }));
 
   // ==== Helper for Use Item confirm ====
@@ -2013,19 +2280,20 @@ export default function StoryScreen() {
 
   // Broadcast helpers
   const requestRest = async (type: 'short' | 'long') => {
-    if (!currentCampaign || !user) return;
+    if (!currentCampaign || !user?.id) return;
     if (isSinglePlayerCampaign) {
       executeRest(type);
     } else {
       const deadline = Date.now() + 10000;
-      console.log('🛌 Requesting rest:', { type, playerId: user.id, playerName: currentCharacter?.name || user.username || 'Player' });
-      setPendingRest({ restType: type, requesterId: user.id, requesterName: currentCharacter?.name || user.username || 'Player', deadline, votes: { [user.id]: true } });
-      await broadcastRestRequest(currentCampaign.id, { playerId: user.id, playerName: currentCharacter?.name || user.username || 'Player', restType: type, deadline });
+      const displayName = currentCharacter?.name || user?.username || 'Player';
+      console.log('🛌 Requesting rest:', { type, playerId: user.id, playerName: displayName });
+      setPendingRest({ restType: type, requesterId: user.id, requesterName: displayName, deadline, votes: { [user.id]: true } });
+      await broadcastRestRequest(currentCampaign.id, { playerId: user.id, playerName: displayName, restType: type, deadline });
     }
   };
 
   const respondToRest = async (accepted: boolean) => {
-    if (!currentCampaign || !user || !pendingRest) return;
+    if (!currentCampaign || !user?.id || !pendingRest) return;
     console.log('🛌 Responding to rest with:', { 
       accepted, 
       playerId: user.id, 
@@ -2044,13 +2312,6 @@ export default function StoryScreen() {
     setShowRestPrompt(false);
   };
 
-  // Clear stale actions when the turn passes to another player
-  useEffect(() => {
-    if (currentCampaign) {
-      clearPlayerActions();
-    }
-  }, [currentCampaign?.current_player]);
-
   return (
     <ImageBackground
       source={require('../../assets/images/paper_background.jpg')}
@@ -2062,6 +2323,12 @@ export default function StoryScreen() {
         fullScreen={true}
       >
         <SafeAreaView style={styles.safeArea}>
+        {!isContextReady ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: '#999' }}>Loading campaign...</Text>
+          </View>
+        ) : (
+        <>
         {/* Banner Ad */}
         {!shouldHideAds && (
           <BannerAd size={BannerAdSize.BANNER} style={styles.bannerAd} />
@@ -2113,9 +2380,9 @@ export default function StoryScreen() {
         </View>
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.content}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 10}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           <ScrollView
             ref={scrollViewRef}
@@ -2270,7 +2537,10 @@ export default function StoryScreen() {
             )}
           </View>
 
-          <View style={[styles.inputContainer, Platform.OS === 'android' && {marginBottom: insets.bottom}]}>
+          <View style={[
+            styles.inputContainer, 
+            Platform.OS === 'android' && {marginBottom: insets.bottom}
+          ]}>
             {/* Input Type Selector */}
             <View style={styles.inputTypeContainer}>
               <TouchableOpacity
@@ -2325,198 +2595,33 @@ export default function StoryScreen() {
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
-
-        <Modal
-          visible={isCharacterSheetVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setIsCharacterSheetVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.bottomSheet}>
-              {currentCharacter ? (
-                <CharacterView 
-                  character={currentCharacter} 
-                  onClose={closeCharacterView}
-                  onLeaveCampaign={handleLeaveCampaign}
-                />
-              ) : (
-                <View style={styles.noCharacterContainer}>
-                  <Text style={styles.noCharacterText}>
-                    You haven&apos;t selected a character for this campaign yet.
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.selectCharacterButton}
-                    onPress={() => {
-                      setIsCharacterSheetVisible(false);
-                      router.push('/invite');
-                    }}
-                  >
-                    <Text style={styles.selectCharacterButtonText}>Select Character</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View>
-        </Modal>
-
-        {/* Content Report Modal */}
-        <ContentReportModal
-          visible={showReportModal}
-          onClose={handleCloseReport}
-          message={reportingMessage}
-          campaignId={currentCampaign?.id || ''}
-        />
-
-        {/* Use Item Modal */}
-        <Modal visible={useItemModalVisible} transparent animationType="fade" onRequestClose={() => setUseItemModalVisible(false)}>
-          <View style={styles.centeredOverlay}>
-            <View style={styles.simpleModal}>
-              <Text style={styles.simpleModalTitle}>Use an Item</Text>
-
-              <ScrollView style={{ maxHeight: 250, alignSelf: 'stretch', marginVertical: 8 }}>
-                {currentCharacter?.equipment?.filter(eq => {
-                  if (!currentCharacter.equipped_items) return true;
-                  const isEquipped = Object.values(currentCharacter.equipped_items).some(eqi => {
-                    if (!eqi) return false;
-                    if (Array.isArray(eqi)) {
-                      return eqi.some(item => item && item.id === eq.id);
-                    }
-                    return eqi.id === eq.id;
-                  });
-                  return !isEquipped;
-                }).map((eq, idx) => (
-                  <TouchableOpacity
-                    key={`${eq.id}-${idx}`}
-                    style={[styles.itemRow, selectedUseItemId === eq.id && styles.itemRowSelected]}
-                    onPress={() => setSelectedUseItemId(eq.id)}
-                  >
-                    <Text style={styles.itemRowText}>{eq.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              <TextInput
-                style={styles.simpleTextInput}
-                placeholder="Describe how you use the item (optional)"
-                placeholderTextColor="#666"
-                multiline
-                value={useItemNote}
-                onChangeText={setUseItemNote}
-              />
-
-              <View style={styles.simpleModalButtons}>
-                <TouchableOpacity
-                  style={[styles.simpleModalButton, !selectedUseItemId && styles.simpleModalButtonDisabled]}
-                  disabled={!selectedUseItemId}
-                  onPress={handleConfirmUseItem}
-                >
-                  <Text style={styles.simpleModalButtonText}>Confirm</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.simpleModalCancel} onPress={() => setUseItemModalVisible(false)}>
-                  <Text style={styles.simpleModalCancelText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Rest Modal */}
-        <Modal visible={restModalVisible} transparent animationType="fade" onRequestClose={() => setRestModalVisible(false)}>
-          <View style={styles.centeredOverlay}>
-            <View style={styles.simpleModal}>
-              <Text style={styles.simpleModalTitle}>Choose Rest Type</Text>
-              <View style={styles.simpleModalButtons}>
-                <TouchableOpacity style={styles.simpleModalButton} onPress={() => { requestRest('short'); setRestModalVisible(false); }}>
-                  <Text style={styles.simpleModalButtonText}>Short Rest</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.simpleModalButton} onPress={() => { requestRest('long'); setRestModalVisible(false); }}>
-                  <Text style={styles.simpleModalButtonText}>Long Rest</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.simpleModalCancel} onPress={() => setRestModalVisible(false)}>
-                  <Text style={styles.simpleModalCancelText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Steal Modal */}
-        <Modal visible={stealModalVisible} transparent animationType="fade" onRequestClose={() => setStealModalVisible(false)}>
-          <View style={styles.centeredOverlay}>
-            <View style={styles.simpleModal}>
-              <Text style={styles.simpleModalTitle}>Choose Steal Target</Text>
-              
-              <ScrollView style={{ maxHeight: 200, alignSelf: 'stretch', marginVertical: 8 }}>
-                {getStealTargets().map((target) => (
-                  <TouchableOpacity
-                    key={target.id}
-                    style={[
-                      styles.itemRow, 
-                      selectedStealTarget === target.name && styles.itemRowSelected,
-                      target.type === 'player' && !target.isOnline && styles.itemRowOffline
-                    ]}
-                    onPress={() => setSelectedStealTarget(target.name)}
-                    disabled={target.type === 'player' && !target.isOnline}
-                  >
-                    <Text style={[
-                      styles.itemRowText,
-                      target.type === 'player' && !target.isOnline && styles.itemRowTextOffline
-                    ]}>
-                      {target.name} {target.type === 'player' ? '(Player)' : '(NPC)'}
-                      {target.type === 'player' && !target.isOnline && ' (Offline)'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              <TextInput
-                style={styles.simpleTextInput}
-                placeholder="Describe what you're trying to steal..."
-                placeholderTextColor="#666"
-                multiline
-                value={stealDescription}
-                onChangeText={setStealDescription}
-              />
-
-              <View style={styles.simpleModalButtons}>
-                <TouchableOpacity
-                  style={[
-                    styles.simpleModalButton, 
-                    (!selectedStealTarget || !stealDescription.trim()) && styles.simpleModalButtonDisabled
-                  ]}
-                  disabled={!selectedStealTarget || !stealDescription.trim()}
-                  onPress={handleConfirmSteal}
-                >
-                  <Text style={styles.simpleModalButtonText}>Attempt Steal</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.simpleModalCancel} onPress={() => setStealModalVisible(false)}>
-                  <Text style={styles.simpleModalCancelText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Rest Vote Prompt */}
-        <Modal visible={showRestPrompt && !!pendingRest} transparent animationType="fade" onRequestClose={() => {}}>
-          <View style={styles.centeredOverlay}>
-            <View style={styles.simpleModal}>
-              <Text style={styles.simpleModalTitle}>{pendingRest?.requesterName} has requested a {pendingRest?.restType} rest.</Text>
-              <Text style={{ color: '#ccc', marginBottom: 12 }}>Do you agree?</Text>
-              <View style={styles.simpleModalButtons}>
-                <TouchableOpacity style={styles.simpleModalButton} onPress={() => respondToRest(true)}>
-                  <Text style={styles.simpleModalButtonText}>Yes</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.simpleModalCancel} onPress={() => respondToRest(false)}>
-                  <Text style={styles.simpleModalCancelText}>No</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      </SafeAreaView>
+        </>
+        )}
+        </SafeAreaView>
       </ActivityIndicator>
+      <CombatActionModal
+        visible={combatModalVisible}
+        loadingTargets={combatTargetsLoading}
+        targets={combatTargets}
+        onClose={() => setCombatModalVisible(false)}
+        onConfirm={handleConfirmCombat}
+        onShown={() => console.log('[CombatUI] Modal visible (mounted)')}
+      />
+      {/* Character View Modal */}
+      <Modal
+        visible={isCharacterSheetVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsCharacterSheetVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <CharacterView
+            character={getCurrentCharacter()}
+            onClose={() => setIsCharacterSheetVisible(false)}
+            readonly={false}
+          />
+        </View>
+      </Modal>
     </ImageBackground>
   );
 }
@@ -2529,6 +2634,10 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#121212',
   },
   header: {
     flexDirection: 'row',
@@ -2812,11 +2921,11 @@ const styles = StyleSheet.create({
   },
   actionsTab: {
     alignSelf: 'center',
-    width: 40,
-    height: 6,
+    width: 45,
+    height: 10,
     borderRadius: 3,
     backgroundColor: '#666',
-    marginVertical: 6,
+    marginVertical: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },

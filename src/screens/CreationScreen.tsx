@@ -12,6 +12,7 @@ import {
   Platform,
   Modal,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { ArrowLeft, ArrowRight, Save, User, Dices, Scroll, Package, Camera, Upload, ShieldUser, Dna, Brain, BookOpen, X, ShoppingCart, Trash2, Coins, ChevronUp, ChevronDown } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -142,7 +143,13 @@ export default function CreationScreen() {
   const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set());
   const [expandedTraits, setExpandedTraits] = useState<Set<string>>(new Set());
 
-  const currStepRef = useRef<ScrollView>();
+  const currStepRef = useRef<ScrollView | null>(null);
+
+  // Track the furthest step the user has visited to allow back navigation but prevent jumping ahead
+  const [furthestStepVisited, setFurthestStepVisited] = useState<number>(0);
+  useEffect(() => {
+    setFurthestStepVisited(prev => Math.max(prev, currentStep));
+  }, [currentStep]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -342,11 +349,11 @@ export default function CreationScreen() {
 
     // Find equipped armor
     const equippedArmor = purchasedEquipment.find(item =>
-      item.type === 'armor' && item.category !== 'shield'
-    );
+      (item as any).type === 'armor' && (item as any).category !== 'shield'
+    ) as any;
 
-    if (equippedArmor && equippedArmor.properties) {
-      const armorProps = equippedArmor.properties as any;
+    if (equippedArmor && (equippedArmor as any).properties) {
+      const armorProps = (equippedArmor as any).properties as any;
       let ac = armorProps.ac || 10;
 
       // Apply DEX modifier based on armor type
@@ -673,22 +680,85 @@ export default function CreationScreen() {
     }
   };
 
+  // Compute max unlocked step based on validations so users cannot click ahead
+  const getMaxUnlockedStep = () => {
+    let max = 0; // Step 0 (Info) is always accessible
+
+    // Step 0 complete -> unlock step 1
+    if (characterName.length > 0) max = 1; else return max;
+
+    // Step 1 (Class) complete -> unlock step 2
+    if (selectedClass) max = 2; else return max;
+
+    // Step 2 (Race) complete -> unlock step 3
+    if (selectedRace) max = 3; else return max;
+
+    // Step 3 (Stats) complete -> unlock step 4
+    if (getRemainingPoints() === 0) max = 4; else return max;
+
+    // Step 4 (Skills) complete -> unlock step 5
+    const skillChoices = selectedClass?.proficiency_choices?.[0];
+    const maxChoices = skillChoices?.choose || 0;
+    if (maxChoices === 0 || selectedSkills.length === maxChoices) {
+      max = 5;
+    } else {
+      return max;
+    }
+
+    // Step 5 (Spells) rules
+    const spellcastingInfo = getSpellcastingInfo();
+    const classHasSpellsAtLevel1 = !!(spellcastingInfo && (spellcastingInfo.cantripsKnown > 0 || spellcastingInfo.spellsKnown > 0));
+    if (!classHasSpellsAtLevel1) {
+      // No spells to pick at level 1 -> unlock step 6
+      max = 6;
+    } else {
+      const selectedCantrips = selectedSpells.filter(spell => spell.level === 0);
+      const selectedLevel1Spells = selectedSpells.filter(spell => spell.level === 1);
+      if (
+        selectedCantrips.length === (spellcastingInfo?.cantripsKnown || 0) &&
+        selectedLevel1Spells.length === (spellcastingInfo?.spellsKnown || 0)
+      ) {
+        max = 6;
+      } else {
+        return max;
+      }
+    }
+
+    // Step 6 (Equip) -> unlock step 7 (Review) always allowed
+    max = 7;
+
+    return max;
+  };
+
+  const maxUnlockedStep = getMaxUnlockedStep();
+
   const renderStepIndicator = () => (
     <View style={styles.stepIndicatorContainer}>
       <View
-        //horizontal
-        //scrollEnabled={false}
-        //showsHorizontalScrollIndicator={false}
         style={styles.stepIndicator}
-        //contentContainerStyle={styles.stepIndicatorContent}
       >
         {CREATION_STEPS.map((step, index) => {
           const Icon = step.icon;
           const isActive = index === currentStep;
           const isCompleted = index < currentStep;
+          const isClickable = index <= Math.max(furthestStepVisited, maxUnlockedStep);
 
           return (
-            <View key={step.id} style={styles.stepItem}>
+            <TouchableOpacity
+              key={step.id}
+              style={[
+                styles.stepItem,
+                !isClickable && styles.stepItemDisabled,
+              ]}
+              onPress={() => {
+                if (isClickable) {
+                  setCurrentStep(index);
+                  currStepRef.current?.scrollTo({ y: 0, animated: true });
+                }
+              }}
+              disabled={!isClickable}
+              activeOpacity={0.7}
+            >
               <View style={[
                 styles.stepCircle,
                 isActive && styles.stepCircleActive,
@@ -705,9 +775,17 @@ export default function CreationScreen() {
               ]}>
                 {step.title}
               </Text>
-            </View>
+            </TouchableOpacity>
           );
         })}
+
+        {currentStep === 3 && (
+          <View style={styles.pointBuyBadge}>
+            <Text style={styles.pointBuyBadgeText}>
+              Points {calculatePointsUsed()}/{POINT_BUY_TOTAL} ({getRemainingPoints()} left)
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -1007,10 +1085,10 @@ export default function CreationScreen() {
       return (
         <View style={styles.stepContent}>
           <Text style={styles.stepTitle}>Choose Skills</Text>
-          <Text style={styles.subtitle}>This class doesn't provide skill proficiency choices.</Text>
+          <Text style={styles.subtitle}>This class doesn&apos;t provide skill proficiency choices.</Text>
           <View style={styles.noSpellsContainer}>
             <Text style={styles.noSpellsText}>
-              {selectedClass?.name} doesn't grant additional skill proficiencies at character creation.
+              {selectedClass?.name} doesn&apos;t grant additional skill proficiencies at character creation.
             </Text>
           </View>
         </View>
@@ -1242,7 +1320,7 @@ export default function CreationScreen() {
                 </View>
                 {expandedSpells.has(spell.index) && (
                   <View style={styles.spellDetails}>
-                    <Text style={styles.spellProperty}>School: {spell.school || ''}</Text>
+                    <Text style={styles.spellProperty}>School: {spell.school?.name || ''}</Text>
                     <Text style={styles.spellProperty}>Range: {spell.range || 'Unknown'}</Text>
                     <Text style={styles.spellProperty}>Duration: {spell.duration || 'Unknown'}</Text>
                     {spell.concentration && (
@@ -1640,11 +1718,11 @@ export default function CreationScreen() {
         setAvatarUri(result.url);
         setSelectedAvatarId(null);
       } else {
-        Alert.alert('Upload Failed', result.error || 'Failed to upload avatar');
+        showAlert('Upload Failed', result.error || 'Failed to upload avatar', undefined, 'error');
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to select avatar');
+      showAlert('Error', 'Failed to select avatar', undefined, 'error');
     } finally {
       setIsUploadingAvatar(false);
       setUploadProgress('');
@@ -1989,6 +2067,9 @@ const styles = StyleSheet.create({
   stepItem: {
     alignItems: 'center',
     minWidth: 25,
+  },
+  stepItemDisabled: {
+    opacity: 0.5,
   },
   stepCircle: {
     width: 30,
@@ -2988,5 +3069,21 @@ const styles = StyleSheet.create({
   },
   featurePrerequisites: {
     marginBottom: 8,
+  },
+  pointBuyBadge: {
+    position: 'absolute',
+    right: 12,
+    top: 8,
+    backgroundColor: 'rgba(76, 175, 80, 0.12)',
+    borderColor: '#4CAF50',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  pointBuyBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
   },
 });

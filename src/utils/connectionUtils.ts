@@ -81,13 +81,13 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
     const responseTime = Date.now() - startTime;
     
     if (error) {
-      console.warn('Connection check failed:', error);
+      console.log('Connection check failed:', error);
       return false;
     }
     
     // Consider slow responses as potential connection issues
     if (responseTime > 15000) { // 15 seconds
-      console.warn('Connection check slow:', responseTime, 'ms');
+      console.log('Connection check slow:', responseTime, 'ms');
       return false;
     }
     
@@ -95,7 +95,7 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
     console.log(`Connection check successful (${responseTime}ms)`);
     return true;
   } catch (error) {
-    console.error('Connection check failed:', error);
+    console.log('Connection check failed:', error);
     return false;
   }
 };
@@ -109,7 +109,7 @@ export const createRealtimeSubscription = (
 ) => {
   // Check if this channel is already registered
   if (globalChannelRegistry.has(channelName)) {
-    console.warn(`⚠️ Channel ${channelName} already exists. Skipping duplicate subscription.`);
+    console.log(`⚠️ Channel ${channelName} already exists. Skipping duplicate subscription.`);
     
     // Return a no-op cleanup function for the duplicate attempt
     return () => {
@@ -149,7 +149,7 @@ export const createRealtimeSubscription = (
         if (event.type === 'join') {
           console.log('✅ Realtime joined the channel');
         } else if (event.type === 'leave') {
-          console.warn('⚠️ Realtime left the channel');
+          console.log('⚠️ Realtime left the channel');
         } else {
           console.log('📡 system event:', JSON.stringify(event, null, 2));
         }
@@ -168,7 +168,7 @@ export const createRealtimeSubscription = (
             subscriptionData.lastError = undefined;
           } 
           else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.error(`❌ [${channelName}] Connection error: ${status}`, err);
+            console.log(`❌ [${channelName}] Connection error: ${status}`, err);
             subscriptionData.lastError = `${status}: ${err?.message || 'Unknown error'}`;
             
             // Attempt reconnection with exponential backoff
@@ -185,14 +185,14 @@ export const createRealtimeSubscription = (
                 try {
                   subscription.unsubscribe();
                 } catch (cleanupError) {
-                  console.warn('Error cleaning up old subscription:', cleanupError);
+                  console.log('Error cleaning up old subscription:', cleanupError);
                 }
                 
                 // Create new subscription
                 subscriptionData.subscription = createSubscription();
               }, delay);
             } else {
-              console.error(`💀 [${channelName}] Max reconnection attempts reached. Manual intervention required.`);
+              console.log(`💀 [${channelName}] Max reconnection attempts reached. Manual intervention required.`);
             }
           }
           else if (status === 'CLOSED') {
@@ -202,7 +202,7 @@ export const createRealtimeSubscription = (
       
       return subscription;
     } catch (error) {
-      console.error(`💥 [${channelName}] Error creating subscription:`, error);
+      console.log(`💥 [${channelName}] Error creating subscription:`, error);
       throw error;
     }
   };
@@ -219,7 +219,7 @@ export const createRealtimeSubscription = (
         data.subscription.unsubscribe();
         supabase.removeChannel(data.subscription);
       } catch (error) {
-        console.warn(`Warning during ${channelName} cleanup:`, error);
+        console.log(`Warning during ${channelName} cleanup:`, error);
       }
     }
     activeSubscriptions.delete(channelName);
@@ -247,7 +247,7 @@ export const monitorSubscriptionHealth = () => {
   // List all tracked subscriptions
   activeSubscriptions.forEach((data, channelName) => {
     if (data.lastError || data.reconnectAttempts > 0) {
-      console.warn(`⚠️ [${channelName}] Health issue - Reconnect attempts: ${data.reconnectAttempts}, Last error: ${data.lastError}`);
+      console.log(`⚠️ [${channelName}] Health issue - Reconnect attempts: ${data.reconnectAttempts}, Last error: ${data.lastError}`);
     } else {
       console.log(`✅ [${channelName}] Healthy`);
     }
@@ -284,7 +284,7 @@ export const reconnectAllSubscriptions = async () => {
         data.subscription.unsubscribe();
         supabase.removeChannel(data.subscription);
       } catch (error) {
-        console.warn(`Error unsubscribing ${channelName}:`, error);
+        console.log(`Error unsubscribing ${channelName}:`, error);
       }
     }
   });
@@ -326,7 +326,7 @@ export const withConnectionRetry = async <T>(
       return result;
     } catch (error) {
       lastError = error as Error;
-      console.warn(`${operationName} failed (attempt ${i + 1}/${maxRetries}):`, error);
+      console.log(`${operationName} failed (attempt ${i + 1}/${maxRetries}):`, error);
       
       // If it's a connection error, try to refresh the connection
       if (isConnectionError(error)) {
@@ -356,7 +356,7 @@ export const refreshSupabaseConnection = async (): Promise<void> => {
   
   // Set a timeout to ensure isReconnecting doesn't get stuck
   const timeoutId = setTimeout(() => {
-    console.warn('Reconnection timeout - resetting isReconnecting flag');
+    console.log('Reconnection timeout - resetting isReconnecting flag');
     isReconnecting = false;
   }, 30000); // 30 second timeout
   
@@ -367,13 +367,13 @@ export const refreshSupabaseConnection = async (): Promise<void> => {
     const { data: { session }, error: authError } = await supabase.auth.refreshSession();
     
     if (authError) {
-      console.error('Failed to refresh auth session:', authError);
+      console.log('Failed to refresh auth session:', authError);
       
       // If refresh fails, try to get the current session
       const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !currentSession) {
-        console.error('No valid session found, user may need to re-authenticate');
+        console.log('No valid session found, user may need to re-authenticate');
         throw new Error('Authentication session expired. Please log in again.');
       }
     } else {
@@ -385,14 +385,14 @@ export const refreshSupabaseConnection = async (): Promise<void> => {
     // Test the connection with a simple query
     const connectionTest = await checkSupabaseConnection();
     if (!connectionTest) {
-      console.warn('Connection test failed after refresh, but continuing...');
+      console.log('Connection test failed after refresh, but continuing...');
       // Don't throw here - let the app continue functioning
     } else {
       console.log('Supabase connection successfully refreshed and tested');
     }
     
   } catch (error) {
-    console.error('Error refreshing connection:', error);
+    console.log('Error refreshing connection:', error);
     // Don't re-throw the error to prevent blocking the app
   } finally {
     clearTimeout(timeoutId);
@@ -430,7 +430,7 @@ export const startConnectionMonitoring = (interval: number = 60000): void => {
         console.log('Periodic check: Connection healthy');
       }
     } catch (error) {
-      console.error('Error in periodic connection check:', error);
+      console.log('Error in periodic connection check:', error);
     }
   }, interval);
   
@@ -478,7 +478,7 @@ export const initializeAppStateMonitoring = () => {
           await addUserToOnlineStatus(user.id);
         }
       } catch (error) {
-        console.error('Error updating online status on app active:', error);
+        console.log('Error updating online status on app active:', error);
       }
     } else if (nextAppState === 'background' || nextAppState === 'inactive') {
       // App went to background - remove from online status
@@ -489,7 +489,7 @@ export const initializeAppStateMonitoring = () => {
           await removeUserFromOnlineStatus(user.id);
         }
       } catch (error) {
-        console.error('Error updating online status on app background:', error);
+        console.log('Error updating online status on app background:', error);
       }
     }
   });
@@ -556,7 +556,7 @@ export const initializeCampaignBroadcast = (campaignId: string, callbacks: {
       if (status === 'SUBSCRIBED') {
         console.log('✅ Campaign broadcast channel ready:', channelName);
       } else if (status === 'CHANNEL_ERROR') {
-        console.error('❌ Campaign broadcast channel error:', channelName);
+        console.log('❌ Campaign broadcast channel error:', channelName);
       }
     });
     
@@ -575,7 +575,7 @@ export const broadcastActionStarted = async (campaignId: string, data: {
   action: string;
 }) => {
   if (!campaignBroadcastChannel) {
-    console.warn('⚠️ No broadcast channel available for action_started');
+    console.log('⚠️ No broadcast channel available for action_started');
     return;
   }
   
@@ -590,8 +590,8 @@ export const broadcastActionStarted = async (campaignId: string, data: {
     });
     console.log('📢 action_started send result:', result);
   } catch (error) {
-    console.error('❌ action_started broadcast failed:', error);
-    console.error('❌ action_started error message:', error instanceof Error ? error.message : String(error));
+    console.log('❌ action_started broadcast failed:', error);
+    console.log('❌ action_started error message:', error instanceof Error ? error.message : String(error));
   }
 };
 
@@ -600,7 +600,7 @@ export const broadcastActionCompleted = async (campaignId: string, data: {
   success: boolean;
 }) => {
   if (!campaignBroadcastChannel) {
-    console.warn('⚠️ No broadcast channel available for action_completed');
+    console.log('⚠️ No broadcast channel available for action_completed');
     return;
   }
   
@@ -619,9 +619,9 @@ export const broadcastActionCompleted = async (campaignId: string, data: {
     console.log('📢 Broadcast send result type:', typeof result);
     console.log('📢 Broadcast send result keys:', result ? Object.keys(result) : 'null');
   } catch (error) {
-    console.error('❌ Broadcast send failed:', error);
-    console.error('❌ Broadcast error type:', typeof error);
-    console.error('❌ Broadcast error message:', error instanceof Error ? error.message : String(error));
+    console.log('❌ Broadcast send failed:', error);
+    console.log('❌ Broadcast error type:', typeof error);
+    console.log('❌ Broadcast error message:', error instanceof Error ? error.message : String(error));
     // Don't throw - just log the error like broadcastActionStarted
   }
 };
@@ -633,7 +633,7 @@ export const broadcastRestRequest = async (campaignId: string, data: {
   deadline: number;
 }) => {
   if (!campaignBroadcastChannel) {
-    console.warn('⚠️ No broadcast channel for rest_request');
+    console.log('⚠️ No broadcast channel for rest_request');
     return;
   }
   
@@ -648,7 +648,7 @@ export const broadcastRestRequest = async (campaignId: string, data: {
     });
     console.log('📢 rest_request send result:', result);
   } catch (error) {
-    console.error('❌ rest_request broadcast failed:', error);
+    console.log('❌ rest_request broadcast failed:', error);
   }
 };
 
@@ -657,7 +657,7 @@ export const broadcastRestResponse = async (campaignId: string, data: {
   accepted: boolean;
 }) => {
   if (!campaignBroadcastChannel) {
-    console.warn('⚠️ No broadcast channel for rest_response');
+    console.log('⚠️ No broadcast channel for rest_response');
     return;
   }
   
@@ -672,6 +672,6 @@ export const broadcastRestResponse = async (campaignId: string, data: {
     });
     console.log('📢 rest_response send result:', result);
   } catch (error) {
-    console.error('❌ rest_response broadcast failed:', error);
+    console.log('❌ rest_response broadcast failed:', error);
   }
 }; 

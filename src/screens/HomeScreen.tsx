@@ -22,7 +22,7 @@ import {
 import SidebarMenu from '../components/SidebarMenu';
 import JoinCampaignModal from '../components/JoinCampaignModal';
 import { useCustomAlert } from '../components/CustomAlert';
-import { initializeNotificationListeners, requestNotificationPermissions } from '../utils/notifications';
+import { initializeNotificationListeners, requestNotificationPermissions, registerDevicePushToken } from '../utils/notifications';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
 import { useLimitEnforcement } from '../hooks/useLimitEnforcement';
@@ -86,15 +86,23 @@ export default function HomeScreen() {
       // Note: Read status subscription is handled globally in app/_layout.tsx
       // Removed duplicate initializeReadStatusRealtime() call to prevent "subscribe multiple times" error
 
-      // Initialize notification listeners
-      const cleanupNotifications = initializeNotificationListeners();
+      // Initialize notification listeners with navigation handler
+      const cleanupNotifications = initializeNotificationListeners((path) => {
+        try { router.push(path as any); } catch {}
+      });
 
       // Request notification permissions
       requestNotificationPermissions().catch(error => {
         console.log('Error requesting notification permissions:', error);
       });
 
+      // Register device push token and save on profile
+      try {
+        if (user?.id) registerDevicePushToken(user.id).catch(() => {});
+      } catch {}
+
       return () => {
+        // Cleanup notifications
         if (typeof cleanupNotifications === 'function') {
           cleanupNotifications();
         }
