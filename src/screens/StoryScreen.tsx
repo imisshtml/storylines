@@ -74,6 +74,14 @@ interface InputOption {
   target?: string; // For whisper targets
 }
 
+// Resolve middleware base URL for emulator/device
+const getMiddlewareBaseUrl = (): string => {
+  const env = (process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL as unknown) as string | undefined;
+  if (env && env.trim().length > 0) return env.trim();
+  if (Platform.OS === 'android') return 'http://10.0.2.2:3001';
+  return 'http://localhost:3001';
+};
+
 export default function StoryScreen() {
   const insets = useSafeAreaInsets();
   const [userInput, setUserInput] = useState('');
@@ -385,6 +393,13 @@ export default function StoryScreen() {
           if (data.success) {
             console.log('📢 Action completed successfully, refreshing history');
             atomRefs.current.fetchCampaignHistory(currentCampaign.id);
+            // Retry a couple of times to avoid race with server insert/propagation
+            setTimeout(() => {
+              try { atomRefs.current.fetchCampaignHistory(currentCampaign.id); } catch {}
+            }, 400);
+            setTimeout(() => {
+              try { atomRefs.current.fetchCampaignHistory(currentCampaign.id); } catch {}
+            }, 1200);
           } else {
             console.log('📢 Action completed with failure');
           }
@@ -683,7 +698,7 @@ export default function StoryScreen() {
         });
 
         // Use production endpoint for API calls
-        const middlewareUrl = process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL || 'http://localhost:3001';
+        const middlewareUrl = getMiddlewareBaseUrl();
         const fullUrl = `${middlewareUrl}/api/game/action`;
         
         console.log('📡 Middleware URL from env:', process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL);
@@ -784,6 +799,8 @@ export default function StoryScreen() {
   useEffect(() => {
     if (currentCampaign) {
       clearPlayerActions();
+      // Also refresh history so everyone sees the latest GM story on turn handoff
+      try { atomRefs.current.fetchCampaignHistory(currentCampaign.id); } catch (e) {}
     }
   }, [currentCampaign?.current_player]);
 
@@ -1158,7 +1175,7 @@ export default function StoryScreen() {
         };
 
         // Use production endpoint for API calls
-        const middlewareUrl = process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL || 'http://localhost:3001';
+        const middlewareUrl = getMiddlewareBaseUrl();
         const fullUrl = `${middlewareUrl}/api/game/action`;
         
         console.log('🎭 Middleware URL from env:', process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL);
@@ -1231,17 +1248,20 @@ export default function StoryScreen() {
         }
 
         console.log('🎭 Adding GM response to campaign history');
-        // Add GM response to campaign history (system message for ask responses)
+        // Add GM response to campaign history only if server did not insert it
         const responseMessageType = typeToUse === 'ask' ? 'system' : 'gm';
-        const insertedMessage = await atomRefs.current.addCampaignMessage({
-          campaign_id: currentCampaign.id,
-          message: data.response,
-          author: typeToUse === 'ask' ? 'System' : 'GM',
-          message_type: responseMessageType,
-        });
-
-        // Immediately refresh local history in case realtime not yet connected
-        if (insertedMessage?.id) {
+        if (!data.messageId) {
+          const insertedMessage = await atomRefs.current.addCampaignMessage({
+            campaign_id: currentCampaign.id,
+            message: data.response,
+            author: typeToUse === 'ask' ? 'System' : 'GM',
+            message_type: responseMessageType,
+          });
+          if (insertedMessage?.id) {
+            await atomRefs.current.fetchCampaignHistory(currentCampaign.id);
+          }
+        } else {
+          // If server inserted, just fetch to ensure everyone gets it
           await atomRefs.current.fetchCampaignHistory(currentCampaign.id);
         }
 
@@ -1252,11 +1272,10 @@ export default function StoryScreen() {
         }
 
         // Force refresh campaign history to ensure we have the latest data
-        // This works around potential real-time subscription issues
         console.log('🔄 Force refreshing campaign history after story action');
         setTimeout(() => {
           atomRefs.current.fetchCampaignHistory(currentCampaign.id);
-        }, 1000); // Wait 1 second for server to process
+        }, 1000);
 
         // Broadcast that this player's action completed successfully
         try {
@@ -1386,7 +1405,7 @@ export default function StoryScreen() {
       // Determine location size based on current scene or default to medium
       const locationSize = 'medium'; // Could be enhanced to detect from scene context
       
-      const middlewareUrl = process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL || 'http://localhost:3001';
+      const middlewareUrl = getMiddlewareBaseUrl();
       const fullUrl = `${middlewareUrl}/api/market/view-inventory`;
 
       const response = await fetch(fullUrl, {
@@ -2120,7 +2139,7 @@ export default function StoryScreen() {
     // Background fetch to update targets from server state without blocking UI
     (async () => {
       try {
-        const middlewareUrl = process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL || 'http://localhost:3001';
+        const middlewareUrl = getMiddlewareBaseUrl();
         const stateUrl = `${middlewareUrl}/api/game/state/${currentCampaign.id}`;
         console.log('[CombatUI] (bg) Fetching targets from', stateUrl);
         const res = await fetch(stateUrl, { method: 'GET' });
@@ -2520,7 +2539,7 @@ export default function StoryScreen() {
 
           <View style={[
             styles.inputContainer, 
-            Platform.OS === 'ios' && {marginBottom: insets.bottom}
+            Platform.OS === 'android' && {marginBottom: insets.bottom}
           ]}>
             {/* Input Type Selector */}
             <View style={styles.inputTypeContainer}>
@@ -2588,6 +2607,21 @@ export default function StoryScreen() {
         onConfirm={handleConfirmCombat}
         onShown={() => console.log('[CombatUI] Modal visible (mounted)')}
       />
+      {/* Character View Modal */}
+      <Modal
+        visible={isCharacterSheetVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsCharacterSheetVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <CharacterView
+            character={getCurrentCharacter()}
+            onClose={() => setIsCharacterSheetVisible(false)}
+            readonly={false}
+          />
+        </View>
+      </Modal>
     </ImageBackground>
   );
 }
@@ -2600,6 +2634,10 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#121212',
   },
   header: {
     flexDirection: 'row',
