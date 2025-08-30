@@ -88,7 +88,7 @@ export const addUserToOnlineStatus = async (userId: string): Promise<void> => {
     
     // Get all campaigns the user is part of
     const campaigns = await getUserCampaigns(userId);
-    console.log('Found campaigns for user:', campaigns.length);
+    //console.log('Found campaigns for user:', campaigns.length);
 
     if (campaigns.length === 0) return;
 
@@ -137,7 +137,7 @@ export const removeUserFromOnlineStatus = async (userId: string): Promise<void> 
     
     // Get all campaigns the user is part of
     const campaigns = await getUserCampaigns(userId);
-    console.log('Found campaigns for user:', campaigns.length);
+    //console.log('Found campaigns for user:', campaigns.length);
 
     if (campaigns.length === 0) return;
 

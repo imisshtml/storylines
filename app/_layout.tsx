@@ -24,6 +24,94 @@ import {
   reconnectAllSubscriptions,
   initializeAppStateMonitoring
 } from '../src/utils/connectionUtils';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
+import { supabase } from '../src/config/supabase';
+
+// Android: set a channel (one-time)
+if (Platform.OS === 'android') {
+  Notifications.setNotificationChannelAsync('default', {
+    name: 'Default',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#FF231F7C',
+    sound: 'default',
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+  }).catch(() => {});
+}
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    // Newer Expo types:
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
+async function ensurePushRegistered(userId?: string) {
+  const { status } = await Notifications.requestPermissionsAsync();
+  console.log('[Push] perm status:', status);
+  if (status !== 'granted') return;
+
+  const projectId =
+    (Constants?.expoConfig?.extra as any)?.eas?.projectId ||
+    (Constants as any)?.easConfig?.projectId;
+  console.log('[Push] projectId:', projectId);
+
+  const tokenPromise = (async () => {
+    try {
+      const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
+      return data as string | undefined;
+    } catch (e:any) {
+      console.log('[Push] getExpoPushTokenAsync error:', e?.message || e);
+      return undefined;
+    }
+  })();
+
+  const timeoutPromise = new Promise<string | undefined>(r =>
+    setTimeout(() => {
+      console.log('[Push] token fetch timed out');
+      r(undefined);
+    }, 8000) // 8s cap
+  );
+
+  const token = await Promise.race([tokenPromise, timeoutPromise]);
+  console.log('[Push] token:', token);
+
+  if (userId && token) {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ expo_push_token: token })
+      .eq('id', userId);
+    if (error) {
+      console.log('[Push] save token error:', error);
+    } else {
+      console.log('[Push] token saved for user:', userId);
+    }
+
+    // Fallback: also register via backend to guarantee persistence
+    try {
+      const base = Platform.OS === 'android'
+        ? 'http://10.0.2.2:3001'
+        : (process.env.EXPO_PUBLIC_MIDDLEWARE_SERVICE_URL || 'http://localhost:3001');
+      const resp = await fetch(`${base}/api/notifications/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, token })
+      });
+      const json = await resp.json().catch(() => ({} as any));
+      console.log('[Push] server register result:', resp.status, json);
+    } catch (e:any) {
+      console.log('[Push] server register error:', e?.message || e);
+    }
+  }
+}
+
+// Somewhere in your layout component (e.g., useEffect in RootLayout):
+// useEffect(() => { ensurePushRegistered(currentUserId); }, [currentUserId]);
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -59,6 +147,10 @@ export default function RootLayout() {
     }
   }, [user, authLoading]);
 
+  useEffect(() => {
+    ensurePushRegistered(user?.id);
+  }, [user?.id]);
+
   // Enhanced connection monitoring with manual recovery options
   useConnectionMonitor({
     onConnectionLost: () => {
@@ -92,7 +184,7 @@ export default function RootLayout() {
         await initializeAuth();
         
         // Load equipment reference early in the initialization process
-        console.log('🛡️ Loading equipment reference...');
+        //console.log('🛡️ Loading equipment reference...');
         await loadEquipmentReference();
 
         // Initialize realtime subscriptions with staggered timing to prevent overload

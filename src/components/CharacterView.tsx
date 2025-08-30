@@ -891,10 +891,10 @@ export default function CharacterView({ character, onClose, onLeaveCampaign, rea
         return;
       }
 
-      console.log('Found campaign:', campaign.name, 'with players:', campaign.players);
+     //console.log('Found campaign:', campaign.name, 'with players:', campaign.players);
 
       const isOwner = campaign.owner === user.id;
-      console.log('User is owner:', isOwner);
+      //console.log('User is owner:', isOwner);
 
       // Remove character from campaign
       const { error: characterError } = await supabase
@@ -911,7 +911,7 @@ export default function CharacterView({ character, onClose, onLeaveCampaign, rea
         return;
       }
 
-      console.log('Successfully removed character from campaign');
+      //console.log('Successfully removed character from campaign');
 
       // Remove user from campaign's players array and handle owner leaving
       const currentPlayers = campaign.players || [];
