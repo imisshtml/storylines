@@ -273,7 +273,7 @@ export default function JoinScreen() {
         return;
       }
 
-      console.log('Found campaign:', campaign);
+      //console.log('Found campaign:', campaign);
 
       // Check if user is already in the campaign
       const currentPlayers = campaign.players || [];

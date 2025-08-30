@@ -116,8 +116,8 @@ export default function HomeScreen() {
     console.log('🎯 Available campaigns:', campaigns.length);
 
     const campaign = campaigns.find(c => c.id === campaignId);
-    console.log('🎯 Found campaign:', campaign ? campaign.name : 'NOT FOUND');
-    console.log('🎯 Campaign status:', campaign?.status);
+    //console.log('🎯 Found campaign:', campaign ? campaign.name : 'NOT FOUND');
+    //console.log('🎯 Campaign status:', campaign?.status);
 
     if (campaign) {
       console.log('🎯 Setting current campaign...');
@@ -148,7 +148,7 @@ export default function HomeScreen() {
 
   const handleSettingsPress = (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
-    console.log('::: C ', campaignId, campaigns, campaign)
+    //console.log('::: C ', campaignId, campaigns, campaign)
     if (campaign) {
       setCurrentCampaign(campaign);
       router.push('/create');

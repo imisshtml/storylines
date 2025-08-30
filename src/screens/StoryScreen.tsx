@@ -885,16 +885,16 @@ export default function StoryScreen() {
   const getInputOptions = (): InputOption[] => {
     const baseOptions: InputOption[] = [
       {
-        type: 'say',
-        label: 'Say',
-        icon: <MessageSquare size={16} color="#4CAF50" />,
-        placeholder: 'Say something out loud...'
-      },
-      {
         type: 'rp',
         label: 'RP',
         icon: <Drama size={16} color="#9C27B0" />,
         placeholder: 'Roleplay your action...'
+      },
+      {
+        type: 'say',
+        label: 'Say',
+        icon: <MessageSquare size={16} color="#4CAF50" />,
+        placeholder: 'Say something out loud...'
       },
       {
         type: 'ooc',
