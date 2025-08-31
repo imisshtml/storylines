@@ -11,3 +11,13 @@ expo-env.d.ts
 .expo/
 .expo/types/
 .env
+
+# do not commit service accounts
+*firebase-adminsdk-*.json
+*.service-account.json
+*.cred.json
+
+# do not commit service accounts
+*firebase-adminsdk-*.json
+*.service-account.json
+*.cred.json

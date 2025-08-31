@@ -118,6 +118,7 @@ export default function ProfileScreen() {
       .from('profiles')
       .update(patch)
       .eq('id', user.id);
+
     if (error) throw error;
   };
 
