@@ -8,6 +8,10 @@
     "scheme": "storylines",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "notification": {
+      "icon": "./assets/images/push_icon.png",
+      "color": "#4CAF50"
+    },
     "splash": {
       "image": "./assets/images/sl_logo.jpg",
       "resizeMode": "contain",
@@ -27,7 +31,8 @@
         "backgroundColor": "#050908"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.imisshtml.storylines"
+      "package": "com.imisshtml.storylines",
+      "googleServicesFile": "./google-services.json"
     },
     "plugins": [
       "expo-router",
