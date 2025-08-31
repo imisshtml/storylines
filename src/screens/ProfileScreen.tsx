@@ -63,10 +63,10 @@ export default function ProfileScreen() {
     if (!user) return;
 
     try {
-      // Get user profile data including creation date
+      // Get user profile data including creation date and notification prefs
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('created_at')
+        .select('created_at, push_notifications_enabled, turn_notifications_enabled, email_notifications_enabled')
         .eq('id', user.id)
         .single();
 
@@ -74,6 +74,11 @@ export default function ProfileScreen() {
         console.error('Error fetching profile:', profileError);
         return;
       }
+
+      // Initialize toggle states from DB (strict: default to false)
+      setPushNotifications(profile?.push_notifications_enabled === true);
+      setTurnNotifications(profile?.turn_notifications_enabled === true);
+      setReceiveEmails(profile?.email_notifications_enabled === true);
 
       // Count completed campaigns (campaigns where user was a participant and status is completed)
       const completedCampaigns = campaigns.filter(campaign => 
@@ -104,6 +109,62 @@ export default function ProfileScreen() {
       month: 'long',
       day: 'numeric'
     });
+  };
+
+  // Persist preference changes to Supabase with optimistic UI
+  const updateProfilePrefs = async (patch: Partial<{ push_notifications_enabled: boolean; turn_notifications_enabled: boolean; email_notifications_enabled: boolean }>) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update(patch)
+      .eq('id', user.id);
+    if (error) throw error;
+  };
+
+  const handleTogglePush = async (value: boolean) => {
+    const prevPush = pushNotifications;
+    const prevTurn = turnNotifications;
+    // Optimistic
+    setPushNotifications(value);
+    // If disabling push, also force turn off
+    if (!value && prevTurn) setTurnNotifications(false);
+    try {
+      const patch: any = { push_notifications_enabled: value };
+      if (!value) patch.turn_notifications_enabled = false;
+      await updateProfilePrefs(patch);
+    } catch (e: any) {
+      // Revert
+      setPushNotifications(prevPush);
+      setTurnNotifications(prevTurn);
+      showAlert('Update Failed', 'Could not update push notifications preference.', undefined, 'error');
+    }
+  };
+
+  const handleToggleTurn = async (value: boolean) => {
+    // Guard: cannot enable turn if push is disabled
+    if (value && !pushNotifications) {
+      showAlert('Push Disabled', 'Enable Push Notifications first to receive turn alerts.', undefined, 'warning');
+      return;
+    }
+    const prev = turnNotifications;
+    setTurnNotifications(value);
+    try {
+      await updateProfilePrefs({ turn_notifications_enabled: value });
+    } catch (e: any) {
+      setTurnNotifications(prev);
+      showAlert('Update Failed', "Could not update 'turn notifications' preference.", undefined, 'error');
+    }
+  };
+
+  const handleToggleEmail = async (value: boolean) => {
+    const prev = receiveEmails;
+    setReceiveEmails(value);
+    try {
+      await updateProfilePrefs({ email_notifications_enabled: value });
+    } catch (e: any) {
+      setReceiveEmails(prev);
+      showAlert('Update Failed', 'Could not update email notifications preference.', undefined, 'error');
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -270,7 +331,7 @@ export default function ProfileScreen() {
             </View>
             <Switch
               value={pushNotifications}
-              onValueChange={setPushNotifications}
+              onValueChange={handleTogglePush}
               trackColor={{ false: '#2a2a2a', true: '#4CAF50' }}
               thumbColor={pushNotifications ? '#fff' : '#666'}
             />
@@ -294,9 +355,10 @@ export default function ProfileScreen() {
             </View>
             <Switch
               value={turnNotifications}
-              onValueChange={setTurnNotifications}
+              onValueChange={handleToggleTurn}
               trackColor={{ false: '#2a2a2a', true: '#4CAF50' }}
               thumbColor={turnNotifications ? '#fff' : '#666'}
+              disabled={!pushNotifications}
             />
           </View>
 
@@ -314,7 +376,7 @@ export default function ProfileScreen() {
             </View>
             <Switch
               value={receiveEmails}
-              onValueChange={setReceiveEmails}
+              onValueChange={handleToggleEmail}
               trackColor={{ false: '#2a2a2a', true: '#4CAF50' }}
               thumbColor={receiveEmails ? '#fff' : '#666'}
             />

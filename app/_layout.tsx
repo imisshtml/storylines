@@ -42,7 +42,6 @@ if (Platform.OS === 'android') {
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
     // Newer Expo types:
@@ -57,8 +56,9 @@ async function ensurePushRegistered(userId?: string) {
   if (status !== 'granted') return;
 
   const projectId =
-    (Constants?.expoConfig?.extra as any)?.eas?.projectId ||
-    (Constants as any)?.easConfig?.projectId;
+    (Constants?.expoConfig?.extra as any)?.eas?.projectId // dev
+      ?? (Constants as any)?.easConfig?.projectId          // prod build
+      ?? process.env.EXPO_PUBLIC_EAS_PROJECT_ID;  
   console.log('[Push] projectId:', projectId);
 
   const tokenPromise = (async () => {
@@ -251,7 +251,7 @@ export default function RootLayout() {
       cleanupConnectionMonitoring();
       isInitialized = false;
     };
-  }, []); // Remove dependency array to prevent re-initialization
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
