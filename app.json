@@ -74,10 +74,14 @@
             "targetSdkVersion": 34,
             "buildToolsVersion": "34.0.0",
             "minSdkVersion": 24,
-            "ndkVersion": "25.1.8937393"
+            "ndkVersion": "25.1.8937393",
+            "versionName": "1.1.0"
           },
           "ios": {
-            "deploymentTarget": "15.1"
+            "deploymentTarget": "15.1",
+            "infoPlist": {
+              "CFBundleShortVersionString": "1.1.0"
+            }
           }
         }
       ],
@@ -87,7 +91,7 @@
     "experiments": {
       "typedRoutes": true
     },
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": "1.1.0",
     "extra": {
       "router": {},
       "eas": {
