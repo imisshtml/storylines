@@ -116,7 +116,7 @@ export default function StoryScreen() {
   } | null>(null);
   const [showRestPrompt, setShowRestPrompt] = useState(false);
   // Input type selection
-  const [selectedInputType, setSelectedInputType] = useState<InputType>('say');
+  const [selectedInputType, setSelectedInputType] = useState<InputType>('rp');
   const [showInputTypeDropdown, setShowInputTypeDropdown] = useState(false);
   const [whisperTarget, setWhisperTarget] = useState<string>('');
   const [retryCount, setRetryCount] = useState(0);
@@ -2219,7 +2219,7 @@ export default function StoryScreen() {
     { key: 'rest', label: 'Rest', icon: <BedDouble size={18} color="#fff" />, onPress: handleRest },
     { key: 'sneak', label: characterIsInStealth ? 'Sneaking' : 'Sneak', icon: <EyeOff size={18} color="#fff" />, onPress: characterIsInStealth ? undefined : handleSneak },
     // New Combat/Flee button
-    ...(currentCampaign?.current_player ? [{ key: 'flee', label: 'Flee', icon: <LogOutIcon size={18} color="#fff" />, onPress: handleFleeCombat }] : [{ key: 'combat', label: 'Combat', icon: <Swords size={18} color="#fff" />, onPress: handleForceCombat }]),
+    //...(currentCampaign?.current_player ? [{ key: 'flee', label: 'Flee', icon: <LogOutIcon size={18} color="#fff" />, onPress: handleFleeCombat }] : [{ key: 'combat', label: 'Combat', icon: <Swords size={18} color="#fff" />, onPress: handleForceCombat }]),
     ...(characterIsInStealth ? [{ key: 'steal', label: 'Steal', icon: <HandCoins size={18} color="#fff" />, onPress: handleSteal }] : []),
     ...(characterHasLockpicks ? [{ key: 'lockpick', label: 'Lockpick', icon: <Lock size={18} color="#fff" />, onPress: handleLockpick }] : []),
     { key: 'pause', label: currentCampaign?.paused ? 'Unpause' : 'Pause', icon: <PauseIcon size={18} color="#fff" />, onPress: handleTogglePause },
