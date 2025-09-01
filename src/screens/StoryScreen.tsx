@@ -2622,6 +2622,160 @@ export default function StoryScreen() {
           />
         </View>
       </Modal>
+      <ContentReportModal
+          visible={showReportModal}
+          onClose={handleCloseReport}
+          message={reportingMessage}
+          campaignId={currentCampaign?.id || ''}
+        />
+
+        {/* Use Item Modal */}
+        <Modal visible={useItemModalVisible} transparent animationType="fade" onRequestClose={() => setUseItemModalVisible(false)}>
+          <View style={styles.centeredOverlay}>
+            <View style={styles.simpleModal}>
+              <Text style={styles.simpleModalTitle}>Use an Item</Text>
+
+              <ScrollView style={{ maxHeight: 250, alignSelf: 'stretch', marginVertical: 8 }}>
+                {currentCharacter?.equipment?.filter(eq => {
+                  if (!currentCharacter.equipped_items) return true;
+                  const isEquipped = Object.values(currentCharacter.equipped_items).some(eqi => {
+                    if (!eqi) return false;
+                    if (Array.isArray(eqi)) {
+                      return eqi.some(item => item && item.id === eq.id);
+                    }
+                    return eqi.id === eq.id;
+                  });
+                  return !isEquipped;
+                }).map((eq, idx) => (
+                  <TouchableOpacity
+                    key={`${eq.id}-${idx}`}
+                    style={[styles.itemRow, selectedUseItemId === eq.id && styles.itemRowSelected]}
+                    onPress={() => setSelectedUseItemId(eq.id)}
+                  >
+                    <Text style={styles.itemRowText}>{eq.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <TextInput
+                style={styles.simpleTextInput}
+                placeholder="Describe how you use the item (optional)"
+                placeholderTextColor="#666"
+                multiline
+                value={useItemNote}
+                onChangeText={setUseItemNote}
+              />
+
+              <View style={styles.simpleModalButtons}>
+                <TouchableOpacity
+                  style={[styles.simpleModalButton, !selectedUseItemId && styles.simpleModalButtonDisabled]}
+                  disabled={!selectedUseItemId}
+                  onPress={handleConfirmUseItem}
+                >
+                  <Text style={styles.simpleModalButtonText}>Confirm</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.simpleModalCancel} onPress={() => setUseItemModalVisible(false)}>
+                  <Text style={styles.simpleModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Rest Modal */}
+        <Modal visible={restModalVisible} transparent animationType="fade" onRequestClose={() => setRestModalVisible(false)}>
+          <View style={styles.centeredOverlay}>
+            <View style={styles.simpleModal}>
+              <Text style={styles.simpleModalTitle}>Choose Rest Type</Text>
+              <View style={styles.simpleModalButtons}>
+                <TouchableOpacity style={styles.simpleModalButton} onPress={() => { requestRest('short'); setRestModalVisible(false); }}>
+                  <Text style={styles.simpleModalButtonText}>Short Rest</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.simpleModalButton} onPress={() => { requestRest('long'); setRestModalVisible(false); }}>
+                  <Text style={styles.simpleModalButtonText}>Long Rest</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.simpleModalCancel} onPress={() => setRestModalVisible(false)}>
+                  <Text style={styles.simpleModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Steal Modal */}
+        <Modal visible={stealModalVisible} transparent animationType="fade" onRequestClose={() => setStealModalVisible(false)}>
+          <View style={styles.centeredOverlay}>
+            <View style={styles.simpleModal}>
+              <Text style={styles.simpleModalTitle}>Choose Steal Target</Text>
+              
+              <ScrollView style={{ maxHeight: 200, alignSelf: 'stretch', marginVertical: 8 }}>
+                {getStealTargets().map((target) => (
+                  <TouchableOpacity
+                    key={target.id}
+                    style={[
+                      styles.itemRow, 
+                      selectedStealTarget === target.name && styles.itemRowSelected,
+                      target.type === 'player' && !target.isOnline && styles.itemRowOffline
+                    ]}
+                    onPress={() => setSelectedStealTarget(target.name)}
+                    disabled={target.type === 'player' && !target.isOnline}
+                  >
+                    <Text style={[
+                      styles.itemRowText,
+                      target.type === 'player' && !target.isOnline && styles.itemRowTextOffline
+                    ]}>
+                      {target.name} {target.type === 'player' ? '(Player)' : '(NPC)'}
+                      {target.type === 'player' && !target.isOnline && ' (Offline)'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <TextInput
+                style={styles.simpleTextInput}
+                placeholder="Describe what you're trying to steal..."
+                placeholderTextColor="#666"
+                multiline
+                value={stealDescription}
+                onChangeText={setStealDescription}
+              />
+
+              <View style={styles.simpleModalButtons}>
+                <TouchableOpacity
+                  style={[
+                    styles.simpleModalButton, 
+                    (!selectedStealTarget || !stealDescription.trim()) && styles.simpleModalButtonDisabled
+                  ]}
+                  disabled={!selectedStealTarget || !stealDescription.trim()}
+                  onPress={handleConfirmSteal}
+                >
+                  <Text style={styles.simpleModalButtonText}>Attempt Steal</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.simpleModalCancel} onPress={() => setStealModalVisible(false)}>
+                  <Text style={styles.simpleModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Rest Vote Prompt */}
+        <Modal visible={showRestPrompt && !!pendingRest} transparent animationType="fade" onRequestClose={() => {}}>
+          <View style={styles.centeredOverlay}>
+            <View style={styles.simpleModal}>
+              <Text style={styles.simpleModalTitle}>{pendingRest?.requesterName} has requested a {pendingRest?.restType} rest.</Text>
+              <Text style={{ color: '#ccc', marginBottom: 12 }}>Do you agree?</Text>
+              <View style={styles.simpleModalButtons}>
+                <TouchableOpacity style={styles.simpleModalButton} onPress={() => respondToRest(true)}>
+                  <Text style={styles.simpleModalButtonText}>Yes</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.simpleModalCancel} onPress={() => respondToRest(false)}>
+                  <Text style={styles.simpleModalCancelText}>No</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
     </ImageBackground>
   );
 }
