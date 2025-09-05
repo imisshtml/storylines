@@ -1,10 +1,14 @@
-import React, { memo } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { User, Crown, Info, Flag, VenetianMask } from 'lucide-react-native';
+import React, { memo, useCallback } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { User, Repeat1, Info, Flag, VenetianMask } from 'lucide-react-native';
 import { isInStealth } from '../utils/stealthUtils';
 import { CampaignMessage } from '../atoms/campaignHistoryAtoms';
 import { Character } from '../atoms/characterAtoms';
 import { getCharacterAvatarUrl } from '../utils/avatarStorage';
+import { useAtom } from 'jotai';
+import { AnimatedText } from './AnimatedText';
+import { ttsEnabledAtom, ttsAvailableAtom, ttsProviderAtom, ttsLoadingMessageIdsAtom, addTTSLoadingMessageIdAtom, removeTTSLoadingMessageIdAtom, lastNarratedMessageIdAtom } from '../atoms/ttsAtom';
+import { speak, isTTSConfigured } from '../utils/tts';
 
 interface StoryEventItemProps {
   message: CampaignMessage;
@@ -12,9 +16,32 @@ interface StoryEventItemProps {
   character?: Character; // Add character data to check stealth status
   currentUserId?: string; // Current user ID to check whisper visibility
   onReport?: (message: CampaignMessage) => void;
+  animateFromId?: number; // Only animate messages with id greater than this
 }
 
-const StoryEventItem = memo(({ message, campaignId, character, currentUserId, onReport }: StoryEventItemProps) => {
+const StoryEventItem = memo(({ message, campaignId, character, currentUserId, onReport, animateFromId }: StoryEventItemProps) => {
+  // TTS repeat handler for GM messages – hooks must be top-level (before any early returns)
+  const [ttsEnabled] = useAtom(ttsEnabledAtom);
+  const [ttsAvailable] = useAtom(ttsAvailableAtom);
+  const [ttsProvider] = useAtom(ttsProviderAtom);
+  const [loadingIds] = useAtom(ttsLoadingMessageIdsAtom);
+  const [, addLoading] = useAtom(addTTSLoadingMessageIdAtom);
+  const [, removeLoading] = useAtom(removeTTSLoadingMessageIdAtom);
+  const [lastNarratedId] = useAtom(lastNarratedMessageIdAtom);
+  const canRepeat = ttsEnabled && ttsAvailable && isTTSConfigured(ttsProvider);
+  const isLoadingThis = loadingIds.has(message.id);
+
+  const handleRepeatPress = useCallback(async () => {
+    if (!canRepeat) return;
+    try {
+      addLoading(message.id);
+      await speak(message.message, ttsProvider);
+    } catch {}
+    finally {
+      removeLoading(message.id);
+    }
+  }, [canRepeat, message.id, message.message, ttsProvider, addLoading, removeLoading]);
+
   // Check if this is a whisper and if the current user should see it
   if (message.message_type === 'whisper' && currentUserId) {
     const isAuthor = message.author === currentUserId;
@@ -31,7 +58,7 @@ const StoryEventItem = memo(({ message, campaignId, character, currentUserId, on
   const getEventIcon = () => {
     switch (message.message_type) {
       case 'gm':
-        return <Crown size={24} color="#FFD700" />;
+        return null;// <Crown size={24} color="#FFD700" />;
       case 'player':
         // Check if the character is actually in stealth based on stealth_roll
         const playerIsInStealth = character && isInStealth(character);
@@ -123,6 +150,17 @@ const StoryEventItem = memo(({ message, campaignId, character, currentUserId, on
             message.message_type === 'whisper' ? (message.character_name || message.author) :
               'System'}
         </Text>
+        {message.message_type === 'gm' && (
+          <TouchableOpacity
+            onPress={handleRepeatPress}
+            disabled={!canRepeat}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            {isLoadingThis
+              ? <ActivityIndicator size="small" color="#4CAF50" style={{marginRight: 10}} />
+              : <Repeat1 size={18} color={canRepeat ? '#4CAF50' : '#999'} style={{marginRight: 10}} />}
+          </TouchableOpacity>
+        )}
         <View style={styles.rightHeader}>
           <Text style={styles.timestamp}>
             {new Date(message.timestamp).toLocaleTimeString([], {
@@ -143,9 +181,15 @@ const StoryEventItem = memo(({ message, campaignId, character, currentUserId, on
         </View>
       </View>
       <View style={styles.contentContainer}>
-        <Text style={[styles.content, eventStyles.text]}>
-          {message.message}
-        </Text>
+        {message.message_type === 'gm' && (message.id === lastNarratedId) ? (
+          <AnimatedText style={[styles.content, eventStyles.text]}>
+            {message.message}
+          </AnimatedText>
+        ) : (
+          <Text style={[styles.content, eventStyles.text]}>
+            {message.message}
+          </Text>
+        )}
         {/* DiceRoll component temporarily disabled to prevent ExoPlayer crashes on Android */}
       </View>
     </View>
@@ -208,6 +252,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    alignSelf: 'flex-end'
   },
   timestamp: {
     fontSize: 12,

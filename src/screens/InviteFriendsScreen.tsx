@@ -264,6 +264,12 @@ export default function InviteFriendsScreen() {
       if (playerWithCharacter && playerWithCharacter.character) {
         // Convert the stored character info back to a Character object
         const charData = playerWithCharacter.character;
+        // Prefer the full character from campaignCharacters (contains avatar and other fields)
+        const fullCharacter = campaignCharacters.find(c => c.id === charData.id) || campaignCharacters.find(c => c.user_id === playerId);
+        if (fullCharacter) {
+          return fullCharacter;
+        }
+        // Fallback: synthesize a minimal character, preserving avatar if present on charData
         return {
           id: charData.id,
           name: charData.name,
@@ -272,7 +278,6 @@ export default function InviteFriendsScreen() {
           level: charData.level,
           user_id: playerId,
           campaign_id: currentCampaign.id,
-          // Add default values for other required Character fields
           background: '',
           abilities: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
           skills: [],
@@ -286,7 +291,7 @@ export default function InviteFriendsScreen() {
           gold: 0,
           silver: 0,
           copper: 0,
-          avatar: '',
+          avatar: charData.avatar || '',
           traits: [],
           features: [],
           saving_throws: [],
@@ -384,6 +389,7 @@ export default function InviteFriendsScreen() {
               class: selectedCharacter.class,
               race: selectedCharacter.race,
               level: selectedCharacter.level,
+              avatar: selectedCharacter.avatar,
             } : null,
           };
         }
@@ -880,7 +886,6 @@ export default function InviteFriendsScreen() {
           <View style={styles.playersList}>
             {currentCampaign.players.map((player, index) => {
               const playerCharacter = getPlayerCharacter(player.id);
-              const availableCharacters = getAvailableCharacters(player.id);
               const canSelectCharacter = player.id === user?.id;
 
               return (

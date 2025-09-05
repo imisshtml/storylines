@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, ChevronUp, MessageSquare, Drama, Ear, CircleHelp as HelpCircle, RefreshCw, Search, Package as PackageIcon, BedDouble, EyeOff, HandCoins, Lock, Pause as PauseIcon, Swords, LogOut as LogOutIcon } from 'lucide-react-native';
+import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, ChevronUp, MessageSquare, Drama, Ear, CircleHelp as HelpCircle, RefreshCw, Search, Package as PackageIcon, BedDouble, EyeOff, HandCoins, Lock, Pause as PauseIcon, Swords, LogOut as LogOutIcon, Volume2, VolumeX } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom, fetchCampaignsAtom } from '../atoms/campaignAtoms';
@@ -63,6 +63,9 @@ import {
 } from '../utils/inventoryManager';
 import { useCustomAlert } from '@/components/CustomAlert';
 import CombatActionModal, { CombatAttackType, CombatTarget } from '../components/CombatActionModal';
+import useStoryNarrator from '../hooks/useStoryNarrator';
+import { ttsEnabledAtom, saveTTSEnabledAtom, ttsAvailableAtom, ttsProviderAtom, loadTTSEnabledAtom } from '../atoms/ttsAtom';
+import { isTTSConfigured } from '../utils/tts';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask' | 'action' | 'ooc';
 
@@ -167,6 +170,26 @@ export default function StoryScreen() {
     addCampaignMessage
   });
 
+  useStoryNarrator();
+
+  // TTS state and toggle setup
+  const [ttsEnabled] = useAtom(ttsEnabledAtom);
+  const [, saveTTSEnabled] = useAtom(saveTTSEnabledAtom);
+  const [ttsAvailable] = useAtom(ttsAvailableAtom);
+  const [ttsProvider] = useAtom(ttsProviderAtom);
+  const [, loadTTSEnabled] = useAtom(loadTTSEnabledAtom);
+  const ttsConfigured = isTTSConfigured(ttsProvider);
+
+  useEffect(() => {
+    loadTTSEnabled();
+  }, [loadTTSEnabled]);
+
+  const canToggleTTS = ttsAvailable && ttsConfigured;
+  const toggleTTS = () => {
+    if (!canToggleTTS) return;
+    saveTTSEnabled(!ttsEnabled);
+  };
+
   // Update refs when atoms change
   useEffect(() => {
     atomRefs.current = {
@@ -190,6 +213,7 @@ export default function StoryScreen() {
   const lastMessageCountRef = useRef(0);
   const [animation] = useState(new Animated.Value(0));
   const broadcastCleanupRef = useRef<(() => void) | null>(null);
+  const initialLastMessageIdRef = useRef<number | null>(null);
 
   // Add performance tracking refs
   const lastScrollTime = useRef(0);
@@ -276,6 +300,10 @@ export default function StoryScreen() {
 
   // Check if ads should be hidden based on purchases
   useEffect(() => {
+    // Capture baseline last message id once at initial render when history is available
+    if (initialLastMessageIdRef.current === null && campaignHistory.length) {
+      initialLastMessageIdRef.current = campaignHistory[campaignHistory.length - 1].id;
+    }
     const checkAdStatus = async () => {
       try {
         // Initialize purchase manager if user is available and not already initialized
@@ -1186,7 +1214,7 @@ export default function StoryScreen() {
         // Send request to our API route with user ID in the body, with client-side soft-timeout
         const response = await (async () => {
           const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 12000);
+          const timer = setTimeout(() => controller.abort(), 20000);
           try {
             const resp = await fetch(fullUrl, {
               method: 'POST',
@@ -2343,8 +2371,24 @@ export default function StoryScreen() {
               style={styles.headerTitle}
               onPress={() => setIsPartyDisplayExpanded(!isPartyDisplayExpanded)}
               activeOpacity={0.7}
+              pointerEvents="none"
             >
-              <Text style={styles.title}>{currentCampaign.name}</Text>
+              <View style={{alignItems: 'center', justifyContent: 'center'}}>
+                <Text style={styles.title}>{currentCampaign.name}</Text>
+                {/* TTS Toggle */}
+                <TouchableOpacity 
+                  onPress={toggleTTS} 
+                  style={styles.ttsButton}
+                  disabled={!canToggleTTS}
+                >
+                  {canToggleTTS
+                    ? (ttsEnabled
+                        ? <Volume2 size={24} color="#4CAF50" />
+                        : <VolumeX size={24} color="#ff7676" />)
+                    : <VolumeX size={24} color="#999" />}
+                </TouchableOpacity>
+              </View>
+              
               <View style={{flexDirection: 'row', alignItems: 'center'}}>
                 <Text style={styles.subTitle}>{!!currentCampaign?.current_player_name ? currentCampaign?.current_player_name + '\'s Turn' : 'Turn Tracker'}</Text>
                 <Animated.View style={{marginLeft: 5, transform: [{ rotate: arrowRotation }] }}>
@@ -2417,6 +2461,7 @@ export default function StoryScreen() {
                       campaignId={currentCampaign.id}
                       character={messageCharacter}
                       currentUserId={user?.id}
+                      animateFromId={initialLastMessageIdRef.current ?? undefined}
                       onReport={handleReport}
                     />
                   );
@@ -2811,6 +2856,15 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  ttsButton: {
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    right: -30, top: -4,
+    zIndex: 999
   },
   headerTitle: {
     flex: 1,
