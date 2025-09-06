@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, ChevronUp, MessageSquare, Drama, Ear, CircleHelp as HelpCircle, RefreshCw, Search, Package as PackageIcon, BedDouble, EyeOff, HandCoins, Lock, Pause as PauseIcon, Swords, LogOut as LogOutIcon, Volume2, VolumeX } from 'lucide-react-native';
+import { Ellipsis, LifeBuoy, Home, User as User2, X, CircleAlert as AlertCircle, Forward, ChevronDown, ChevronUp, MessageSquare, Drama, Ear, CircleHelp as HelpCircle, RefreshCw, Search, Package as PackageIcon, BedDouble, EyeOff, HandCoins, Lock, Pause as PauseIcon, Swords, LogOut as LogOutIcon, Volume2, VolumeX } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAtom } from 'jotai';
 import { currentCampaignAtom, fetchCampaignsAtom } from '../atoms/campaignAtoms';
@@ -42,7 +42,7 @@ import {
 } from '../atoms/playerActionsAtoms';
 import CharacterView from '../components/CharacterView';
 import StoryEventItem from '../components/StoryEventItem';
-import EnhancedStoryChoices from '../components/EnhancedStoryChoices';
+import EnhancedStoryOptions from '../components/EnhancedStoryOptions';
 import ContentReportModal from '../components/ContentReportModal';
 import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 import ActivityIndicator from '../components/ActivityIndicator';
@@ -65,7 +65,7 @@ import { useCustomAlert } from '@/components/CustomAlert';
 import CombatActionModal, { CombatAttackType, CombatTarget } from '../components/CombatActionModal';
 import useStoryNarrator from '../hooks/useStoryNarrator';
 import { ttsEnabledAtom, saveTTSEnabledAtom, ttsAvailableAtom, ttsProviderAtom, loadTTSEnabledAtom } from '../atoms/ttsAtom';
-import { isTTSConfigured } from '../utils/tts';
+import { isTTSConfigured, stopTTS } from '../utils/tts';
 
 type InputType = 'say' | 'rp' | 'whisper' | 'ask' | 'action' | 'ooc';
 
@@ -134,6 +134,7 @@ export default function StoryScreen() {
   const [combatModalVisible, setCombatModalVisible] = useState(false);
   const [combatTargets, setCombatTargets] = useState<CombatTarget[]>([]);
   const [combatTargetsLoading, setCombatTargetsLoading] = useState(false);
+  const [storyOptionsVisible, setStoryOptionsVisible] = useState(false);
   // Room data extracted by backend from LLM
   const [sceneRoomData, setSceneRoomData] = useState<{ persons: string[]; items: string[] } | null>(null);
 
@@ -187,7 +188,12 @@ export default function StoryScreen() {
   const canToggleTTS = ttsAvailable && ttsConfigured;
   const toggleTTS = () => {
     if (!canToggleTTS) return;
-    saveTTSEnabled(!ttsEnabled);
+    const next = !ttsEnabled;
+    if (!next) {
+      // Turning OFF: stop any playing TTS immediately
+      try { stopTTS(); } catch {}
+    }
+    saveTTSEnabled(next);
   };
 
   // Update refs when atoms change
@@ -297,6 +303,15 @@ export default function StoryScreen() {
       useNativeDriver: false,
     }).start();
   }, [isPartyDisplayExpanded, animation]);
+
+  // When story options open, scroll history to bottom so options are visible
+  useEffect(() => {
+    if (storyOptionsVisible) {
+      try {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      } catch {}
+    }
+  }, [storyOptionsVisible]);
 
   // Check if ads should be hidden based on purchases
   useEffect(() => {
@@ -2241,11 +2256,18 @@ export default function StoryScreen() {
     await sendPlayerAction(actionText);
   };
 
+  const showStoryOptions = showChoices && isPlayerTurn && !isLoading('sendAction');
+
+  const openStoryOptions = () => {
+    setStoryOptionsVisible(true);
+  }
+
   const baseActions = [
+    ...(showStoryOptions ? [{ key: 'suggestions', label: 'Suggest', icon: <LifeBuoy size={18} color="#fff" />, onPress: openStoryOptions }] : []),
     { key: 'search', label: 'Search', icon: <Search size={18} color="#fff" />, onPress: handleSearch },
     { key: 'useItem', label: 'Use Item', icon: <PackageIcon size={18} color="#fff" />, onPress: handleUseItem },
-    { key: 'rest', label: 'Rest', icon: <BedDouble size={18} color="#fff" />, onPress: handleRest },
     { key: 'sneak', label: characterIsInStealth ? 'Sneaking' : 'Sneak', icon: <EyeOff size={18} color="#fff" />, onPress: characterIsInStealth ? undefined : handleSneak },
+    { key: 'rest', label: 'Rest', icon: <BedDouble size={18} color="#fff" />, onPress: handleRest },
     // New Combat/Flee button
     //...(currentCampaign?.current_player ? [{ key: 'flee', label: 'Flee', icon: <LogOutIcon size={18} color="#fff" />, onPress: handleFleeCombat }] : [{ key: 'combat', label: 'Combat', icon: <Swords size={18} color="#fff" />, onPress: handleForceCombat }]),
     ...(characterIsInStealth ? [{ key: 'steal', label: 'Steal', icon: <HandCoins size={18} color="#fff" />, onPress: handleSteal }] : []),
@@ -2548,9 +2570,17 @@ export default function StoryScreen() {
               </View>
             )}
 
-            {showChoices && isPlayerTurn && !isLoading('sendAction') &&
+            {showStoryOptions && (
+              <View style={styles.yourTurnEvent}>
+                <Text style={styles.loadingEventText}>
+                  It is your turn...
+                </Text>
+              </View>
+            )}
+
+            {storyOptionsVisible &&
               (selectedInputType === 'say' || selectedInputType === 'rp' || selectedInputType === 'action') && (
-                <EnhancedStoryChoices
+                <EnhancedStoryOptions
                   choices={choicesToShow}
                   onChoiceSelect={handleChoiceSelect}
                   disabled={isLoading('sendAction')}
@@ -2561,7 +2591,7 @@ export default function StoryScreen() {
           {/* ─── Base Actions Panel ─────────────────────────────── */}
           <View style={styles.actionsPanelWrapper}>
             <TouchableOpacity style={styles.actionsTab} onPress={toggleActionsPanel} activeOpacity={0.7}>
-              <ChevronUp size={16} color="#ccc" style={{ transform: [{ rotate: isActionsPanelExpanded ? '180deg' : '0deg' }] }} />
+              <Ellipsis size={26} color="#ccc" style={{ transform: [{ rotate: isActionsPanelExpanded ? '180deg' : '0deg' }] }} />
             </TouchableOpacity>
 
             {isActionsPanelExpanded && (
@@ -2919,6 +2949,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
     backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderRadius: 12,
+    marginVertical: 8,
+  },
+  yourTurnEvent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(0, 255, 98, 0.1)',
     borderRadius: 12,
     marginVertical: 8,
   },

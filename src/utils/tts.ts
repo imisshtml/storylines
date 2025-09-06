@@ -13,6 +13,9 @@ const ELEVEN_KEY = 'YOUR_ELEVEN_KEY_HERE';
 
 const ELEVEN_VOICE_ID = 'QjB4YEs2DhdhTmZbJqFQ';
 
+// Track the currently playing sound so we can stop it on demand
+let currentSound: Audio.Sound | null = null;
+
 async function fetchOpenAITTS(text: string): Promise<string> {
   const res = await fetch(OPENAI_API, {
     method: 'POST',
@@ -67,7 +70,28 @@ export async function speak(text: string, provider: TTSProvider = 'openai') {
       ? await fetchOpenAITTS(text)
       : await fetchElevenLabsTTS(text);
 
+    // Stop any previous sound before starting a new one
+    if (currentSound) {
+      try { await currentSound.stopAsync(); } catch {}
+      try { await currentSound.unloadAsync(); } catch {}
+      currentSound = null;
+    }
+
     const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true });
+    currentSound = sound;
+
+    // Auto-cleanup after playback finishes
+    sound.setOnPlaybackStatusUpdate(async (status: any) => {
+      try {
+        if (status && status.isLoaded && (status.didJustFinish || status.positionMillis >= status.durationMillis)) {
+          await sound.unloadAsync();
+          if (currentSound === sound) {
+            currentSound = null;
+          }
+        }
+      } catch {}
+    });
+
     await sound.playAsync();
   } catch (err) {
     console.error(`[${provider.toUpperCase()} TTS] speak error`, err);
@@ -79,4 +103,14 @@ export function isTTSConfigured(provider: TTSProvider): boolean {
   if (provider === 'openai') return !!OPENAI_KEY;
   if (provider === 'elevenlabs') return !!ELEVEN_KEY && ELEVEN_KEY !== 'YOUR_ELEVEN_KEY_HERE';
   return false;
+}
+
+export async function stopTTS() {
+  try {
+    if (currentSound) {
+      try { await currentSound.stopAsync(); } catch {}
+      try { await currentSound.unloadAsync(); } catch {}
+      currentSound = null;
+    }
+  } catch {}
 }

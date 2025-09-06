@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -109,33 +109,35 @@ interface EnhancedStoryChoicesProps {
   choices: string[];
   onChoiceSelect: (choice: string) => void;
   disabled?: boolean;
+  onClose?: () => void;
 }
 
-export default function EnhancedStoryChoices({
+export default function EnhancedStoryOptions({
   choices,
   onChoiceSelect,
   disabled = false,
+  onClose,
 }: EnhancedStoryChoicesProps) {
-  const [selectedModal, setSelectedModal] = useState<CompactCategory | null>(null);
+  const [localOpen, setLocalOpen] = useState(true);
 
-  // Convert simple choices to structured actions
-  const organizedActions = organizeChoicesIntoActions(choices);
-  
-  // Group actions into compact categories
-  const compactActions = {
-    combat: organizedActions.combat,
-    social: organizedActions.social,
-    misc: [
-      ...organizedActions.magic,
-      ...organizedActions.exploration,
-      ...organizedActions.utility,
-      ...organizedActions.rest,
-    ],
-  };
+  // Convert simple choices to structured actions, then flatten
+  const allActions = useMemo(() => {
+    const grouped = organizeChoicesIntoActions(choices);
+    return [
+      ...grouped.combat,
+      ...grouped.magic,
+      ...grouped.social,
+      ...grouped.exploration,
+      ...grouped.utility,
+      ...grouped.rest,
+      ...grouped.market,
+    ];
+  }, [choices]);
 
   const handleActionSelect = (action: ActionChoice) => {
-    setSelectedModal(null);
     onChoiceSelect(action.title);
+    if (onClose) onClose();
+    else setLocalOpen(false);
   };
 
   const getDifficultyColor = (difficulty?: string) => {
@@ -155,131 +157,67 @@ export default function EnhancedStoryChoices({
 
   return (
     <>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerSubtitle}>Some suggestions for you...</Text>
-        </View>
-
-        <View style={styles.compactButtonsContainer}>
-          {Object.entries(compactActions).map(([category, actions]) => {
-            const categoryConfig = COMPACT_CATEGORY_CONFIG[category as CompactCategory];
-            const actionCount = actions.length;
-
-            if (actionCount === 0) return null;
-
-            return (
-              <TouchableOpacity
-                key={category}
-                style={[
-                  styles.compactButton,
-                  { backgroundColor: categoryConfig.color },
-                  disabled && styles.compactButtonDisabled,
-                ]}
-                onPress={() => setSelectedModal(category as CompactCategory)}
-                disabled={disabled}
-                activeOpacity={0.8}
-              >
-                <View style={styles.compactButtonIcon}>
-                  {categoryConfig.icon}
+      <Modal
+        visible={localOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => (onClose ? onClose() : setLocalOpen(false))}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={[styles.modalHeader, { backgroundColor: '#1a1a1a' }]}>
+              <View style={styles.modalHeaderLeft}>
+                <View style={styles.modalHeaderIcon}>
+                  <Target size={18} color="#fff" />
                 </View>
-                <Text style={styles.compactButtonTitle}>{categoryConfig.title}</Text>
-                <View style={styles.compactButtonCount}>
-                  <Text style={styles.compactButtonCountText}>{actionCount}</Text>
+                <View>
+                  <Text style={styles.modalTitle}>Suggested Actions</Text>
+                  <Text style={styles.modalSubtitle}>Helpful options to move the story forward</Text>
                 </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Action Modal */}
-      {selectedModal && (
-        <Modal
-          visible={true}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setSelectedModal(null)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={[
-                styles.modalHeader,
-                { backgroundColor: COMPACT_CATEGORY_CONFIG[selectedModal].color }
-              ]}>
-                <View style={styles.modalHeaderLeft}>
-                  <View style={styles.modalHeaderIcon}>
-                    {COMPACT_CATEGORY_CONFIG[selectedModal].icon}
-                  </View>
-                  <View>
-                    <Text style={styles.modalTitle}>
-                      {COMPACT_CATEGORY_CONFIG[selectedModal].title} Actions
-                    </Text>
-                    <Text style={styles.modalSubtitle}>
-                      {COMPACT_CATEGORY_CONFIG[selectedModal].description}
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={styles.modalCloseButton}
-                  onPress={() => setSelectedModal(null)}
-                >
-                  <X size={24} color="#fff" />
-                </TouchableOpacity>
               </View>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => (onClose ? onClose() : setLocalOpen(false))}
+              >
+                <X size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
 
-              <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
-                {compactActions[selectedModal].map((action, index) => (
-                  <TouchableOpacity
-                    key={`${action.id}-${index}`}
-                    style={[
-                      styles.modalActionCard,
-                      disabled && styles.modalActionCardDisabled,
-                    ]}
-                    onPress={() => handleActionSelect(action)}
-                    disabled={disabled}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.modalActionHeader}>
-                      <View style={styles.modalActionIconContainer}>
-                        {action.icon || <Target size={16} color={CATEGORY_CONFIG[action.category].color} />}
-                      </View>
-                      <View style={styles.modalActionContent}>
-                        <Text style={styles.modalActionTitle}>{action.title}</Text>
-                        {false && (
-                          <Text style={styles.modalActionDescription}>
-                            {action.description}
-                          </Text>
-                        )}
-                      </View>
-                      {false && action.difficulty && (
-                        <View
-                          style={[
-                            styles.modalDifficultyBadge,
-                            { backgroundColor: getDifficultyColor(action.difficulty) },
-                          ]}
-                        >
-                          <Text style={styles.modalDifficultyText}>
-                            {action.difficulty?.toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
+            <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+              {allActions.map((action, index) => (
+                <TouchableOpacity
+                  key={`${action.id}-${index}`}
+                  style={[styles.modalActionCard, disabled && styles.modalActionCardDisabled]}
+                  onPress={() => handleActionSelect(action)}
+                  disabled={disabled}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.modalActionHeader}>
+                    <View style={styles.modalActionIconContainer}>
+                      {action.icon || <Target size={16} color={CATEGORY_CONFIG[action.category].color} />}
                     </View>
-
-                    {false && action.requirements?.length && action.requirements?.length > 0 && (
-                      <View style={styles.modalRequirementsContainer}>
-                        <Text style={styles.modalRequirementsLabel}>Requires:</Text>
-                        <Text style={styles.modalRequirementsText}>
-                          {action.requirements?.join(', ')}
-                        </Text>
+                    <View style={styles.modalActionContent}>
+                      <Text style={styles.modalActionTitle}>{action.title}</Text>
+                    </View>
+                    {false && action.difficulty && (
+                      <View style={[styles.modalDifficultyBadge, { backgroundColor: getDifficultyColor(action.difficulty) }]}>
+                        <Text style={styles.modalDifficultyText}>{action.difficulty?.toUpperCase()}</Text>
                       </View>
                     )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
+                  </View>
+
+                  {false && action.requirements && action.requirements.length > 0 && (
+                    <View style={styles.modalRequirementsContainer}>
+                      <Text style={styles.modalRequirementsLabel}>Requires:</Text>
+                      <Text style={styles.modalRequirementsText}>{action.requirements.join(', ')}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
-        </Modal>
-      )}
+        </View>
+      </Modal>
     </>
   );
 }
