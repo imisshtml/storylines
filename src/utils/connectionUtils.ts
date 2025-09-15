@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase';
+import { supabase, hardResetSupabase } from '../config/supabase';
 import { AppState } from 'react-native';
 import { addUserToOnlineStatus, removeUserFromOnlineStatus } from './onlineStatusManager';
 
@@ -6,6 +6,7 @@ import { addUserToOnlineStatus, removeUserFromOnlineStatus } from './onlineStatu
 let lastConnectionCheck = Date.now();
 let connectionCheckInterval: ReturnType<typeof setInterval> | null = null;
 let isReconnecting = false;
+let lastGlobalReconnectAt = 0;
 
 // Realtime subscription management
 const activeSubscriptions = new Map<string, {
@@ -13,6 +14,7 @@ const activeSubscriptions = new Map<string, {
   reconnectCount: number;
   lastError?: string;
   reconnectAttempts: number;
+  recreate?: () => any;
 }>();
 
 // Global registry to prevent duplicate subscriptions
@@ -124,7 +126,8 @@ export const createRealtimeSubscription = (
     subscription: null as any,
     reconnectCount: 0,
     reconnectAttempts: 0,
-    lastError: undefined as string | undefined
+    lastError: undefined as string | undefined,
+    recreate: undefined as undefined | (() => any)
   };
   
   const createSubscription = () => {
@@ -171,6 +174,40 @@ export const createRealtimeSubscription = (
             console.log(`❌ [${channelName}] Connection error: ${status}`, err);
             subscriptionData.lastError = `${status}: ${err?.message || 'Unknown error'}`;
             
+            // Detect invalid/expired JWT and refresh session + rebuild channels
+            try {
+              const msg = String(err?.message || '').toLowerCase();
+              if (msg.includes('invalidjwttoken') || msg.includes('expired') || msg.includes('jwt')) {
+                console.log(`🔐 [${channelName}] JWT issue detected. Refreshing session and reconnecting channels...`);
+                (async () => {
+                  try {
+                    await refreshSupabaseConnection();
+                    await reconnectAllSubscriptions();
+                  } catch (e) {
+                    console.log('🔐 JWT refresh/reconnect failed, user may need re-authentication:', e);
+                  }
+                })();
+                return; // skip normal backoff path; reconnection handled globally
+              }
+              // If no error detail, treat as generic transport failure and try one guarded global refresh
+              if (!err || !err.message) {
+                const now = Date.now();
+                if (now - lastGlobalReconnectAt > 20000 && !isReconnecting) {
+                  lastGlobalReconnectAt = now;
+                  console.log(`🌐 [${channelName}] No error detail; attempting guarded global refresh/reconnect...`);
+                  (async () => {
+                    try {
+                      await refreshSupabaseConnection();
+                      await reconnectAllSubscriptions();
+                    } catch (e) {
+                      console.log('🌐 Guarded refresh/reconnect failed:', e);
+                    }
+                  })();
+                  return; // let global path handle recreate
+                }
+              }
+            } catch (_) {}
+            
             // Attempt reconnection with exponential backoff
             if (subscriptionData.reconnectAttempts < maxReconnectAttempts) {
               const delay = Math.min(1000 * Math.pow(2, subscriptionData.reconnectAttempts), 30000);
@@ -192,7 +229,31 @@ export const createRealtimeSubscription = (
                 subscriptionData.subscription = createSubscription();
               }, delay);
             } else {
-              console.log(`💀 [${channelName}] Max reconnection attempts reached. Manual intervention required.`);
+              console.log(`💀 [${channelName}] Max reconnection attempts reached. Performing final global refresh & recreate...`);
+              (async () => {
+                try {
+                  await refreshSupabaseConnection();
+                  // Try to recreate this channel specifically to avoid full app resubscribe if possible
+                  if (subscriptionData.subscription) {
+                    try {
+                      subscriptionData.subscription.unsubscribe();
+                      supabase.removeChannel(subscriptionData.subscription);
+                    } catch (e) {
+                      console.log(`Warning removing channel during final refresh:`, e);
+                    }
+                  }
+                  if (typeof subscriptionData.recreate === 'function') {
+                    subscriptionData.reconnectAttempts = 0;
+                    subscriptionData.lastError = undefined;
+                    subscriptionData.subscription = subscriptionData.recreate();
+                  } else {
+                    // Fallback to reconnect all
+                    await reconnectAllSubscriptions();
+                  }
+                } catch (e) {
+                  console.log('Final refresh & recreate failed:', e);
+                }
+              })();
             }
           }
           else if (status === 'CLOSED') {
@@ -207,7 +268,16 @@ export const createRealtimeSubscription = (
     }
   };
   
-  subscriptionData.subscription = createSubscription();
+  subscriptionData.recreate = () => {
+    try {
+      return (subscriptionData.subscription = createSubscription());
+    } catch (e) {
+      console.log(`💥 [${channelName}] Error in recreate():`, e);
+      return null;
+    }
+  };
+
+  subscriptionData.subscription = subscriptionData.recreate();
   activeSubscriptions.set(channelName, subscriptionData);
   
   // Return cleanup function
@@ -274,26 +344,38 @@ export const reconnectAllSubscriptions = async () => {
   // First refresh the main connection
   await refreshSupabaseConnection();
   
-  // Clean up all active subscriptions and registry
-  activeSubscriptions.forEach((data, channelName) => {
-    data.reconnectAttempts = 0;
-    data.lastError = undefined;
-    
-    if (data.subscription) {
-      try {
-        data.subscription.unsubscribe();
-        supabase.removeChannel(data.subscription);
-      } catch (error) {
-        console.log(`Error unsubscribing ${channelName}:`, error);
+  // Recreate each tracked subscription in place to avoid consumers needing to re-register
+  const names = Array.from(activeSubscriptions.keys());
+  for (const channelName of names) {
+    const data = activeSubscriptions.get(channelName);
+    if (!data) continue;
+    try {
+      console.log(`🔁 Recreating subscription: ${channelName}`);
+      data.reconnectAttempts = 0;
+      data.lastError = undefined;
+      if (data.subscription) {
+        try {
+          data.subscription.unsubscribe();
+          supabase.removeChannel(data.subscription);
+        } catch (e) {
+          console.log(`Warning unsubscribing old ${channelName}:`, e);
+        }
       }
+      if (typeof data.recreate === 'function') {
+        data.subscription = data.recreate();
+      } else {
+        console.log(`⚠️ No recreate() hook for ${channelName}; consumer must resubscribe.`);
+        activeSubscriptions.delete(channelName);
+        globalChannelRegistry.delete(channelName);
+      }
+    } catch (err) {
+      console.log(`💥 Error recreating subscription ${channelName}:`, err);
+      activeSubscriptions.delete(channelName);
+      globalChannelRegistry.delete(channelName);
     }
-  });
+  }
   
-  // Clear all registries to allow fresh subscriptions
-  activeSubscriptions.clear();
-  globalChannelRegistry.clear();
-  
-  console.log('🔄 All subscriptions and registry cleared. Ready for fresh connections.');
+  console.log('✅ Reconnect attempt complete for tracked subscriptions.');
 };
 
 export const withConnectionRetry = async <T>(
@@ -378,15 +460,29 @@ export const refreshSupabaseConnection = async (): Promise<void> => {
       }
     } else {
       console.log('Successfully refreshed Supabase auth session');
+      // Force fetch of new session to ensure Realtime client has latest access token
+      try {
+        const { data: { session: verified } } = await supabase.auth.getSession();
+        console.log('Verified refreshed session:', !!verified?.access_token);
+      } catch (_) {}
       // Wait briefly to avoid race with old Realtime connection
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     
-    // Test the connection with a simple query
-    const connectionTest = await checkSupabaseConnection();
-    if (!connectionTest) {
-      console.log('Connection test failed after refresh, but continuing...');
-      // Don't throw here - let the app continue functioning
+    // Test the connection with a simple query; if repeated failure, do a hard reset
+    const ok = await checkSupabaseConnection();
+    if (!ok) {
+      console.log('Connection test failed after refresh; attempting hard client reset (no relogin)...');
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        await hardResetSupabase(session ?? null);
+        // Give the new client a moment then test again
+        await new Promise(r => setTimeout(r, 300));
+        const ok2 = await checkSupabaseConnection();
+        console.log('Hard reset connection test result:', ok2);
+      } catch (e) {
+        console.log('Hard reset error:', e);
+      }
     } else {
       console.log('Supabase connection successfully refreshed and tested');
     }
@@ -420,12 +516,29 @@ export const startConnectionMonitoring = (interval: number = 60000): void => {
       console.log('Periodic connection check...');
       const isConnected = await checkSupabaseConnection();
       if (!isConnected) {
-        console.log('Periodic check: Connection lost, attempting to refresh...');
-        await refreshSupabaseConnection();
-        // Force reconnection of realtime subscriptions after refreshing auth/session
-        await reconnectAllSubscriptions();
-        // Check health after reconnection
-        monitorSubscriptionHealth();
+        console.log('Periodic check: Connection appears unhealthy, but checking if realtime is still working...');
+        
+        // Check if subscriptions are actually still working before forcing reconnection
+        let hasWorkingSubscriptions = false;
+        try {
+          // If we have active subscriptions that aren't in error state, connection might be fine
+          hasWorkingSubscriptions = Array.from(activeSubscriptions.values()).some(sub => 
+            sub.subscription && 
+            !sub.lastError && 
+            sub.reconnectAttempts === 0
+          );
+        } catch (_) {}
+        
+        if (hasWorkingSubscriptions) {
+          console.log('Periodic check: Realtime subscriptions appear healthy, skipping aggressive reconnection');
+        } else {
+          console.log('Periodic check: Connection lost and subscriptions unhealthy, attempting to refresh...');
+          await refreshSupabaseConnection();
+          // Force reconnection of realtime subscriptions after refreshing auth/session
+          await reconnectAllSubscriptions();
+          // Check health after reconnection
+          monitorSubscriptionHealth();
+        }
       } else {
         console.log('Periodic check: Connection healthy');
       }

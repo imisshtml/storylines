@@ -184,8 +184,8 @@ export const validateInventoryAction = (character: Character, actionDescription:
     { pattern: /(?:use|uses)\s+(?:a\s+|an\s+|my\s+|the\s+|some\s+)?([a-zA-Z\s]+?)(?:\s*$|,|\.|!|\?|;)/, consumable: true },
     // Casting spells (non-consumable)
     { pattern: /(?:cast|casts)\s+(?:a\s+|an\s+|my\s+|the\s+)?([a-zA-Z\s]+?)(?:\s|$)/, consumable: false },
-    // Attacking with weapons (non-consumable)
-    { pattern: /(?:attack|attacks|strike|strikes|hit|hits)\s+(?:with\s+)?(?:a\s+|an\s+|my\s+|the\s+)?([a-zA-Z\s]+?)(?:\s|$)/, consumable: false },
+    // Attacking with weapons (non-consumable) - only match when "with" is explicitly used
+    { pattern: /(?:attack|attacks|strike|strikes|hit|hits)\s+.*?\s+with\s+(?:a\s+|an\s+|my\s+|the\s+)?([a-zA-Z\s]+?)(?:\s*$|,|\.|!|\?)/, consumable: false },
   ];
   
   // Check currency first

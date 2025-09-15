@@ -54,7 +54,7 @@ export default function BannerAd({ size = BannerAdSize.BANNER, style }: BannerAd
           requestNonPersonalizedAdsOnly: false,
         }}
         onAdLoaded={() => {
-          console.log('Banner ad loaded successfully');
+          //console.log('Banner ad loaded successfully');
         }}
         onAdFailedToLoad={(error) => {
           console.error('Banner ad failed to load:', error);

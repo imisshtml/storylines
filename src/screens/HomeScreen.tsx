@@ -313,7 +313,7 @@ export default function HomeScreen() {
 
             <View style={styles.titleContainer}>
               <Image source={require('../../assets/images/sl_logo_small3.png')} style={styles.logoImg} resizeMode='contain' />
-              {user && (
+              {false && user && (
                 <Text style={styles.welcomeText}>
                   Welcome back, {user.username || user.email}!
                 </Text>
@@ -635,7 +635,14 @@ export default function HomeScreen() {
                     </View>
                   </>
                 )}
+                
               </ScrollView>
+              <View style={styles.betaWrapper}>
+                <Text style={styles.betaText}>
+                  Please be aware, this is a beta release of Storylines and we are pushing new changes up weekly.
+                  Comments & suggestions are welcome, please email us at dev.imisshtml@gmail.com
+                </Text>
+              </View>
             </View>
           </View>
         </View>
@@ -704,6 +711,16 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  betaText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#fff',
+  },
+  betaWrapper: {
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderRadius: 8,
+    padding: 10,
   },
   invitationsBanner: {
     backgroundColor: 'rgba(0, 215, 0, 0.1)',

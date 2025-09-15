@@ -30,7 +30,6 @@ interface ActionChoice {
 }
 
 type ActionCategory = 'combat' | 'magic' | 'social' | 'exploration' | 'utility' | 'rest' | 'market';
-type CompactCategory = 'combat' | 'social' | 'misc';
 
 interface CategoryConfig {
   title: string;
@@ -83,28 +82,6 @@ const CATEGORY_CONFIG: Record<ActionCategory, CategoryConfig> = {
     description: 'Buy, sell, or trade items',
   },
 };
-
-const COMPACT_CATEGORY_CONFIG: Record<CompactCategory, CategoryConfig> = {
-  combat: {
-    title: 'Combat',
-    icon: <Sword size={18} color="#fff" />,
-    color: '#e74c3c',
-    description: 'Attack, defend, and tactical maneuvers',
-  },
-  social: {
-    title: 'Social',
-    icon: <MessageCircle size={18} color="#fff" />,
-    color: '#2ecc71',
-    description: 'Talk, persuade, and interact with others',
-  },
-  misc: {
-    title: 'Misc',
-    icon: <Package size={18} color="#fff" />,
-    color: '#3498db',
-    description: 'Magic, exploration, items, and other actions',
-  },
-};
-
 interface EnhancedStoryChoicesProps {
   choices: string[];
   onChoiceSelect: (choice: string) => void;
@@ -120,7 +97,6 @@ export default function EnhancedStoryOptions({
 }: EnhancedStoryChoicesProps) {
   const [localOpen, setLocalOpen] = useState(true);
 
-  // Convert simple choices to structured actions, then flatten
   const allActions = useMemo(() => {
     const grouped = organizeChoicesIntoActions(choices);
     return [
@@ -136,21 +112,7 @@ export default function EnhancedStoryOptions({
 
   const handleActionSelect = (action: ActionChoice) => {
     onChoiceSelect(action.title);
-    if (onClose) onClose();
-    else setLocalOpen(false);
-  };
-
-  const getDifficultyColor = (difficulty?: string) => {
-    switch (difficulty) {
-      case 'easy':
-        return '#2ecc71';
-      case 'medium':
-        return '#f39c12';
-      case 'hard':
-        return '#e74c3c';
-      default:
-        return '#95a5a6';
-    }
+    onClose && onClose();
   };
 
   if (choices.length === 0) return null;
@@ -161,7 +123,7 @@ export default function EnhancedStoryOptions({
         visible={localOpen}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => (onClose ? onClose() : setLocalOpen(false))}
+        onRequestClose={() => (onClose && onClose())}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -177,7 +139,7 @@ export default function EnhancedStoryOptions({
               </View>
               <TouchableOpacity
                 style={styles.modalCloseButton}
-                onPress={() => (onClose ? onClose() : setLocalOpen(false))}
+                onPress={() => (onClose && onClose())}
               >
                 <X size={24} color="#fff" />
               </TouchableOpacity>
@@ -199,11 +161,6 @@ export default function EnhancedStoryOptions({
                     <View style={styles.modalActionContent}>
                       <Text style={styles.modalActionTitle}>{action.title}</Text>
                     </View>
-                    {false && action.difficulty && (
-                      <View style={[styles.modalDifficultyBadge, { backgroundColor: getDifficultyColor(action.difficulty) }]}>
-                        <Text style={styles.modalDifficultyText}>{action.difficulty?.toUpperCase()}</Text>
-                      </View>
-                    )}
                   </View>
 
                   {false && action.requirements && action.requirements.length > 0 && (

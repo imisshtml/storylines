@@ -17,9 +17,90 @@ interface StoryEventItemProps {
   currentUserId?: string; // Current user ID to check whisper visibility
   onReport?: (message: CampaignMessage) => void;
   animateFromId?: number; // Only animate messages with id greater than this
+  combatActive?: boolean; // Whether combat mode is currently active
 }
 
-const StoryEventItem = memo(({ message, campaignId, character, currentUserId, onReport, animateFromId }: StoryEventItemProps) => {
+const StoryEventItem = memo(({ message, campaignId, character, currentUserId, onReport, animateFromId, combatActive }: StoryEventItemProps) => {
+  // Helper function to detect combat messages
+  const isCombatMessage = (msg: CampaignMessage): boolean => {
+    if (msg.message_type !== 'gm') return false;
+    
+    // If combat mode is active, treat all GM messages as combat messages
+    if (combatActive) return true;
+    
+    // Fallback to keyword detection for backwards compatibility
+    const content = msg.message.toLowerCase();
+    return content.includes('initiative') || 
+           content.includes('combat begins') || 
+           content.includes('rolls initiative') || 
+           content.includes('attacks') || 
+           content.includes('damage') || 
+           content.includes('hits for') || 
+           content.includes('strikes') || 
+           content.includes('hit points') ||
+           content.includes('hp remaining') ||
+           content.includes('takes damage') ||
+           content.includes('attack roll');
+  };
+
+  const isThisCombatMessage = isCombatMessage(message);
+
+  // Parse combat message for better formatting
+  const parseCombatMessage = (msg: string) => {
+    if (!isThisCombatMessage) return { main: msg, initiative: [], damage: null };
+    
+    // Extract individual initiative rolls - look for patterns like "Name rolls initiative: 15"
+    const initiativeMatches = msg.match(/([A-Za-z\s]+(?:rolls|rolled)\s+initiative[^.]*\.)/gi);
+    let main = msg;
+    let initiative: string[] = [];
+    
+    if (initiativeMatches && initiativeMatches.length > 0) {
+      initiative = initiativeMatches.map(match => match.trim());
+      // Remove initiative text from main message
+      initiativeMatches.forEach(match => {
+        main = main.replace(match, '').trim();
+      });
+      // Clean up extra spaces and periods
+      main = main.replace(/\s+/g, ' ').replace(/\.\s*\./g, '.').trim();
+    }
+    
+    // Extract damage information - look for explicit damage mentions or combat impact descriptions
+    const damageMatches = msg.match(/(takes? (\d+) (?:damage|hit points?)|(\d+) (?:damage|hit points?) (?:of )?(?:damage)?|hits? for (\d+)|deals? (\d+)|solid hit|successful strike|lands a (?:hit|blow)|connects|sparks? fly|impact|striking.*thud|resounding|metallic screech)/gi);
+    let damage = null;
+    
+    if (damageMatches && damageMatches.length > 0) {
+      // Extract numbers from damage matches if available
+      const damageNumbers = damageMatches.map(match => {
+        const num = match.match(/\d+/);
+        return num ? parseInt(num[0]) : 0;
+      }).filter(num => num > 0);
+      
+      if (damageNumbers.length > 0) {
+        const totalDamage = damageNumbers.reduce((sum, dmg) => sum + dmg, 0);
+        damage = `Damage: ${totalDamage}`;
+      } else {
+        // If no specific numbers but combat impact detected, show general hit indicator
+        const hasImpact = msg.toLowerCase().includes('solid hit') || 
+                         msg.toLowerCase().includes('connects') || 
+                         msg.toLowerCase().includes('lands') ||
+                         msg.toLowerCase().includes('strikes') ||
+                         msg.toLowerCase().includes('successful') ||
+                         msg.toLowerCase().includes('sparks fly') ||
+                         msg.toLowerCase().includes('impact') ||
+                         msg.toLowerCase().includes('thud') ||
+                         msg.toLowerCase().includes('resounding') ||
+                         msg.toLowerCase().includes('screech');
+        if (hasImpact) {
+          damage = 'Hit successful';
+        }
+      }
+    }
+    
+    return { main, initiative, damage };
+  };
+
+  const combatParsed = parseCombatMessage(message.message);
+
   // TTS repeat handler for GM messages – hooks must be top-level (before any early returns)
   const [ttsEnabled] = useAtom(ttsEnabledAtom);
   const [ttsAvailable] = useAtom(ttsAvailableAtom);
@@ -106,7 +187,11 @@ const StoryEventItem = memo(({ message, campaignId, character, currentUserId, on
   const getEventStyles = () => {
     switch (message.message_type) {
       case 'gm':
-        return {
+        return isThisCombatMessage ? {
+          container: styles.combatContainer,
+          text: styles.combatText,
+          header: styles.combatHeader,
+        } : {
           container: styles.gmContainer,
           text: styles.gmText,
           header: styles.gmHeader,
@@ -145,7 +230,7 @@ const StoryEventItem = memo(({ message, campaignId, character, currentUserId, on
       <View style={[styles.header, eventStyles.header]}>
         {getEventIcon()}
         <Text style={styles.headerText}>
-          {message.message_type === 'gm' ? 'Storyteller' :
+          {message.message_type === 'gm' ? (isThisCombatMessage ? 'Combat' : 'Storyteller') :
             message.message_type === 'player' ? (message.character_name || message.author) :
             message.message_type === 'whisper' ? (message.character_name || message.author) :
               'System'}
@@ -181,15 +266,34 @@ const StoryEventItem = memo(({ message, campaignId, character, currentUserId, on
         </View>
       </View>
       <View style={styles.contentContainer}>
-        {message.message_type === 'gm' && (message.id === lastNarratedId) ? (
+        {false && message.message_type === 'gm' && (message.id === lastNarratedId) ? (
           <AnimatedText style={[styles.content, eventStyles.text]}>
-            {message.message}
+            {isThisCombatMessage ? combatParsed.main : message.message}
           </AnimatedText>
         ) : (
           <Text style={[styles.content, eventStyles.text]}>
-            {message.message}
+            {isThisCombatMessage ? combatParsed.main : message.message}
           </Text>
         )}
+        
+        {/* Show initiative information separately for combat messages */}
+        {isThisCombatMessage && combatParsed.initiative.length > 0 && (
+          <View style={styles.initiativeContainer}>
+            {combatParsed.initiative.map((roll, index) => (
+              <Text key={index} style={[styles.combatDetail, styles.initiativeText]}>
+                {roll}
+              </Text>
+            ))}
+          </View>
+        )}
+        
+        {/* Show damage information separately for combat messages */}
+        {isThisCombatMessage && combatParsed.damage && (
+          <Text style={[styles.combatDetail, styles.damageText]}>
+            {combatParsed.damage}
+          </Text>
+        )}
+        
         {/* DiceRoll component temporarily disabled to prevent ExoPlayer crashes on Android */}
       </View>
     </View>
@@ -285,6 +389,18 @@ const styles = StyleSheet.create({
   gmText: {
     color: '#1a1a1a',
   },
+  // Combat styles
+  combatContainer: {
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff4444',
+  },
+  combatHeader: {
+    borderBottomColor: 'rgba(255, 68, 68, 0.3)',
+  },
+  combatText: {
+    color: '#1a1a1a',
+  },
   // Player styles
   playerContainer: {
     backgroundColor: 'rgba(76, 175, 80, 0.1)',
@@ -328,5 +444,29 @@ const styles = StyleSheet.create({
     padding: 4,
     borderRadius: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  // Combat detail styles
+  combatDetail: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  initiativeContainer: {
+    gap: 4,
+  },
+  initiativeText: {
+    backgroundColor: 'rgba(33, 150, 243, 0.15)',
+    color: '#1976D2',
+    borderLeftWidth: 3,
+    borderLeftColor: '#2196F3',
+  },
+  damageText: {
+    backgroundColor: 'rgba(244, 67, 54, 0.15)',
+    color: '#D32F2F',
+    borderLeftWidth: 3,
+    borderLeftColor: '#F44336',
   },
 });

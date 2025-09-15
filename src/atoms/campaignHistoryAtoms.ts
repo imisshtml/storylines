@@ -17,6 +17,7 @@ export type CampaignMessage = {
   character_avatar?: string; // Character avatar URL
   whisper_target_id?: string; // User ID of whisper target (for private messages)
   display_type?: string; // For special rendering (e.g., 'initial')
+  room_data?: { persons: string[]; items: string[] }; // Room data extracted from LLM responses
 };
 
 // Campaign history state

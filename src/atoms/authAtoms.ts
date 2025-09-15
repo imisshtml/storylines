@@ -417,6 +417,14 @@ export const initializeAuthAtom = atom(
 
       // Listen for auth changes
       supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'TOKEN_REFRESHED') {
+          try {
+            const { reconnectAllSubscriptions } = await import('../utils/connectionUtils');
+            await reconnectAllSubscriptions();
+          } catch (e) {
+            console.warn('[Auth] Failed to reconnect channels after token refresh:', e);
+          }
+        }
         if (session?.user) {
           set(sessionAtom, session);
           

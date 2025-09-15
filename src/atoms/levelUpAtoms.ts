@@ -182,7 +182,7 @@ export const initializeCharacterLevelRealtimeAtom = atom(
       activeCharacterLevelUserId = null;
     }
 
-    console.log(`📡 Creating new robust character level subscription for user: ${user.id}`);
+    //console.log(`📡 Creating new robust character level subscription for user: ${user.id}`);
     
     const channelName = `character-level-changes:${user.id}`;
     

@@ -13,6 +13,7 @@ import {
   Modal,
   Animated,
   StatusBar,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -47,7 +48,7 @@ import ContentReportModal from '../components/ContentReportModal';
 import { useConnectionMonitor } from '../hooks/useConnectionMonitor';
 import ActivityIndicator from '../components/ActivityIndicator';
 import { useLoading } from '../hooks/useLoading';
-import { initializeCampaignBroadcast, broadcastActionStarted, broadcastActionCompleted, createRealtimeSubscription, broadcastRestRequest, broadcastRestResponse } from '../utils/connectionUtils';
+import { initializeCampaignBroadcast, broadcastActionStarted, broadcastActionCompleted, createRealtimeSubscription, broadcastRestRequest, broadcastRestResponse, checkSupabaseConnection, refreshSupabaseConnection, reconnectAllSubscriptions } from '../utils/connectionUtils';
 import BannerAd from '../components/BannerAd';
 import LottieView from 'lottie-react-native';
 import { BannerAdSize } from 'react-native-google-mobile-ads';
@@ -62,7 +63,7 @@ import {
   generateInventoryContext 
 } from '../utils/inventoryManager';
 import { useCustomAlert } from '@/components/CustomAlert';
-import CombatActionModal, { CombatAttackType, CombatTarget } from '../components/CombatActionModal';
+import CombatActionModal, { CombatAction, CombatTarget } from '../components/CombatActionModal';
 import useStoryNarrator from '../hooks/useStoryNarrator';
 import { ttsEnabledAtom, saveTTSEnabledAtom, ttsAvailableAtom, ttsProviderAtom, loadTTSEnabledAtom } from '../atoms/ttsAtom';
 import { isTTSConfigured, stopTTS } from '../utils/tts';
@@ -87,6 +88,7 @@ const getMiddlewareBaseUrl = (): string => {
 
 export default function StoryScreen() {
   const insets = useSafeAreaInsets();
+  const [uiEpoch, setUiEpoch] = useState(0);
   const [userInput, setUserInput] = useState('');
   const [currentCampaign, setCurrentCampaign] = useAtom(currentCampaignAtom);
   const [user] = useAtom(userAtom);
@@ -134,9 +136,15 @@ export default function StoryScreen() {
   const [combatModalVisible, setCombatModalVisible] = useState(false);
   const [combatTargets, setCombatTargets] = useState<CombatTarget[]>([]);
   const [combatTargetsLoading, setCombatTargetsLoading] = useState(false);
+  // Combat selection persistence
+  const [lastCombatActionId, setLastCombatActionId] = useState<string | null>(null);
+  const [lastCombatTargetIds, setLastCombatTargetIds] = useState<string[]>([]);
+  const [lastCombatTargetNames, setLastCombatTargetNames] = useState<string[]>([]);
   const [storyOptionsVisible, setStoryOptionsVisible] = useState(false);
   // Room data extracted by backend from LLM
   const [sceneRoomData, setSceneRoomData] = useState<{ persons: string[]; items: string[] } | null>(null);
+  // Combat mode tracking
+  const [combatActive, setCombatActive] = useState<boolean>(false);
 
   // Campaign history atoms
   const [campaignHistory] = useAtom(campaignHistoryAtom);
@@ -241,11 +249,11 @@ export default function StoryScreen() {
     setRetryCount(0);
   }, []);
 
-  // Enhanced connection monitoring for this critical screen
+  // Connection monitoring for this screen - less aggressive to avoid disrupting idle connections
   useConnectionMonitor({
     onConnectionLost,
     onConnectionRestored,
-    checkInterval: 30000 // More frequent checks for story screen (30 seconds)
+    checkInterval: 120000 // Less frequent checks to avoid disrupting idle connections (2 minutes)
   });
 
   // Function to get Android navigation bar height
@@ -674,10 +682,10 @@ export default function StoryScreen() {
       );
 
       if (hasGMMessages) {
-        console.log('🚫 Story already started - found GM messages:', {
+        /*console.log('🚫 Story already started - found GM messages:', {
           campaignHistoryLength: campaignHistory.length,
           gmMessageCount: campaignHistory.filter(m => m.message_type === 'gm' || m.author === 'GM').length
-        });
+        });*/
         return;
       }
 
@@ -789,7 +797,7 @@ export default function StoryScreen() {
         // Add the initial story as a GM message
         const insertedMessage = await atomRefs.current.addCampaignMessage({
           campaign_id: currentCampaign.id,
-          message: data.response,
+          message: sanitizeStoryText(data.response || ''),
           author: 'GM',
           message_type: 'gm',
           display_type: 'initial',
@@ -846,6 +854,30 @@ export default function StoryScreen() {
       try { atomRefs.current.fetchCampaignHistory(currentCampaign.id); } catch (e) {}
     }
   }, [currentCampaign?.current_player]);
+
+  // Extract room_data from the latest campaign history messages
+  useEffect(() => {
+    if (!campaignHistory.length) return;
+    
+    // Find the most recent GM message with room_data
+    const recentGMMessages = campaignHistory
+      .filter(msg => msg.message_type === 'gm' && msg.room_data)
+      .slice(-5); // Get last 5 GM messages with room_data
+    
+    if (recentGMMessages.length > 0) {
+      const latestRoomData = recentGMMessages[recentGMMessages.length - 1].room_data;
+      if (latestRoomData && latestRoomData.persons) {
+        setSceneRoomData({
+          persons: latestRoomData.persons,
+          items: latestRoomData.items || []
+        });
+        console.log('[RoomData][FE] Updated from campaign history:', {
+          persons: latestRoomData.persons.length,
+          items: (latestRoomData.items || []).length
+        });
+      }
+    }
+  }, [campaignHistory]);
 
   // Log room data whenever it updates so you can see it in FE logs
   useEffect(() => {
@@ -922,6 +954,19 @@ export default function StoryScreen() {
     });
     
     return targets;
+  };
+
+  // Sanitize story text: remove any bracketed directives at the edges like [TAG]... or [ROOM_DATA]...[/ROOM_DATA]
+  const sanitizeStoryText = (text: string): string => {
+    if (!text) return text;
+    let s = text;
+    // Remove edge [SOMETHING]...[/SOMETHING] blocks at start or end
+    s = s.replace(/^\s*\[[A-Za-z0-9_]+\][\s\S]*?\[\/[A-Za-z0-9_]+\]\s*/i, '')
+         .replace(/\s*\[[A-Za-z0-9_]+\][\s\S]*?\[\/[A-Za-z0-9_]+\]\s*$/i, '');
+    // Remove single bracket tags at start/end like [meta] or [/meta]
+    s = s.replace(/^\s*\[[^\]]*\]\s*/g, '')
+         .replace(/\s*\[[^\]]*\]\s*$/g, '');
+    return s.trim();
   };
 
   // Get input options based on current state
@@ -1009,7 +1054,7 @@ export default function StoryScreen() {
       return 'initial_story';
     }
 
-    if (lowerMessage.includes('attack') || lowerMessage.includes('strike') || lowerMessage.includes('hit')) {
+    if (lowerMessage.includes('attack') || lowerMessage.includes('strike') || lowerMessage.includes('hit') || lowerMessage.includes('punch') || lowerMessage.includes('kick') || lowerMessage.includes('fight') || lowerMessage.includes('grapple') || lowerMessage.includes('shove')) {
       return 'attack';
     }
     if (lowerMessage.includes('cast') || lowerMessage.includes('spell') || lowerMessage.includes('magic')) {
@@ -1043,6 +1088,18 @@ export default function StoryScreen() {
     console.log('🎭 Action:', action);
     console.log('🎭 Input Type:', inputType || selectedInputType);
     
+    // Preflight: ensure connection is healthy; attempt refresh once if not
+    try {
+      const ok = await checkSupabaseConnection();
+      if (!ok) {
+        console.log('🛠️ Preflight connection failed -> refreshing session and channels');
+        await refreshSupabaseConnection();
+        await reconnectAllSubscriptions();
+      }
+    } catch (e) {
+      console.warn('Preflight connection check failed (continuing anyway):', e);
+    }
+
     if (!currentCampaign || !action.trim()) {
       console.log('❌ Early return - no campaign or empty action');
       return;
@@ -1138,8 +1195,8 @@ export default function StoryScreen() {
         }
       }
 
-      // Validate inventory for action-type messages
-      if (currentCharacter && (typeToUse === 'action' || typeToUse === 'say' || typeToUse === 'rp')) {
+      // COMBAT ACTIONS: Skip all inventory validation - combat modal pre-validates everything
+      if (typeToUse !== 'combat' && currentCharacter && (typeToUse === 'action' || typeToUse === 'say' || typeToUse === 'rp')) {
         try {
           const inventoryValidation = validateInventoryAction(currentCharacter, action);
           console.log('🎒 Inventory validation result:', inventoryValidation);
@@ -1172,7 +1229,7 @@ export default function StoryScreen() {
       // Add player message to campaign history (without dice_roll for now)
       await atomRefs.current.addCampaignMessage({
         campaign_id: currentCampaign.id,
-        message: formattedMessage,
+        message: sanitizeStoryText(formattedMessage),
         author: messageAuthor,
         message_type: messageType,
         character_id: currentCharacter?.id,
@@ -1183,8 +1240,8 @@ export default function StoryScreen() {
       });
 
       // Determine if GM should respond and if message should contribute to story
-      const shouldTriggerGM = typeToUse === 'say' || typeToUse === 'rp' || typeToUse === 'action' || typeToUse === 'ask';
-      const shouldContributeToStory = typeToUse === 'say' || typeToUse === 'rp' || typeToUse === 'action';
+      const shouldTriggerGM = typeToUse === 'say' || typeToUse === 'rp' || typeToUse === 'action' || typeToUse === 'ask' || typeToUse === 'combat';
+      const shouldContributeToStory = typeToUse === 'say' || typeToUse === 'rp' || typeToUse === 'action' || typeToUse === 'combat';
       // Only send to AI for messages that should trigger GM response
       if (shouldTriggerGM) {
         console.log('🎭 Preparing to send to AI storyteller');
@@ -1241,15 +1298,46 @@ export default function StoryScreen() {
           } catch (err: any) {
             if (err?.name === 'AbortError') {
               console.warn('🕒 Game action soft-timeout on client; will continue in background');
-              // Show lightweight info and allow realtime/history to bring in result later
-              try { showAlert('Working…', 'Story is continuing in the background.', [{ text: 'OK' }], 'info'); } catch {}
+              
+              // Set connection status to allow manual refresh
+              setConnectionStatus('disconnected');
+              setError('Request timed out. Story may be continuing in the background.');
+              
+              // Show alert with refresh option
+              try { 
+                showAlert(
+                  'Request Timed Out', 
+                  'Your story may be continuing in the background. Check for new messages or try refreshing the connection.',
+                  [
+                    { text: 'Wait', style: 'cancel' },
+                    { text: 'Refresh Connection', onPress: handleRefreshConnection }
+                  ], 
+                  'warning'
+                ); 
+              } catch {}
+              
               // Stop loading visual, refresh history shortly to pull GM message when it arrives
               stopLoading('sendAction');
               setTimeout(() => {
                 if (currentCampaign?.id) atomRefs.current.fetchCampaignHistory(currentCampaign.id).catch(() => {});
               }, 2000);
+              
               // Return a fake minimal Response-like object to short-circuit further handling
               return new Response(JSON.stringify({ success: true, response: '', choices: [] }), { status: 200 });
+            }
+            // On network failure, try a one-shot reconnect and retry once
+            console.warn('🌐 Network error on fetch, attempting reconnect and one retry...', err);
+            try {
+              await refreshSupabaseConnection();
+              await reconnectAllSubscriptions();
+              const retry = await fetch(fullUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody),
+              });
+              return retry;
+            } catch (retryErr) {
+              console.error('🌐 Reconnect+retry failed:', retryErr);
             }
             throw err;
           } finally {
@@ -1296,7 +1384,7 @@ export default function StoryScreen() {
         if (!data.messageId) {
           const insertedMessage = await atomRefs.current.addCampaignMessage({
             campaign_id: currentCampaign.id,
-            message: data.response,
+            message: sanitizeStoryText(data.response || ''),
             author: typeToUse === 'ask' ? 'System' : 'GM',
             message_type: responseMessageType,
           });
@@ -1310,12 +1398,19 @@ export default function StoryScreen() {
 
         // Use choices from AI response (only for story-contributing messages)
         if (currentCampaign && shouldContributeToStory) {
-          console.log('🎭 Setting AI choices:', data.choices?.length || 0, 'choices');
+          //console.log('🎭 Setting AI choices:', data.choices?.length || 0, 'choices');
           atomRefs.current.setAiChoices({ campaignId: currentCampaign.id, choices: data.choices || [] });
         }
 
+        // Update combat state from server response
+        if (data.gameState?.scene?.combatActive !== undefined) {
+          const newCombatState = data.gameState.scene.combatActive;
+          console.log('🎯 Combat state update:', combatActive, '->', newCombatState);
+          setCombatActive(newCombatState);
+        }
+
         // Force refresh campaign history to ensure we have the latest data
-        console.log('🔄 Force refreshing campaign history after story action');
+        //console.log('🔄 Force refreshing campaign history after story action');
         setTimeout(() => {
           atomRefs.current.fetchCampaignHistory(currentCampaign.id);
         }, 1000);
@@ -1491,7 +1586,7 @@ export default function StoryScreen() {
       // Add the market inventory as a system message
       await atomRefs.current.addCampaignMessage({
         campaign_id: currentCampaign.id,
-        message: inventoryMessage,
+        message: sanitizeStoryText(inventoryMessage),
         author: 'System',
         message_type: 'system',
       });
@@ -1518,7 +1613,7 @@ export default function StoryScreen() {
 
   const handleChoiceSelect = async (choice: string) => {
     if (isLoading('sendAction')) return;
-
+    toggleStoryOptions(false)
     setShowChoices(false);
     const currentCharacter = getCurrentCharacter();
     const characterName = currentCharacter?.name || user?.username || user?.email || 'Player';
@@ -1705,7 +1800,7 @@ export default function StoryScreen() {
             // Notify all players that rest was denied
             atomRefs.current.addCampaignMessage({
               campaign_id: currentCampaign.id,
-              message: `Rest request was declined by ${denierName || 'a party member'}.`,
+              message: sanitizeStoryText(`Rest request was declined by ${denierName || 'a party member'}.`),
               author: 'System',
               message_type: 'system'
             });
@@ -1916,28 +2011,52 @@ export default function StoryScreen() {
   const filteredAiChoices = deduplicateChoices(filterBaseActions(aiChoices));
   const filteredDbChoices = deduplicateChoices(filterBaseActions(databaseChoices));
 
+  // Cross-deduplicate AI and DB choices, prioritizing AI but preventing accumulation
+  let choicesToShow: string[] = [];
+  
+  if (filteredAiChoices.length > 0) {
+    // Use AI choices but limit to reasonable number and cross-deduplicate with DB
+    const combinedChoices = [...filteredAiChoices, ...filteredDbChoices];
+    const crossDeduplicatedChoices = deduplicateChoices(combinedChoices);
+    // Limit to max 4 choices to prevent overwhelming UI
+    choicesToShow = crossDeduplicatedChoices.slice(0, 4);
+  } else if (filteredDbChoices.length > 0) {
+    choicesToShow = filteredDbChoices.slice(0, 4); // Limit DB choices too
+  } else {
+    choicesToShow = [
+      'Explore deeper into the forest',
+      'Investigate any strange noises', 
+      'Set up camp for the night',
+      'Plan your next move together',
+    ]; // Fallback to defaults last
+  }
+
   // Debug logging for choice sources
-  if (aiChoices.length > 0) {
-    //console.log('🎯 Raw AI choices:', aiChoices.length, aiChoices);
-    //console.log('🎯 Filtered AI choices:', filteredAiChoices.length, filteredAiChoices);
+  /*
+  console.log('🚨 CHOICE DEBUG - Start of choice selection process:');
+  console.log('🎯 Raw AI choices:', aiChoices.length, aiChoices);
+  console.log('🎯 Raw DB choices:', databaseChoices.length, databaseChoices);
+  console.log('🎯 Filtered AI choices:', filteredAiChoices.length, filteredAiChoices);
+  console.log('🎯 Filtered DB choices:', filteredDbChoices.length, filteredDbChoices);
+  
+  if (filteredAiChoices.length > 0) {
+    console.log('✅ Using AI choices as primary source');
+  } else if (filteredDbChoices.length > 0) {
+    console.log('⚠️ Using DB choices because no AI choices available');
+  } else {
+    console.log('❌ Using fallback default choices - neither AI nor DB available');
   }
+  
+
+  console.log('🎯 Final choices to show:', choicesToShow.length, choicesToShow);
+  console.log('🚨 CHOICE DEBUG - End of choice selection process');
+  console.log('---');
+  */
+  
+  // Additional DB choice source debugging
   if (databaseChoices.length > 0) {
-    //console.log('🎯 Raw DB choices:', databaseChoices.length, databaseChoices);
-    //console.log('🎯 Filtered DB choices:', filteredDbChoices.length, filteredDbChoices);
+    //console.log('🔍 DB Choice Details - PlayerActions raw data:', playerActions?.slice(0, 5));
   }
-
-  const choicesToShow = filteredAiChoices.length > 0
-    ? filteredAiChoices // Use AI-generated choices first
-    : filteredDbChoices.length > 0
-      ? filteredDbChoices // Use database actions second
-      : [
-        'Explore deeper into the forest',
-        'Investigate any strange noises',
-        'Set up camp for the night',
-        'Plan your next move together',
-      ]; // Fallback to defaults last
-
-  //console.log('🎯 Final choices to show:', choicesToShow.length, choicesToShow);
 
   const currentInputOption = getCurrentInputOption();
   // Add manual refresh connection function
@@ -2107,9 +2226,33 @@ export default function StoryScreen() {
     }
     
     console.log('🔄 Manually refreshing campaign history...');
+    setConnectionStatus('connecting');
+    
     try {
-      await atomRefs.current.fetchCampaignHistory(currentCampaign.id);
-      console.log('✅ Campaign history refreshed successfully');
+      // First check if connection is healthy
+      const isConnected = await checkSupabaseConnection();
+      if (!isConnected) {
+        console.log('🔄 Connection unhealthy, refreshing before history fetch...');
+        await refreshSupabaseConnection();
+        await reconnectAllSubscriptions();
+      }
+      
+      // Refresh campaign history and character data
+      await Promise.all([
+        atomRefs.current.fetchCampaignHistory(currentCampaign.id),
+        fetchCharacters(),
+        fetchCampaigns()
+      ]);
+      
+      setConnectionStatus('connected');
+      setError(null);
+      console.log('✅ Campaign history and data refreshed successfully');
+      
+      // Show a brief success message
+      try {
+        showAlert('Updated', 'Campaign data refreshed successfully.', [{ text: 'OK' }], 'success');
+      } catch {}
+      
     } catch (error) {
       console.error('❌ Failed to refresh campaign history:', error);
       setError('Failed to refresh history. Please try again.');
@@ -2138,13 +2281,9 @@ export default function StoryScreen() {
       console.error('Failed to flee combat:', e);
     }
   };
-
   const handleOpenCombat = async () => {
     if (!currentCampaign) return;
     console.log('[CombatUI] Open combat selector pressed');
-    try {
-      showAlert('Combat', 'Opening combat selector...', [{ text: 'OK' }], 'info');
-    } catch (_) {}
     console.log('[RoomData][FE] at combat open:', sceneRoomData);
     // Show the modal immediately
     setCombatModalVisible(true);
@@ -2223,53 +2362,91 @@ export default function StoryScreen() {
     })();
   };
 
-  const handleConfirmCombat = async ({ attackType, target }: { attackType: CombatAttackType; target: CombatTarget | null }) => {
+  // Handler to persist combat selection changes
+  const handleCombatSelectionChange = (actionId: string | null, targetIds: string[]) => {
+    setLastCombatActionId(actionId);
+    setLastCombatTargetIds(targetIds);
+    
+    // Also save target names for more reliable persistence across ID changes
+    const targetNames = targetIds.map(id => {
+      const target = combatTargets.find(t => t.id === id);
+      return target?.name || '';
+    }).filter(Boolean);
+    setLastCombatTargetNames(targetNames);
+  };
+
+  const handleConfirmCombat = async ({ action, targets, details }: { action: CombatAction; targets: CombatTarget[]; details: string }) => {
     setCombatModalVisible(false);
+    setCombatTargetsLoading(false);
     const actorName = getCurrentCharacter()?.name || user?.username || 'Player';
 
+    // Build action text based on the selected action
     let actionText = '';
-    switch (attackType) {
-      case 'Unarmed Strike':
-        actionText = `${actorName} throws a punch at ${target?.name || 'the nearest enemy'}`;
-        break;
-      case 'Grapple':
-        actionText = `${actorName} attempts to grapple ${target?.name || 'the nearest enemy'}`;
-        break;
-      case 'Shove':
-        actionText = `${actorName} tries to shove ${target?.name || 'the nearest enemy'}`;
-        break;
-      case 'Improvised Weapon':
-        actionText = `${actorName} grabs a nearby object and uses it as an improvised weapon against ${target?.name || 'the nearest enemy'}`;
-        break;
-      case 'Help':
-        actionText = `${actorName} uses the Help action to assist ${target?.name || 'an ally'}`;
-        break;
-      case 'Dodge':
-        actionText = `${actorName} takes the Dodge action`;
-        break;
-      case 'Disengage':
-        actionText = `${actorName} takes the Disengage action to withdraw carefully`;
-        break;
+    const formatTargetList = (t: CombatTarget[] | null | undefined): string => {
+      const list = (t || []).map(x => x.name);
+      if (list.length === 0) return 'the nearest enemy';
+      if (list.length === 1) return list[0];
+      if (list.length === 2) return `${list[0]} and ${list[1]}`;
+      return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+    };
+    const targetText = formatTargetList(targets);
+    
+    if (action.category === 'spell' && action.sourceSpell) {
+      actionText = `${actorName} casts ${action.sourceSpell.name}${(targets && targets.length > 0) ? ` at ${targetText}` : ''}`;
+    } else if (action.category === 'weapon' && action.sourceItem) {
+      actionText = `${actorName} attacks ${targetText} with ${action.sourceItem.name}`;
+    } else if (action.category === 'item' && action.sourceItem) {
+      actionText = `${actorName} uses ${action.sourceItem.name}${(targets && targets.length > 0) ? ` on ${targetText}` : ''}`;
+    } else {
+      // Basic actions
+      switch (action.name) {
+        case 'Unarmed Strike':
+          actionText = `${actorName} throws ${targets && targets.length > 1 ? 'punches at' : 'a punch at'} ${targetText}`;
+          break;
+        case 'Grapple':
+          actionText = `${actorName} attempts to grapple ${targetText}`;
+          break;
+        case 'Shove':
+          actionText = `${actorName} tries to shove ${targetText}`;
+          break;
+        case 'Help':
+          actionText = `${actorName} uses the Help action to assist ${targetText}`;
+          break;
+        case 'Dodge':
+          actionText = `${actorName} takes the Dodge action`;
+          break;
+        case 'Disengage':
+          actionText = `${actorName} takes the Disengage action to withdraw carefully`;
+          break;
+        default:
+          actionText = `${actorName} ${action.name.toLowerCase()}${(targets && targets.length > 0) ? ` targeting ${targetText}` : ''}`;
+          break;
+      }
     }
 
-    // Send action with optional structured metadata (backend currently ignores but safe to include)
-    await sendPlayerAction(actionText);
+    // Add details if provided
+    if (details.trim()) {
+      actionText += ` - ${details}`;
+    }
+
+    // Send action as a combat action to trigger combat mode
+    await sendPlayerAction(actionText, user?.id || 'player1', user?.username || 'Player', 'combat');
   };
 
   const showStoryOptions = showChoices && isPlayerTurn && !isLoading('sendAction');
 
-  const openStoryOptions = () => {
-    setStoryOptionsVisible(true);
+  const toggleStoryOptions = (val: boolean) => {
+    setStoryOptionsVisible(val);
   }
 
   const baseActions = [
-    ...(showStoryOptions ? [{ key: 'suggestions', label: 'Suggest', icon: <LifeBuoy size={18} color="#fff" />, onPress: openStoryOptions }] : []),
+    ...(showStoryOptions ? [{ key: 'suggestions', label: 'Suggest', icon: <LifeBuoy size={18} color="#fff" />, onPress: () => toggleStoryOptions(true) }] : []),
+    //{ key: 'combat', label: 'Combat', icon: <Swords size={18} color="#fff" />, onPress: handleForceCombat },
     { key: 'search', label: 'Search', icon: <Search size={18} color="#fff" />, onPress: handleSearch },
     { key: 'useItem', label: 'Use Item', icon: <PackageIcon size={18} color="#fff" />, onPress: handleUseItem },
     { key: 'sneak', label: characterIsInStealth ? 'Sneaking' : 'Sneak', icon: <EyeOff size={18} color="#fff" />, onPress: characterIsInStealth ? undefined : handleSneak },
     { key: 'rest', label: 'Rest', icon: <BedDouble size={18} color="#fff" />, onPress: handleRest },
-    // New Combat/Flee button
-    //...(currentCampaign?.current_player ? [{ key: 'flee', label: 'Flee', icon: <LogOutIcon size={18} color="#fff" />, onPress: handleFleeCombat }] : [{ key: 'combat', label: 'Combat', icon: <Swords size={18} color="#fff" />, onPress: handleForceCombat }]),
+    // Combat/Flee button - shows Flee when in combat, Combat when not
     ...(characterIsInStealth ? [{ key: 'steal', label: 'Steal', icon: <HandCoins size={18} color="#fff" />, onPress: handleSteal }] : []),
     ...(characterHasLockpicks ? [{ key: 'lockpick', label: 'Lockpick', icon: <Lock size={18} color="#fff" />, onPress: handleLockpick }] : []),
     { key: 'pause', label: currentCampaign?.paused ? 'Unpause' : 'Pause', icon: <PauseIcon size={18} color="#fff" />, onPress: handleTogglePause },
@@ -2393,10 +2570,16 @@ export default function StoryScreen() {
               style={styles.headerTitle}
               onPress={() => setIsPartyDisplayExpanded(!isPartyDisplayExpanded)}
               activeOpacity={0.7}
-              pointerEvents="none"
             >
               <View style={{alignItems: 'center', justifyContent: 'center'}}>
                 <Text style={styles.title}>{currentCampaign.name}</Text>
+                {/* Combat Mode Indicator */}
+                {combatActive && (
+                  <View style={styles.combatIndicator}>
+                    <Swords size={16} color="#ff4444" />
+                    <Text style={styles.combatText}>COMBAT</Text>
+                  </View>
+                )}
                 {/* TTS Toggle */}
                 <TouchableOpacity 
                   onPress={toggleTTS} 
@@ -2446,6 +2629,7 @@ export default function StoryScreen() {
         </View>
 
         <KeyboardAvoidingView
+          key={uiEpoch}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.content}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
@@ -2485,6 +2669,7 @@ export default function StoryScreen() {
                       currentUserId={user?.id}
                       animateFromId={initialLastMessageIdRef.current ?? undefined}
                       onReport={handleReport}
+                      combatActive={combatActive}
                     />
                   );
                 })
@@ -2578,12 +2763,12 @@ export default function StoryScreen() {
               </View>
             )}
 
-            {storyOptionsVisible &&
-              (selectedInputType === 'say' || selectedInputType === 'rp' || selectedInputType === 'action') && (
+            {storyOptionsVisible && (
                 <EnhancedStoryOptions
                   choices={choicesToShow}
                   onChoiceSelect={handleChoiceSelect}
                   disabled={isLoading('sendAction')}
+                  onClose={() => setStoryOptionsVisible(false)}
                 />
             )}
           </ScrollView>
@@ -2674,14 +2859,28 @@ export default function StoryScreen() {
         )}
         </SafeAreaView>
       </ActivityIndicator>
-      <CombatActionModal
-        visible={combatModalVisible}
-        loadingTargets={combatTargetsLoading}
-        targets={combatTargets}
-        onClose={() => setCombatModalVisible(false)}
-        onConfirm={handleConfirmCombat}
-        onShown={() => console.log('[CombatUI] Modal visible (mounted)')}
-      />
+      {combatModalVisible && (
+        <CombatActionModal
+          visible={combatModalVisible}
+          loadingTargets={combatTargetsLoading}
+          targets={combatTargets}
+          character={currentCharacter || undefined}
+          onClose={() => {
+            try { Keyboard.dismiss(); } catch {}
+            setShowInputTypeDropdown(false);
+            setStoryOptionsVisible(false);
+            setCombatTargetsLoading(false);
+            setCombatModalVisible(false);
+            setUiEpoch(e => e + 1);
+          }}
+          onConfirm={handleConfirmCombat}
+          onShown={() => console.log('[CombatUI] Modal visible (mounted)')}
+          lastSelectedActionId={lastCombatActionId}
+          lastSelectedTargetIds={lastCombatTargetIds}
+          lastSelectedTargetNames={lastCombatTargetNames}
+          onSelectionChange={handleCombatSelectionChange}
+        />
+      )}
       {/* Character View Modal */}
       <Modal
         visible={isCharacterSheetVisible}
@@ -2895,6 +3094,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: -30, top: -4,
     zIndex: 999
+  },
+  combatIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ff4444',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  combatText: {
+    fontSize: 10,
+    color: '#ffffff',
+    fontFamily: 'Inter-Bold',
+    marginLeft: 4,
+    letterSpacing: 1,
   },
   headerTitle: {
     flex: 1,

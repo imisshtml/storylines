@@ -69,7 +69,7 @@ export const CustomAlert: React.FC<CustomAlertProps> = ({
     }
   };
 
-  if (!visible) return null;
+  // Let Modal handle mounting/unmounting; don't early-return to avoid stale overlays
 
   return (
     <Modal
@@ -77,8 +77,10 @@ export const CustomAlert: React.FC<CustomAlertProps> = ({
       visible={visible}
       animationType="fade"
       onRequestClose={onRequestClose}
+      onDismiss={onRequestClose}
+      hardwareAccelerated
     >
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, !visible && styles.overlayHidden]} pointerEvents={visible ? 'auto' : 'none'}>
         <View style={styles.container}>
           <View style={styles.header}>
             {getIcon()}
@@ -193,6 +195,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+  },
+  overlayHidden: {
+    backgroundColor: 'transparent',
   },
   container: {
     backgroundColor: '#1a1a1a',
